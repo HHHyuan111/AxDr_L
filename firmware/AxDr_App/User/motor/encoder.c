@@ -69,7 +69,7 @@ _RAM_FUNC uint32_t read_ma732_raw(void)
     uint16_t tx[2] = {0x0000};
     uint16_t rx[2] = {0x0000};
     cs_down;
-    spi_transmit_receive_sync(&hspi1, tx[0], &rx, 200);
+    spi_transmit_receive_sync(&hspi1, tx[0], rx, 200);
     //	HAL_SPI_TransmitReceive(&hspi1, (uint8_t*)&tx_data, (uint8_t*)&rx_data, 1, 1000);
     cs_up;
     pm.pos_box.ma732.rev_flag = 1;

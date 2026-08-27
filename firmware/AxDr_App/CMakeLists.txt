@@ -21,31 +21,50 @@ endif()
 # Set the project name
 set(CMAKE_PROJECT_NAME AxDr)
 
-# Include toolchain file
-include("cmake/gcc-arm-none-eabi.cmake")
-
 # Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 # Enable CMake support for ASM and C languages
-enable_language(C ASM)
-
-# Core project settings
-project(${CMAKE_PROJECT_NAME})
+project(${CMAKE_PROJECT_NAME} LANGUAGES C ASM)
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
 include_directories(
-        "User/bsp/inc"
-        "User/motor"
+    "User/bsp/inc"
+    "User/motor"
+    "User/moldue/inc"
 )
 
-file(GLOB_RECURSE SOURCES
-        "User/bsp/*.c"
-        "User/motor/*.c"
+set(AXDR_USER_SOURCES
+    User/bsp/bsp_cpu.c
+    User/bsp/bsp_fdcan.c
+    User/bsp/bsp_flash.c
+    User/bsp/bsp_gpio.c
+    User/bsp/bsp_uart.c
+    User/moldue/display.c
+    User/moldue/lcd.c
+    User/moldue/vofa.c
+    User/motor/alob.c
+    User/motor/anticogging.c
+    User/motor/calibration.c
+    User/motor/eh_observer.c
+    User/motor/encoder.c
+    User/motor/foc_calc.c
+    User/motor/foc_ctrl.c
+    User/motor/foc_drv.c
+    User/motor/hfsi.c
+    User/motor/idpm.c
+    User/motor/ipd_pos.c
+    User/motor/nlob.c
+    User/motor/pid.c
+    User/motor/pll.c
+    User/motor/pos_calc.c
+    User/motor/scvm.c
+    User/motor/trap_traj.c
+    User/motor/util.c
 )
 
 # Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCES})
+add_executable(${CMAKE_PROJECT_NAME} ${AXDR_USER_SOURCES})
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -75,4 +94,16 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
 
     # Add user defined libraries
+)
+
+add_custom_command(
+    TARGET ${CMAKE_PROJECT_NAME}
+    POST_BUILD
+    COMMAND ${CMAKE_OBJCOPY}
+        -O ihex
+        $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+        ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}.hex
+    COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+    COMMENT "Generate HEX and print image size"
+    VERBATIM
 )

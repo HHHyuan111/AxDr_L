@@ -296,7 +296,7 @@ void LCD_ShowChinese12x12(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 	uint16_t x0=x;
 	TypefaceNum=(sizey/8+((sizey%8)?1:0))*sizey;
 	                         
-	HZnum=sizeof(tfont12)/sizeof(typFNT_GB12);	//统计汉字数目
+    HZnum = (uint16_t)(sizeof(tfont12) / sizeof(tfont12[0]) - 1U);
 	for(k=0;k<HZnum;k++) 
 	{
 		if((tfont12[k].Index[0]==*(s))&&(tfont12[k].Index[1]==*(s+1)))
@@ -355,7 +355,7 @@ void LCD_ShowChinese16x16(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 	uint16_t TypefaceNum;//一个字符所占字节大小
 	uint16_t x0=x;
   TypefaceNum=(sizey/8+((sizey%8)?1:0))*sizey;
-	HZnum=sizeof(tfont16)/sizeof(typFNT_GB16);	//统计汉字数目
+    HZnum = (uint16_t)(sizeof(tfont16) / sizeof(tfont16[0]) - 1U);
 	for(k=0;k<HZnum;k++) 
 	{
 		if ((tfont16[k].Index[0]==*(s))&&(tfont16[k].Index[1]==*(s+1)))
@@ -414,7 +414,7 @@ void LCD_ShowChinese24x24(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 	uint16_t TypefaceNum;//一个字符所占字节大小
 	uint16_t x0=x;
 	TypefaceNum=(sizey/8+((sizey%8)?1:0))*sizey;
-	HZnum=sizeof(tfont24)/sizeof(typFNT_GB24);	//统计汉字数目
+    HZnum = (uint16_t)(sizeof(tfont24) / sizeof(tfont24[0]) - 1U);
 	for(k=0;k<HZnum;k++) 
 	{
 		if ((tfont24[k].Index[0]==*(s))&&(tfont24[k].Index[1]==*(s+1)))
@@ -473,7 +473,7 @@ void LCD_ShowChinese32x32(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 	uint16_t TypefaceNum;//一个字符所占字节大小
 	uint16_t x0=x;
 	TypefaceNum=(sizey/8+((sizey%8)?1:0))*sizey;
-	HZnum=sizeof(tfont32)/sizeof(typFNT_GB32);	//统计汉字数目
+    HZnum = (uint16_t)(sizeof(tfont32) / sizeof(tfont32[0]) - 1U);
 	for(k=0;k<HZnum;k++) 
 	{
 		if ((tfont32[k].Index[0]==*(s))&&(tfont32[k].Index[1]==*(s+1)))
