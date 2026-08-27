@@ -108,7 +108,7 @@ int main(void)
   MX_SPI3_Init();
   /* USER CODE BEGIN 2 */
   HAL_Delay(1000);
-	uint32_t time;
+    uint32_t time = HAL_GetTick();
   HAL_TIM_Base_Start(&htim3);
   // HAL_TIM_Base_Start_IT(&htim1);
 

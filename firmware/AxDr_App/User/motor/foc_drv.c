@@ -622,7 +622,9 @@ _RAM_FUNC void foc_para_calc(pmsm_t* pm)
 **/
 void foc_get_curr_off(void)
 {
-    float sum_a, sum_b, sum_c;
+    float sum_a = 0.0f;
+    float sum_b = 0.0f;
+    float sum_c = 0.0f;
     for (int i = 0; i < 1000; i++)
     {
         HAL_Delay(1);

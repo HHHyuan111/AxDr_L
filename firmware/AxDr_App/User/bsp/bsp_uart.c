@@ -16,28 +16,18 @@ void bsp_uart_start(uart_num_e comport)
 
 int8_t bsp_uart_port_is(uart_num_e comport, UART_HandleTypeDef *huart)
 {
-	if(comport > fdcan_max) {
-		return -1;
-	}
-	else if(comport == uart1) {
-//		huart = &huart1;
-	}
-	else if(comport == uart2) {
-//		huart = &huart2;
-	}
-	else if(comport == uart3) {
-		*huart = huart3;
-	}
-	else {
-		return -1;
-	}
-	return 0;
+    if (comport != uart3)
+    {
+        return -1;
+    }
+    *huart = huart3;
+    return 0;
 }
 
 int8_t bsp_uart_set_baud(uart_num_e comport, uint32_t baud)
 {
 	UART_HandleTypeDef huart;
-	int8_t ret = 0;
+    int8_t ret = -1;
 	
 	if(bsp_uart_port_is(comport, &huart)==0)	
 	{
@@ -52,7 +42,7 @@ int8_t bsp_uart_set_baud(uart_num_e comport, uint32_t baud)
 
 int8_t bsp_uart_send(uart_num_e comport, uint8_t *pbuf, uint16_t len)
 {
-	int8_t ret;
+    int8_t ret = -1;
 	UART_HandleTypeDef huart;
 	
 	if(bsp_uart_port_is(comport, &huart)==0)	
@@ -66,7 +56,7 @@ int8_t bsp_uart_send(uart_num_e comport, uint8_t *pbuf, uint16_t len)
 int8_t bsp_uart_send_dma(uart_num_e comport, uint8_t *pbuf, uint16_t len)
 {
 	UART_HandleTypeDef huart;
-	int8_t ret = 0;
+    int8_t ret = -1;
 	
 	if(bsp_uart_port_is(comport, &huart)==0)	
 	{
@@ -79,7 +69,7 @@ int8_t bsp_uart_send_dma(uart_num_e comport, uint8_t *pbuf, uint16_t len)
 int8_t bsp_uart_tx_state(uart_num_e comport)
 {
 	UART_HandleTypeDef huart;
-	int8_t ret = 0;
+    int8_t ret = -1;
 	
 	if(bsp_uart_port_is(comport, &huart)==0)	
 	{
@@ -91,7 +81,7 @@ int8_t bsp_uart_tx_state(uart_num_e comport)
 int8_t bsp_uart_rx_idle_dma(uart_num_e comport, uint8_t *buf, uint16_t len)
 {
 	UART_HandleTypeDef huart;
-	int8_t ret = 0;
+    int8_t ret = -1;
 	
 	if(bsp_uart_port_is(comport, &huart)==0)	
 	{
@@ -126,5 +116,3 @@ __weak void uart_rx_callback(uart_num_e comport, uint16_t len)
 {
 
 }
-
-

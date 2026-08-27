@@ -42,7 +42,7 @@ _RAM_FUNC uint32_t read_mt6825_raw(void)
     uint16_t timeOut = 1000;
 
     uint16_t tx_data[2] = {0x83ff, 0xffff};
-    uint16_t rx_data[2];
+    uint16_t rx_data[2] = {0U, 0U};
 
     //cs_down;
     //spi_transmit_receive_sync(&hspi1, tx_data[0], &rx_data[0], 200);
@@ -111,6 +111,7 @@ _RAM_FUNC uint32_t read_dm485enc_raw(void)
     // bsp_uart8_transmit(tx_dma_buff, 1);
     //
     // return 0;
+    return 0U;
 }
 
 _RAM_FUNC uint32_t send_mod_dm485enc(void)
@@ -125,6 +126,7 @@ _RAM_FUNC uint32_t send_mod_dm485enc(void)
     // bsp_uart8_transmit(tx_dma_buff, 6);
     //
     // return 0;
+    return 0U;
 }
 
 _RAM_FUNC void pos_encoder_calc(enc_para_t* x, pmsm_t *pm)

@@ -16,27 +16,17 @@ void bsp_can_init(void)
 
 int8_t bsp_fdcan_port_is(fdcan_num_e comport, FDCAN_HandleTypeDef *hfdcan)
 {
-	if(comport > fdcan_max) {
-		return -1;
-	}
-	else if(comport == fdcan1) {
-		*hfdcan = hfdcan1;
-	}
-	else if(comport == fdcan2) {
-//		*hfdcan = hfdcan2;
-	}
-	else if(comport == fdcan3) {
-//		*hfdcan = hfdcan3;
-	}
-	else {
-		return -1;
-	}
-	return 0;
+    if (comport != fdcan1)
+    {
+        return -1;
+    }
+    *hfdcan = hfdcan1;
+    return 0;
 }
 
 int8_t bsp_fdcan_start(fdcan_num_e comport)
 {
-	int8_t ret;
+    int8_t ret = -1;
 	FDCAN_HandleTypeDef hfdcan;
 	
 	if(bsp_fdcan_port_is(comport, &hfdcan)==0)
@@ -47,11 +37,14 @@ int8_t bsp_fdcan_start(fdcan_num_e comport)
 
 int8_t bsp_fdcan_deinit(fdcan_num_e comport)
 {
-	FDCAN_HandleTypeDef hfdcan;
-	
-	if(bsp_fdcan_port_is(comport, &hfdcan)==0)
-		HAL_FDCAN_MspDeInit(&hfdcan);
-	return 0;
+    FDCAN_HandleTypeDef hfdcan;
+
+    if (bsp_fdcan_port_is(comport, &hfdcan) != 0)
+    {
+        return -1;
+    }
+    HAL_FDCAN_MspDeInit(&hfdcan);
+    return 0;
 }
 
 //CAN(FD)波特率推荐设置：
@@ -68,7 +61,7 @@ int8_t bsp_fdcan_deinit(fdcan_num_e comport)
 int8_t bsp_fdcan_set_baud(fdcan_num_e comport, uint8_t nominal_baud, uint8_t data_baud)
 {
 	FDCAN_HandleTypeDef hfdcan;
-	int8_t ret = 0;
+    int8_t ret = -1;
 	uint32_t nom_brp=0, nom_seg1=0, nom_seg2=0, nom_sjw=0;
 	uint32_t dat_brp=0, dat_seg1=0, dat_seg2=0, dat_sjw=0;
 	
@@ -137,7 +130,7 @@ int8_t bsp_can_filter_init(fdcan_num_e comport, uint16_t filt_id)
 {
 	FDCAN_HandleTypeDef hfdcan;
 	FDCAN_FilterTypeDef fdcan_filter;
-	int8_t ret = 0;
+    int8_t ret = -1;
 	
 	fdcan_filter.IdType = FDCAN_STANDARD_ID;                       //标准ID
 	fdcan_filter.FilterIndex = 0;                                  //滤波器索引                   
@@ -159,7 +152,7 @@ int8_t bsp_fdcan_send_data(fdcan_num_e comport, uint16_t id, uint8_t *data, uint
 {	
 	FDCAN_HandleTypeDef hfdcan;
     FDCAN_TxHeaderTypeDef pTxHeader;
-	int8_t ret = 0;
+    int8_t ret = -1;
 	
     pTxHeader.Identifier=id;
     pTxHeader.IdType=FDCAN_EXTENDED_ID;
@@ -200,7 +193,7 @@ int8_t bsp_fdcan_receive(fdcan_num_e comport, uint16_t *rec_id, uint8_t *buf, ui
 {	
 	FDCAN_RxHeaderTypeDef pRxHeader;
 	FDCAN_HandleTypeDef hfdcan;
-	int8_t ret = 0;
+    int8_t ret = -1;
 	
 	if(bsp_fdcan_port_is(comport, &hfdcan)==0)
 	{
