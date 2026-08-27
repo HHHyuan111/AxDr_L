@@ -1,0 +1,19 @@
+# CMake 和 Ninja 构建目录
+/firmware/AxDr_App/build/
+/firmware/AxDr_App/cmake-build-*/
+
+# Keil 构建产物和本机配置
+/firmware/AxDr_App/MDK-ARM/AxDr/
+/firmware/AxDr_App/MDK-ARM/*.uvguix.*
+/firmware/AxDr_App/MDK-ARM/*.uvoptx
+/firmware/AxDr_App/MDK-ARM/JLinkLog.txt
+/firmware/AxDr_App/MDK-ARM/JLinkSettings.ini
+
+# IDE 本机状态
+/.idea/
+/firmware/AxDr_App/.idea/
+
+# 临时文件
+*.bak
+*.tmp
+*.log
