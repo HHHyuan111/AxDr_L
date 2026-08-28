@@ -52,7 +52,7 @@ _RAM_FUNC void pos_calc(pmsm_t* pm)
 
             if (x1->rev_flag) {
                 x1->rev_flag = 0;
-                pos_encoder_calc(x1, pm);
+                pos_encoder_calc(x1);
                 pm->foc.e_pr = x1->pos; // 主编码器结果
                 sensory1_pos_calc(pm);
 
@@ -80,7 +80,7 @@ _RAM_FUNC void pos_calc(pmsm_t* pm)
             if (x1->rev_flag && x2->rev_flag) {
                 x1->rev_flag = 0;
                 x2->rev_flag = 0;
-                pos_encoder_calc(x2, pm);
+                pos_encoder_calc(x2);
                 pm->foc.e_pr = x1->pos; // 转子侧用主编码器
                 pm->foc.e_pm = x2->pos; // 机械输出轴侧角度用副编码器
                 sensory2_pos_calc(pm);

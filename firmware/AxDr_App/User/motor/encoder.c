@@ -122,19 +122,26 @@ _RAM_FUNC uint32_t send_mod_dm485enc(void)
     return 0U;
 }
 
-_RAM_FUNC void pos_encoder_calc(enc_para_t* x, pmsm_t *pm)
+/**
+ * @brief 把编码器原始计数换算成一圈内的机械角度。
+ *
+ * @param[in,out] enc 输入原始计数和换算系数，输出范围为 0～2π 的位置角。
+ *
+ * 当前 LUT 补偿尚未启用，因此补偿量保持为 0；本函数不需要访问完整电机对象。
+ */
+_RAM_FUNC void pos_encoder_calc(enc_para_t *enc)
 {
     uint8_t index;
     float off_1, off_2, off_interp;
 
-    index = x->raw >> x->shift_bit;
-//    off_1 = x->lut[index];
+    index = enc->raw >> enc->shift_bit;
+//    off_1 = enc->lut[index];
 //    index++;
-//    off_2 = x->lut[index];
-    // float frac = (float)(x->raw & ((1 << x->shift_bit) - 1)) / (1 << x->shift_bit);
+//    off_2 = enc->lut[index];
+    // float frac = (float)(enc->raw & ((1 << enc->shift_bit) - 1)) / (1 << enc->shift_bit);
     off_interp = 0.0f;//off_1 + (off_2 - off_1) * frac;
-    x->pos = (x->raw + off_interp) * x->factor;
-    wrap_0_2pi(x->pos);
+    enc->pos = (enc->raw + off_interp) * enc->factor;
+    wrap_0_2pi(enc->pos);
 }
 
 _RAM_FUNC void bsp_uart8_rxidle_isr(void)

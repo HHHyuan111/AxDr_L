@@ -1541,7 +1541,7 @@ uint32_t send_mod_dm485enc(void);
 
 void pos_calc(pmsm_t* pm);
 void send_encoder_read_command(pmsm_t* pm);
-void pos_encoder_calc(enc_para_t* x, pmsm_t* pm);
+void pos_encoder_calc(enc_para_t *enc);
 void sensory1_pos_calc(pmsm_t* pm);
 void sensory2_pos_calc(pmsm_t* pm);
 void senless_pos_calc(pmsm_t* pm);
