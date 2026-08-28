@@ -40,6 +40,7 @@ set(AXDR_USER_SOURCES
     User/bsp/bsp_flash.c
     User/bsp/bsp_gpio.c
     User/bsp/bsp_uart.c
+    User/bsp/target_pwm.c
     User/moldue/display.c
     User/moldue/lcd.c
     User/moldue/vofa.c

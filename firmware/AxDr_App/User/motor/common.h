@@ -107,11 +107,6 @@ typedef __I uint8_t vcu8;
 #define getbit(x, y) ((x) >> (y) & 1)
 
 #define Dead_Time 80
-#define PWM_ARR() __HAL_TIM_GET_AUTORELOAD(&htim1)
-
-#define set_dtc_a(value) __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, value)
-#define set_dtc_b(value) __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, value)
-#define set_dtc_c(value) __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, value)
 
 #define cs_down       HAL_GPIO_WritePin(SPI1_CSN_GPIO_Port, SPI1_CSN_Pin, GPIO_PIN_RESET);
 #define cs_up         HAL_GPIO_WritePin(SPI1_CSN_GPIO_Port, SPI1_CSN_Pin, GPIO_PIN_SET);

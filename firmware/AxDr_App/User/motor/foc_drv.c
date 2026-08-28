@@ -1,4 +1,5 @@
 #include "common.h"
+#include "target_pwm.h"
 
 _RAM_DATA pmsm_t pm;
 
@@ -710,12 +711,7 @@ void temp_calc(void)
 **/
 _RAM_FUNC void foc_pwm_start(void)
 {
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1);
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
-    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_2);
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
-    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_3);
+    target_pwm_start_phase_outputs();
 }
 
 /**
@@ -728,12 +724,7 @@ _RAM_FUNC void foc_pwm_start(void)
 **/
 _RAM_FUNC void foc_pwm_stop(void)
 {
-    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
-    HAL_TIMEx_PWMN_Stop(&htim1, TIM_CHANNEL_1);
-    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
-    HAL_TIMEx_PWMN_Stop(&htim1, TIM_CHANNEL_2);
-    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3);
-    HAL_TIMEx_PWMN_Stop(&htim1, TIM_CHANNEL_3);
+    target_pwm_stop_phase_outputs();
 }
 
 extern uint16_t adc1_buff[2];
@@ -787,14 +778,14 @@ _RAM_FUNC void foc_pwm_run(pmsm_t* pm)
 {
     switch (pm->para.phase_order) {
     case ABC_PHASE:
-        htim1.Instance->CCR1 = (uint16_t)(pm->foc.dtc_a * PWM_ARR());
-        htim1.Instance->CCR2 = (uint16_t)(pm->foc.dtc_b * PWM_ARR());
-        htim1.Instance->CCR3 = (uint16_t)(pm->foc.dtc_c * PWM_ARR());
+        target_pwm_commit_channel_duty(pm->foc.dtc_a,
+                                       pm->foc.dtc_b,
+                                       pm->foc.dtc_c);
         break;
     case ACB_PHASE:
-        htim1.Instance->CCR1 = (uint16_t)(pm->foc.dtc_a * PWM_ARR());
-        htim1.Instance->CCR2 = (uint16_t)(pm->foc.dtc_c * PWM_ARR());
-        htim1.Instance->CCR3 = (uint16_t)(pm->foc.dtc_b * PWM_ARR());
+        target_pwm_commit_channel_duty(pm->foc.dtc_a,
+                                       pm->foc.dtc_c,
+                                       pm->foc.dtc_b);
         break;
     default:
         // 默认相序
@@ -804,7 +795,6 @@ _RAM_FUNC void foc_pwm_run(pmsm_t* pm)
 
 _RAM_FUNC void foc_pwm_duty_set(pmsm_t* pm)
 {
-    htim1.Instance->CCR1 = (uint16_t)(0.5f * PWM_ARR());
-    htim1.Instance->CCR2 = (uint16_t)(0.5f * PWM_ARR());
-    htim1.Instance->CCR3 = (uint16_t)(0.5f * PWM_ARR());
+    (void)pm;
+    target_pwm_commit_channel_duty(0.5f, 0.5f, 0.5f);
 }
