@@ -1,4 +1,5 @@
 #include "common.h"
+#include "target_adc.h"
 #include "target_pwm.h"
 
 _RAM_DATA pmsm_t pm;
@@ -614,41 +615,43 @@ _RAM_FUNC void foc_para_calc(pmsm_t* pm)
 }
 
 /**
-***********************************************************************
-* @brief:      get_curr_off(void)
-* @param[in]:  void
-* @retval:     void
-* @details:    电流零偏采集，采集三相ADC的偏置值并求平均，存入pm.adc结构体
-***********************************************************************
-**/
+ * @brief 采集三路电流采样链的零偏平均值。
+ *
+ * 电机未进入闭环控制前，本函数连续读取 1000 次原始电流采样值，每次间隔 1 ms，
+ * 然后根据 ABC 或 ACB 接线关系，把三条物理采样链的平均值保存为 A、B、C 相零偏。
+ */
 void foc_get_curr_off(void)
 {
-    float sum_a = 0.0f;
-    float sum_b = 0.0f;
-    float sum_c = 0.0f;
+    float ia_sum = 0.0f;
+    float ib_sum = 0.0f;
+    float ic_sum = 0.0f;
+
     for (int i = 0; i < 1000; i++)
     {
+        target_adc_abc_raw_t iabc_raw;
+
         HAL_Delay(1);
-        sum_a += (float)(ADC1->JDR3);
-        sum_b += (float)(ADC1->JDR2);
-        sum_c += (float)(ADC1->JDR1);
+        target_adc_read_iabc_raw(&iabc_raw);
+
+        ia_sum += (float)iabc_raw.a;
+        ib_sum += (float)iabc_raw.b;
+        ic_sum += (float)iabc_raw.c;
     }
-	
-    
-	
-	switch (pm.para.phase_order) {
+
+    /* 0.001f 等于 1/1000，把累加值换算成 1000 次采样的平均值。 */
+    switch (pm.para.phase_order) {
     case ABC_PHASE:
-        pm.adc.ia_off = sum_a * 0.001f;
-		pm.adc.ib_off = sum_b * 0.001f;
-		pm.adc.ic_off = sum_c * 0.001f;
+        pm.adc.ia_off = ia_sum * 0.001f;
+        pm.adc.ib_off = ib_sum * 0.001f;
+        pm.adc.ic_off = ic_sum * 0.001f;
         break;
     case ACB_PHASE:
-        pm.adc.ia_off = sum_a * 0.001f;
-		pm.adc.ib_off = sum_c * 0.001f;
-		pm.adc.ic_off = sum_b * 0.001f;
+        pm.adc.ia_off = ia_sum * 0.001f;
+        pm.adc.ib_off = ic_sum * 0.001f;
+        pm.adc.ic_off = ib_sum * 0.001f;
         break;
     default:
-        // 默认相序
+        /* 保留原有行为：相序无效时不更新三相电流零偏。 */
         break;
     }
 }
@@ -725,40 +728,56 @@ _RAM_FUNC void foc_pwm_stop(void)
     target_pwm_stop_phase_outputs();
 }
 
-extern uint16_t adc1_buff[2];
-extern uint16_t adc2_buff[4];
+/**
+ * @brief 读取本控制周期的原始 ADC 数据并换算三相电流。
+ *
+ * @param[in,out] pm 电机控制对象，用于保存原始 ADC 值和换算后的三相电流。
+ *
+ * 函数依次完成三件事：从板级适配层取得原始计数值；根据 ABC/ACB 接线关系
+ * 映射到 A、B、C 相；扣除零偏并乘以电流换算系数。采样触发和 DMA 不在这里处理。
+ */
 _RAM_FUNC void foc_adc_sample(pmsm_t* pm)
 {
+    target_adc_raw_t adc_raw;
+
+    /* 第 1 步：从板级适配层取得当前已经完成的 ADC 原始结果。 */
+    target_adc_read_raw(&adc_raw);
+
+    /* 第 2 步：把板上固定采样链映射为电机逻辑上的 A、B、C 相。 */
     switch (pm->para.phase_order) {
     case ABC_PHASE:
-        pm->adc.ia = ADC1->JDR3;
-        pm->adc.ib = ADC1->JDR2;
-        pm->adc.ic = ADC1->JDR1;
+        pm->adc.ia = adc_raw.i.a;
+        pm->adc.ib = adc_raw.i.b;
+        pm->adc.ic = adc_raw.i.c;
 
-        pm->adc.va = adc2_buff[1];
-        pm->adc.vb = adc2_buff[2];
-        pm->adc.vc = adc2_buff[3];
+        pm->adc.va = adc_raw.v.a;
+        pm->adc.vb = adc_raw.v.b;
+        pm->adc.vc = adc_raw.v.c;
         break;
     case ACB_PHASE:
-        pm->adc.ia = ADC1->JDR3;
-        pm->adc.ic = ADC1->JDR2;
-        pm->adc.ib = ADC1->JDR1;
+        pm->adc.ia = adc_raw.i.a;
+        pm->adc.ic = adc_raw.i.b;
+        pm->adc.ib = adc_raw.i.c;
 
-        pm->adc.va = adc2_buff[1];
-        pm->adc.vc = adc2_buff[2];
-        pm->adc.vb = adc2_buff[3];
+        pm->adc.va = adc_raw.v.a;
+        pm->adc.vc = adc_raw.v.b;
+        pm->adc.vb = adc_raw.v.c;
         break;
     default:
+        /* 保留原有行为：相序无效时不更新三相电流和相电压原始值。 */
         break;
     }
-    pm->adc.vbus     = ADC2->JDR1;
+
+    /* 母线电压不参与相序交换，每个控制周期都直接更新。 */
+    pm->adc.vbus = adc_raw.vbus;
+
     // pm->adc.Trotor   = adc3_seq_buff[4] & 0x0000FFFF;
     // pm->adc.Tmos_ab  = adc3_seq_buff[5] & 0x0000FFFF;
     // pm->adc.Tmos_bc  = adc3_seq_buff[6] & 0x0000FFFF;
     // pm->adc.sin_hall = adc3_seq_buff[7] & 0x0000FFFF;
     // pm->adc.cos_hall = adc3_seq_buff[8] & 0x0000FFFF;
 
-    //  Convert ADC values to actual currents with offset compensation and scaling
+    /* 第 3 步：原始计数减去零偏，再乘以换算系数，得到单位为安培的三相电流。 */
     pm->foc.i_a = ((float) pm->adc.ia - pm->adc.ia_off) * pm->board.i_ratio;
     pm->foc.i_b = ((float) pm->adc.ib - pm->adc.ib_off) * pm->board.i_ratio;
     pm->foc.i_c = ((float) pm->adc.ic - pm->adc.ic_off) * pm->board.i_ratio;
