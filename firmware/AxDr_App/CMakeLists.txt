@@ -41,6 +41,7 @@ set(AXDR_USER_SOURCES
     User/bsp/bsp_gpio.c
     User/bsp/bsp_uart.c
     User/bsp/target_adc.c
+    User/bsp/target_encoder.c
     User/bsp/target_pwm.c
     User/moldue/display.c
     User/moldue/lcd.c

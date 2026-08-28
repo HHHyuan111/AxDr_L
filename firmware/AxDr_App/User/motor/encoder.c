@@ -1,5 +1,6 @@
 #include "common.h"
 #include "spi_bsp.h"
+#include "target_encoder.h"
 //#include "spi.h"
 
 void encoder_init(void)
@@ -79,26 +80,12 @@ _RAM_FUNC uint32_t read_ma732_raw(void)
 
 _RAM_FUNC uint32_t read_mt6816_raw(void)
 {
-    uint16_t data_t[2];
-    uint16_t data_r[2];
-    uint32_t count;
-    data_t[0] = (0x80 | 0x03) << 8;
-    data_t[1] = (0x80 | 0x04) << 8;
+    uint16_t raw_count = target_encoder_read_mt6816_raw();
 
-    cs_down;
-	spi_transmit_receive_sync(&hspi1 ,data_t[0], &data_r[0], 200);
-//    HAL_SPI_TransmitReceive(&hspi1, (uint8_t*)&data_t[0], (uint8_t*)&data_r[0], 1, 1000);
-    cs_up;
-    cs_down;
-	spi_transmit_receive_sync(&hspi1 ,data_t[1], &data_r[1], 200);
-//    HAL_SPI_TransmitReceive(&hspi1, (uint8_t*)&data_t[1], (uint8_t*)&data_r[1], 1, 1000);
-    cs_up;
+    pm.pos_box.mt6816.rev_flag = 1;
+    pm.pos_box.mt6816.raw = raw_count;
 
-    count = (((data_r[0] & 0x00FF) << 8) | (data_r[1] & 0x00FF)) >> 2;
-	
-	pm.pos_box.mt6816.rev_flag = 1;
-    pm.pos_box.mt6816.raw = count;
-    return count;
+    return (uint32_t)raw_count;
 }
 
 _RAM_FUNC uint32_t read_dm485enc_raw(void)
