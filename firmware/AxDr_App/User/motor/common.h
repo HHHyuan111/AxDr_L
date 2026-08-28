@@ -1534,7 +1534,7 @@ void pmsm_fault_stop_mode(pmsm_t* pm);
 /* Encoder functions */
 void encoder_init(void);
 uint32_t read_mt6825_raw(void);
-uint32_t read_mt6816_raw(void);
+void read_mt6816_raw(enc_para_t *enc);
 uint32_t read_ma732_raw(void);
 uint32_t read_dm485enc_raw(void);
 uint32_t send_mod_dm485enc(void);

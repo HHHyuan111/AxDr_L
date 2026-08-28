@@ -9,7 +9,7 @@ _RAM_FUNC void send_encoder_read_command(pmsm_t* pm)
         case Sensorsory_s:
             switch (pm->pos_box.sensory1) {
                 case MA732:  read_ma732_raw(); break;
-                case MT6816: read_mt6816_raw(); break;
+                case MT6816: read_mt6816_raw(&pm->pos_box.mt6816); break;
                 case MT6825: read_mt6825_raw(); break;
                 case DMENC:  read_dm485enc_raw(); break; // 如果是DM485编码器
                 default:     break;
@@ -18,14 +18,14 @@ _RAM_FUNC void send_encoder_read_command(pmsm_t* pm)
         case Sensorsory_d:
             switch (pm->pos_box.sensory1) {
                 case MA732:  read_ma732_raw(); break;
-                case MT6816: read_mt6816_raw(); break;
+                case MT6816: read_mt6816_raw(&pm->pos_box.mt6816); break;
                 case MT6825: read_mt6825_raw(); break;
                 case DMENC:  read_dm485enc_raw(); break; // 如果是DM485编码器
                 default:     break;
             }
             switch (pm->pos_box.sensory2) {
                 case MA732:  read_ma732_raw(); break;   // 如有第二路SPI/IO
-                case MT6816: read_mt6816_raw(); break;
+                case MT6816: read_mt6816_raw(&pm->pos_box.mt6816); break;
                 case MT6825: read_mt6825_raw(); break;
                 default:     break;
             }
@@ -242,4 +242,3 @@ _RAM_FUNC void senless_pos_calc(pmsm_t* pm)
 
     x->pr_lst = x->sp_r;
 }
-

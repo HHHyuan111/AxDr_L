@@ -78,14 +78,20 @@ _RAM_FUNC uint32_t read_ma732_raw(void)
     return 0;
 }
 
-_RAM_FUNC uint32_t read_mt6816_raw(void)
+/**
+ * @brief 读取一次 MT6816 原始位置并保存到指定编码器对象。
+ *
+ * @param[in,out] enc 接收本次原始计数和新数据标志的编码器对象。
+ *
+ * 硬件通信由 target_encoder 完成；本函数只把结果交给上层已有的数据结构。
+ * 显式传入 enc，避免函数暗中修改全局电机对象。
+ */
+_RAM_FUNC void read_mt6816_raw(enc_para_t *enc)
 {
     uint16_t raw_count = target_encoder_read_mt6816_raw();
 
-    pm.pos_box.mt6816.rev_flag = 1;
-    pm.pos_box.mt6816.raw = raw_count;
-
-    return (uint32_t)raw_count;
+    enc->rev_flag = 1;
+    enc->raw = raw_count;
 }
 
 _RAM_FUNC uint32_t read_dm485enc_raw(void)
