@@ -1,96 +1,114 @@
-//
-// Created by disno on 2025/8/19.
-//
 #include "common.h"
 
-_RAM_FUNC void send_encoder_read_command(pmsm_t* pm)
+/**
+ * @brief 按当前位置反馈配置读取本控制周期的编码器原始值。
+ *
+ * @param[in,out] pos_box 位置反馈配置和各编码器数据对象。
+ *
+ * 单编码器模式读取主编码器；双编码器模式依次读取主、副编码器；无传感器
+ * 模式不读取物理编码器。本函数只负责采样，不计算机械角和电角度。
+ */
+_RAM_FUNC void encoder_sample(pos_box_t *pos_box)
 {
-    switch(pm->pos_box.pos_mode) {
+    switch (pos_box->pos_mode) {
         case Sensorsory_s:
-            switch (pm->pos_box.sensory1) {
+            switch (pos_box->sensory1) {
                 case MA732:  read_ma732_raw(); break;
-                case MT6816: read_mt6816_raw(&pm->pos_box.mt6816); break;
+                case MT6816: read_mt6816_raw(&pos_box->mt6816); break;
                 case MT6825: read_mt6825_raw(); break;
                 case DMENC:  read_dm485enc_raw(); break; // 如果是DM485编码器
                 default:     break;
             }
             break;
         case Sensorsory_d:
-            switch (pm->pos_box.sensory1) {
+            switch (pos_box->sensory1) {
                 case MA732:  read_ma732_raw(); break;
-                case MT6816: read_mt6816_raw(&pm->pos_box.mt6816); break;
+                case MT6816: read_mt6816_raw(&pos_box->mt6816); break;
                 case MT6825: read_mt6825_raw(); break;
                 case DMENC:  read_dm485enc_raw(); break; // 如果是DM485编码器
                 default:     break;
             }
-            switch (pm->pos_box.sensory2) {
+            switch (pos_box->sensory2) {
                 case MA732:  read_ma732_raw(); break;   // 如有第二路SPI/IO
-                case MT6816: read_mt6816_raw(&pm->pos_box.mt6816); break;
+                case MT6816: read_mt6816_raw(&pos_box->mt6816); break;
                 case MT6825: read_mt6825_raw(); break;
                 default:     break;
             }
             break;
+        case Sensorless:
+            /* 无传感器模式不读取物理编码器。 */
+            break;
+        default:
+            break;
     }
 }
 
-_RAM_FUNC void pos_calc(pmsm_t* pm)
+/**
+ * @brief 根据当前位置模式更新机械角、电角度和多圈位置反馈。
+ *
+ * @param[in,out] pm 电机控制对象，提供位置配置并接收本周期的位置结果。
+ *
+ * 有感模式使用 encoder_sample 已取得的编码器原始值；无传感器模式使用选定
+ * 观测器的输出。本函数不直接访问 SPI 或编码器片选引脚。
+ */
+_RAM_FUNC void position_update(pmsm_t *pm)
 {
-    enc_para_t* x1 = NULL;
-    enc_para_t* x2 = NULL;
+    enc_para_t *primary_enc = NULL;
+    enc_para_t *secondary_enc = NULL;
 
-    // 根据编码器类型读取原始值
+    /* 根据位置模式选择本周期使用的位置来源。 */
     switch (pm->pos_box.pos_mode)
     {
         case Sensorsory_s: // 单编码器有感
             switch (pm->pos_box.sensory1) {
-                case MT6825: x1 = &pm->pos_box.mt6825;   break;
-                case MT6816: x1 = &pm->pos_box.mt6816;   break;
-                case MA732:  x1 = &pm->pos_box.ma732;    break;
-                case DMENC:  x1 = &pm->pos_box.dm485enc; break;
+                case MT6825: primary_enc = &pm->pos_box.mt6825;   break;
+                case MT6816: primary_enc = &pm->pos_box.mt6816;   break;
+                case MA732:  primary_enc = &pm->pos_box.ma732;    break;
+                case DMENC:  primary_enc = &pm->pos_box.dm485enc; break;
                 default: break;
             }
 
-            if (x1->rev_flag) {
-                x1->rev_flag = 0;
-                pos_encoder_calc(x1);
-                pm->foc.e_pr = x1->pos; // 主编码器结果
+            if (primary_enc->rev_flag) {
+                primary_enc->rev_flag = 0;
+                pos_encoder_calc(primary_enc);
+                pm->foc.e_pr = primary_enc->pos; // 主编码器结果
                 sensory1_pos_calc(pm);
 
-                pm->pos_box.raw_1 = x1->raw;
-                pm->pos_box.bit_1 = x1->bit;
-                pm->pos_box.pos_1 = x1->pos;
+                pm->pos_box.raw_1 = primary_enc->raw;
+                pm->pos_box.bit_1 = primary_enc->bit;
+                pm->pos_box.pos_1 = primary_enc->pos;
             }
             break;
 
-        case Sensorsory_d: // 副编码器
+        case Sensorsory_d: // 双编码器有感
             switch (pm->pos_box.sensory1) {
-                case MT6825: x1 = &pm->pos_box.mt6825;   break;
-                case MT6816: x1 = &pm->pos_box.mt6816;   break;
-                case MA732:  x1 = &pm->pos_box.ma732;    break;
-                case DMENC:  x1 = &pm->pos_box.dm485enc; break;
+                case MT6825: primary_enc = &pm->pos_box.mt6825;   break;
+                case MT6816: primary_enc = &pm->pos_box.mt6816;   break;
+                case MA732:  primary_enc = &pm->pos_box.ma732;    break;
+                case DMENC:  primary_enc = &pm->pos_box.dm485enc; break;
                 default: break;
             }
             switch (pm->pos_box.sensory2) {
-                case MT6825: x2 = &pm->pos_box.mt6825; break; // 如有独立enc_para_t建议新建
-                case MT6816: x2 = &pm->pos_box.mt6816; break;
-                case MA732:  x2 = &pm->pos_box.ma732;  break;
+                case MT6825: secondary_enc = &pm->pos_box.mt6825; break; // 如有独立enc_para_t建议新建
+                case MT6816: secondary_enc = &pm->pos_box.mt6816; break;
+                case MA732:  secondary_enc = &pm->pos_box.ma732;  break;
                 default: break;
             }
 
-            if (x1->rev_flag && x2->rev_flag) {
-                x1->rev_flag = 0;
-                x2->rev_flag = 0;
-                pos_encoder_calc(x2);
-                pm->foc.e_pr = x1->pos; // 转子侧用主编码器
-                pm->foc.e_pm = x2->pos; // 机械输出轴侧角度用副编码器
+            if (primary_enc->rev_flag && secondary_enc->rev_flag) {
+                primary_enc->rev_flag = 0;
+                secondary_enc->rev_flag = 0;
+                pos_encoder_calc(secondary_enc);
+                pm->foc.e_pr = primary_enc->pos; // 转子侧用主编码器
+                pm->foc.e_pm = secondary_enc->pos; // 机械输出轴侧角度用副编码器
                 sensory2_pos_calc(pm);
 
-                pm->pos_box.raw_1 = x1->raw;
-                pm->pos_box.bit_1 = x1->bit;
-                pm->pos_box.pos_1 = x1->pos;
-                pm->pos_box.raw_2 = x2->raw;
-                pm->pos_box.bit_2 = x2->bit;
-                pm->pos_box.pos_2 = x2->pos;
+                pm->pos_box.raw_1 = primary_enc->raw;
+                pm->pos_box.bit_1 = primary_enc->bit;
+                pm->pos_box.pos_1 = primary_enc->pos;
+                pm->pos_box.raw_2 = secondary_enc->raw;
+                pm->pos_box.bit_2 = secondary_enc->bit;
+                pm->pos_box.pos_2 = secondary_enc->pos;
             }
             break;
 

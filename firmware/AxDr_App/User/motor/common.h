@@ -1517,7 +1517,6 @@ void force_curr_mode(pmsm_t* pm);
 
 void sensory_pos_calc(pmsm_t* pm);
 void senless_pos_calc(pmsm_t* pm);
-void pos_calc(pmsm_t* pm);
 
 void pm_mit_mode(pmsm_t* pm);
 void pt_tor_mode(pmsm_t* pm);
@@ -1539,8 +1538,8 @@ uint32_t read_ma732_raw(void);
 uint32_t read_dm485enc_raw(void);
 uint32_t send_mod_dm485enc(void);
 
-void pos_calc(pmsm_t* pm);
-void send_encoder_read_command(pmsm_t* pm);
+void position_update(pmsm_t *pm);
+void encoder_sample(pos_box_t *pos_box);
 void pos_encoder_calc(enc_para_t *enc);
 void sensory1_pos_calc(pmsm_t* pm);
 void sensory2_pos_calc(pmsm_t* pm);
