@@ -32,7 +32,7 @@
 - Debug 全量构建通过，ELF、HEX、MAP 齐全。
 - Release 全量构建通过，ELF、HEX、MAP 齐全。
 - 工程仍保留原有 103 条一般告警，本次修改文件没有新增告警。
-- `target_pwm_commit_channel_duty` 在 Debug 和 Release 的 MAP 中都位于 `.RamFunc`。
+- `target_pwm_set_duty_ratios` 在 Debug 和 Release 的 MAP 中都位于 `.RamFunc`。
 - 用户代码中的 TIM1 三相启停和 CCR1/CCR2/CCR3 写入已集中到 `target_pwm.c`。
 - TIM1 通道 4 的 ADC 触发设置保持原样。
 

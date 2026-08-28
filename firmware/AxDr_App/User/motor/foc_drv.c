@@ -702,26 +702,24 @@ void temp_calc(void)
 }
 
 /**
-***********************************************************************
-* @brief:      foc_pwm_start(void)
-* @param[in]:  void
-* @retval:     void
-* @details:    启动三路PWM输出，分别对应三相电机控制
-***********************************************************************
-**/
+ * @brief 启动三相 PWM 的主输出和互补输出。
+ *
+ * 当前由系统初始化流程和电机 start 状态调用。FOC 层不直接操作 TIM1，
+ * 而是调用 target_pwm_start_phase_outputs()，让板级适配层完成硬件启动。
+ * 本函数只把启动请求交给板级适配层，不修改占空比，也不处理故障状态。
+ */
 _RAM_FUNC void foc_pwm_start(void)
 {
     target_pwm_start_phase_outputs();
 }
 
 /**
-***********************************************************************
-* @brief:      foc_pwm_stop(void)
-* @param[in]:  void
-* @retval:     void
-* @details:    停止三路PWM输出，关闭三相电机控制
-***********************************************************************
-**/
+ * @brief 停止三相 PWM 的主输出和互补输出。
+ *
+ * 当前由电机状态机在离开运行流程时调用。FOC 层只发出停止请求，
+ * 具体关闭 TIM1 主输出和互补输出的操作由板级适配层完成。
+ * 本函数只把停止请求交给板级适配层，不等同于完整的 Gate 或故障保护流程。
+ */
 _RAM_FUNC void foc_pwm_stop(void)
 {
     target_pwm_stop_phase_outputs();
@@ -767,34 +765,46 @@ _RAM_FUNC void foc_adc_sample(pmsm_t* pm)
 }
 
 /**
-***********************************************************************
-* @brief:      foc_pwm_run(foc_para_t* foc)
-* @param[in]:  foc 指向 FOC 参数结构体的指针
-* @retval:     void
-* @details:    根据duty周期设置三相PWM输出，实现SVPWM调制
-***********************************************************************
-**/
+ * @brief 将 FOC 算出的三相占空比映射到物理 PWM 通道。
+ *
+ * @param[in] pm 电机控制对象，使用其中的相序和 A、B、C 三相占空比。
+ *
+ * 电流控制函数先调用 svm()，把计算结果保存到 dtc_a、dtc_b、dtc_c，随后调用
+ * 本函数。这里先根据电机接线顺序排列三相占空比，再交给板级适配层写入 TIM1。
+ */
 _RAM_FUNC void foc_pwm_run(pmsm_t* pm)
 {
     switch (pm->para.phase_order) {
     case ABC_PHASE:
-        target_pwm_commit_channel_duty(pm->foc.dtc_a,
-                                       pm->foc.dtc_b,
-                                       pm->foc.dtc_c);
+        /* ABC 接线：TIM1 通道顺序为 A、B、C。 */
+        target_pwm_set_duty_ratios(pm->foc.dtc_a,
+                                   pm->foc.dtc_b,
+                                   pm->foc.dtc_c);
         break;
     case ACB_PHASE:
-        target_pwm_commit_channel_duty(pm->foc.dtc_a,
-                                       pm->foc.dtc_c,
-                                       pm->foc.dtc_b);
+        /* ACB 接线：交换 B、C 两相后写入物理通道。 */
+        target_pwm_set_duty_ratios(pm->foc.dtc_a,
+                                   pm->foc.dtc_c,
+                                   pm->foc.dtc_b);
         break;
     default:
-        // 默认相序
+        /* 保留原有行为：相序无效时不更新本周期占空比。 */
         break;
     }
 }
 
+/**
+ * @brief 将三路 PWM 固定设置为 50% 占空比。
+ *
+ * @param[in] pm 为兼容现有接口保留，本函数不使用该参数。
+ *
+ * start 状态调用本函数后转入 prech；此处只保留原有的 50% 设置。
+ */
 _RAM_FUNC void foc_pwm_duty_set(pmsm_t* pm)
 {
+    /* 旧接口带有 pm 参数，但固定 50% 占空比不需要读取电机控制数据。 */
     (void)pm;
-    target_pwm_commit_channel_duty(0.5f, 0.5f, 0.5f);
+
+    /* 三个物理通道都设置为 0.5，即 PWM 周期的一半。 */
+    target_pwm_set_duty_ratios(0.5f, 0.5f, 0.5f);
 }
