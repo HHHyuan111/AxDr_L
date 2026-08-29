@@ -29,6 +29,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "axdr_app.h"
 #include "common.h"
 #include "modlue.h"
 #include "lcd.h"
@@ -125,6 +126,7 @@ int main(void)
 
   pmsm_init();
   foc_pwm_start();
+  axdr_app_start_fast_control();
   
   
   LCD_Init();

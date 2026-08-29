@@ -8,11 +8,33 @@
 
 #include "axdr_app.h"
 
+#include <stdbool.h>
+
 #include "common.h"
 #include "modlue.h"
 
+/*
+ * 主初始化流程只把本标志从 false 写为 true 一次，ADC 中断只读取它。
+ * volatile 保证中断每次都读取最新值；它不承担通用的多线程同步功能。
+ */
+static volatile bool fast_control_ready = false;
+
+void axdr_app_start_fast_control(void)
+{
+    fast_control_ready = true;
+}
+
 _RAM_FUNC void axdr_app_fast_step(void)
 {
+    /*
+     * ADC 和 TIM1 通道 4 必须先运行，电流零偏校准才能取得持续更新的采样值；
+     * 但 pmsm_init() 完成以前，不能让中断访问正在初始化的 pm 对象。
+     */
+    if (!fast_control_ready)
+    {
+        return;
+    }
+
     /* 第 1 步：读取编码器，并更新机械角、电角度和多圈位置。 */
     encoder_sample(&pm.pos_box);
     position_update(&pm);
@@ -30,8 +52,8 @@ _RAM_FUNC void axdr_app_fast_step(void)
 /**
  * @brief ADC 注入转换完成回调。
  *
- * ADC1 每完成一组注入采样便进入这里。本回调不再展开控制流程，只把本次控制周期
- * 交给应用层统一入口。当前工程只有 ADC1 使用注入完成中断，因此保持原有触发行为。
+ * HAL 报告一次 ADC1 注入转换完成时进入这里。本回调不再展开控制流程，只把本次
+ * 回调交给应用层统一入口。当前节点保持原有 ADC EOC 配置和回调触发行为。
  */
 _RAM_FUNC void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
