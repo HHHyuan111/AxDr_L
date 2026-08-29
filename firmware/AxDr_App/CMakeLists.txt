@@ -29,12 +29,14 @@ project(${CMAKE_PROJECT_NAME} LANGUAGES C ASM)
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
 include_directories(
+    "User/app"
     "User/bsp/inc"
     "User/motor"
     "User/moldue/inc"
 )
 
 set(AXDR_USER_SOURCES
+    User/app/axdr_app.c
     User/bsp/bsp_cpu.c
     User/bsp/bsp_fdcan.c
     User/bsp/bsp_flash.c
