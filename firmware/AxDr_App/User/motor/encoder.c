@@ -127,20 +127,12 @@ _RAM_FUNC uint32_t send_mod_dm485enc(void)
  *
  * @param[in,out] enc 输入原始计数和换算系数，输出范围为 0～2π 的位置角。
  *
- * 当前 LUT 补偿尚未启用，因此补偿量保持为 0；本函数不需要访问完整电机对象。
+ * factor 在初始化时设置为 2π/cpr，因此本函数只完成“计数 × 每计数弧度”。
+ * 编码器校准 LUT 尚未接入这条运行链路，后续应通过独立节点实现。
  */
-_RAM_FUNC void pos_encoder_calc(enc_para_t *enc)
+_RAM_FUNC void encoder_update_angle(enc_para_t *enc)
 {
-    uint8_t index;
-    float off_1, off_2, off_interp;
-
-    index = enc->raw >> enc->shift_bit;
-//    off_1 = enc->lut[index];
-//    index++;
-//    off_2 = enc->lut[index];
-    // float frac = (float)(enc->raw & ((1 << enc->shift_bit) - 1)) / (1 << enc->shift_bit);
-    off_interp = 0.0f;//off_1 + (off_2 - off_1) * frac;
-    enc->pos = (enc->raw + off_interp) * enc->factor;
+    enc->pos = (float)enc->raw * enc->factor;
     wrap_0_2pi(enc->pos);
 }
 

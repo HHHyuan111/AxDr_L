@@ -70,7 +70,7 @@ _RAM_FUNC void position_update(pmsm_t *pm)
 
             if (primary_enc->rev_flag) {
                 primary_enc->rev_flag = 0;
-                pos_encoder_calc(primary_enc);
+                encoder_update_angle(primary_enc);
                 pm->foc.e_pr = primary_enc->pos; // 主编码器结果
                 position_update_single_encoder(pm);
 
@@ -98,7 +98,7 @@ _RAM_FUNC void position_update(pmsm_t *pm)
             if (primary_enc->rev_flag && secondary_enc->rev_flag) {
                 primary_enc->rev_flag = 0;
                 secondary_enc->rev_flag = 0;
-                pos_encoder_calc(secondary_enc);
+                encoder_update_angle(secondary_enc);
                 pm->foc.e_pr = primary_enc->pos; // 转子侧用主编码器
                 pm->foc.e_pm = secondary_enc->pos; // 机械输出轴侧角度用副编码器
                 sensory2_pos_calc(pm);

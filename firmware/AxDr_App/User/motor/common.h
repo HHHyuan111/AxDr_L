@@ -1540,7 +1540,7 @@ uint32_t send_mod_dm485enc(void);
 
 void position_update(pmsm_t *pm);
 void encoder_sample(pos_box_t *pos_box);
-void pos_encoder_calc(enc_para_t *enc);
+void encoder_update_angle(enc_para_t *enc);
 void position_update_single_encoder(pmsm_t *pm);
 void sensory2_pos_calc(pmsm_t* pm);
 void senless_pos_calc(pmsm_t* pm);
