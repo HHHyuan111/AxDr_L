@@ -72,7 +72,7 @@ _RAM_FUNC void position_update(pmsm_t *pm)
                 primary_enc->rev_flag = 0;
                 pos_encoder_calc(primary_enc);
                 pm->foc.e_pr = primary_enc->pos; // 主编码器结果
-                sensory1_pos_calc(pm);
+                position_update_single_encoder(pm);
 
                 pm->pos_box.raw_1 = primary_enc->raw;
                 pm->pos_box.bit_1 = primary_enc->bit;
@@ -146,45 +146,61 @@ _RAM_FUNC void position_update(pmsm_t *pm)
 }
 
 /**
-***********************************************************************
-* @brief:      sensory_pos_calc(pmsm_t* pm)
-* @param[in]:  pm  指向永磁同步电机（PMSM）控制结构体的指针
-* @retval:     void
-* @details:    计算有传感器模式下的位置和角度，包括转数、电气角度、机械角度等
-***********************************************************************
-**/
-
-_RAM_FUNC void sensory1_pos_calc(pmsm_t* pm)
+ * @brief 根据主编码器单圈角度更新电机的完整位置反馈。
+ *
+ * @param[in,out] pm 电机控制对象；输入主编码器角度和电机参数，输出电角度、
+ *                   转子单圈/多圈位置、输出轴单圈/多圈位置及机械圈数。
+ *
+ * 本函数不读取编码器硬件。进入本函数前，pm->foc.e_pr 已经是 0～2π 范围内
+ * 的主编码器机械角度。
+ */
+_RAM_FUNC void position_update_single_encoder(pmsm_t *pm)
 {
-    pmsm_foc_t* x = &pm->foc;
-    pmsm_para_t* y = &pm->para;
+    pmsm_foc_t *foc = &pm->foc;
+    pmsm_para_t *motor_para = &pm->para;
 
-    // 补偿读取角度过程中的滞后
-    //if(ABS(x->wr_f) > 50.0f)
-//    x->e_pr += (x->wr_f * 40.0f *  0.000001f);
-        
-    // 计算位置差异和转数
-    x->pr_dif = x->e_pr - x->pr_lst;
-    if (x->pr_dif >  0.88f * M_2PI) x->rev--;
-    if (x->pr_dif < -0.88f * M_2PI) x->rev++;
+    /*
+     * 第 1 步：判断单圈角度是否跨过 0/2π 边界，并累计转子圈数。
+     * 正向越过 2π 时，新角度会从接近 2π 跳到接近 0，差值为较大的负数；
+     * 反向越过 0 时，差值为较大的正数。0.88 保留原工程的判断阈值。
+     */
+    foc->pr_dif = foc->e_pr - foc->pr_lst;
+    if (foc->pr_dif > 0.88f * M_2PI) {
+        foc->rev--;
+    }
+    if (foc->pr_dif < -0.88f * M_2PI) {
+        foc->rev++;
+    }
 
-    x->e_pe = x->e_pr * y->pn - (uint32_t)(x->e_pr * y->pnd_2pi) * M_2PI + y->e_off;
-    wrap_0_2pi(x->e_pe);
+    /*
+     * 第 2 步：机械角乘极对数得到电角度，去掉完整电周期后加电角零位。
+     * e_pe 和 p_e 当前保留原工程的相同计算结果，后续控制使用 p_e。
+     */
+    foc->e_pe = foc->e_pr * motor_para->pn
+        - (uint32_t)(foc->e_pr * motor_para->pnd_2pi) * M_2PI
+        + motor_para->e_off;
+    wrap_0_2pi(foc->e_pe);
 
-    x->p_e  = x->e_pr * y->pn - (uint32_t)(x->e_pr * y->pnd_2pi) * M_2PI + y->e_off;
-    wrap_0_2pi(x->p_e);
+    foc->p_e = foc->e_pr * motor_para->pn
+        - (uint32_t)(foc->e_pr * motor_para->pnd_2pi) * M_2PI
+        + motor_para->e_off;
+    wrap_0_2pi(foc->p_e);
 
-    x->sp_r = x->e_pr + y->r_off;
-    wrap_0_2pi(x->sp_r);
-    x->mp_r = x->e_pr + x->rev * M_2PI + y->r_off;
+    /* 第 3 步：加入转子机械零位，得到转子单圈位置和累计多圈位置。 */
+    foc->sp_r = foc->e_pr + motor_para->r_off;
+    wrap_0_2pi(foc->sp_r);
+    foc->mp_r = foc->e_pr + foc->rev * M_2PI + motor_para->r_off;
 
-    x->sp_m = x->sp_r * y->div_Gr + y->m_off;
-    wrap_0_2pi(x->sp_m);
-    x->mp_m = x->mp_r * y->div_Gr;
+    /* 第 4 步：经过减速比换算，得到输出轴单圈位置和累计多圈位置。 */
+    foc->sp_m = foc->sp_r * motor_para->div_Gr + motor_para->m_off;
+    wrap_0_2pi(foc->sp_m);
+    foc->mp_m = foc->mp_r * motor_para->div_Gr;
 
-    x->m_rev = (int32_t)(x->mp_m * div_M_2PI);
+    /* 第 5 步：把输出轴累计角度换算成完整机械圈数。 */
+    foc->m_rev = (int32_t)(foc->mp_m * div_M_2PI);
 
-    x->pr_lst = x->e_pr;
+    /* 保存本周期编码器角度，供下一个周期判断是否跨零。 */
+    foc->pr_lst = foc->e_pr;
 }
 
 _RAM_FUNC void sensory2_pos_calc(pmsm_t* pm)
