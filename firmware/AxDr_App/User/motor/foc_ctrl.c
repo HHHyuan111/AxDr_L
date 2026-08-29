@@ -3,7 +3,7 @@
 /**
  * @brief ADC 注入转换完成后的快速控制回调。
  *
- * 每个控制周期依次更新位置反馈、读取并换算 ADC、更新 FOC 公共参数，最后运行
+ * 每个控制周期依次更新位置反馈、读取并换算 ADC、更新 FOC 运行反馈，最后运行
  * 电机状态和控制模式。这里本身只负责安排执行顺序，不直接操作硬件寄存器。
  */
 _RAM_FUNC void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
@@ -15,8 +15,8 @@ _RAM_FUNC void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
     /* 第 2 步：读取 ADC 原始值，并换算本周期三相电流。 */
     foc_adc_sample(&pm);
 
-    /* 第 3 步：更新速度、滤波值和后续控制共同使用的 FOC 参数。 */
-    foc_para_calc(&pm);
+    /* 第 3 步：更新母线电压、控制限幅、转矩和速度反馈。 */
+    foc_feedback_update(&pm);
 //    pmsm_ctrl_display(&pm);
 //    pmsm_ctrl_set(&pm);
     //pmsm_fault_check(&pm);

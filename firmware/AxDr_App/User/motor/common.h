@@ -1481,7 +1481,7 @@ void pmsm_init(void);
 void pmsm_peroid_init(void);
 void pmsm_protect_init(void);
 void pmsm_lpf_init(void);
-void foc_para_calc(pmsm_t* pm);
+void foc_feedback_update(pmsm_t* pm);
 void foc_pwm_start(void);
 void foc_pwm_stop(void);
 void foc_clear(pmsm_t* pm);
@@ -1489,7 +1489,7 @@ void foc_pwm_run(pmsm_t* pm);
 void foc_pwm_duty_set(pmsm_t* pm);
 void foc_adc_sample(pmsm_t* pm);
 void foc_get_curr_off(void);
-float spd_measure_M(float pos, float fs);
+float angle_speed_calc(float angle_rad, float sample_frequency_hz);
 
 void foc_cur_pi_calc(pmsm_t* pm);
 void foc_spd_pi_calc(pmsm_t* pm);

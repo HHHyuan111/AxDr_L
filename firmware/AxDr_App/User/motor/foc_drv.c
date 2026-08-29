@@ -539,42 +539,46 @@ _RAM_FUNC void foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
 }
 
 /**
-***********************************************************************
-* @brief:      spd_measure_M(float pos, float fs)
-* @param[in]:  pos 当前位置（角度/弧度）
-* @param[in]:  fs  采样频率
-* @retval:     float 速度值
-* @details:    速度测量函数，根据当前位置和采样频率计算速度
-***********************************************************************
-**/
-_RAM_FUNC float spd_measure_M(float pos, float fs)
+ * @brief 根据相邻两个控制周期的角度差计算角速度。
+ *
+ * @param[in] angle_rad 当前角度，单位 rad。
+ * @param[in] sample_frequency_hz 调用频率，单位 Hz。
+ * @return 角速度，单位 rad/s。
+ *
+ * previous_angle_rad 会保留上一次调用的角度。角度差经过正负 pi 限幅后，
+ * 即使角度从 2*pi 跳回 0，也能得到连续的角速度。
+ */
+_RAM_FUNC float angle_speed_calc(float angle_rad, float sample_frequency_hz)
 {
-    static float pos_dif;
-    static float pos_last;
+    static float angle_delta_rad;
+    static float previous_angle_rad;
 
-    pos_dif = pos - pos_last;
-    wrap_pm_pi(pos_dif);
+    angle_delta_rad = angle_rad - previous_angle_rad;
+    wrap_pm_pi(angle_delta_rad);
 
-    float vel = pos_dif * fs;
+    float angular_speed_rad_s = angle_delta_rad * sample_frequency_hz;
 
-    pos_last = pos;
+    previous_angle_rad = angle_rad;
 
-    return vel;
+    return angular_speed_rad_s;
 }
+
 /**
-***********************************************************************
-* @brief:      foc_para_calc(pmsm_t* pm)
-* @param[in]:  pm 指向 PMSM 参数结构体的指针
-* @retval:     void
-* @details:    FOC相关参数计算，包括母线电压、母线电流、滤波电流、转矩等参数的计算
-***********************************************************************
-**/
-_RAM_FUNC void foc_para_calc(pmsm_t* pm)
+ * @brief 更新当前控制周期使用的 FOC 运行反馈。
+ *
+ * @param[in,out] pm 电机控制对象。
+ *
+ * 本函数不直接读取硬件，也不执行电流环。它使用前面已经更新的 ADC 和角度结果，
+ * 依次计算母线电压、控制器限幅、转矩和速度，最后更新观测器。
+ */
+_RAM_FUNC void foc_feedback_update(pmsm_t* pm)
 {
+    /* 第 1 步：把母线 ADC 计数换算成电压，并计算调制所需的电压系数和余量。 */
     pm->foc.vbus = ((float)pm->adc.vbus * pm->board.v_ratio);
     pm->foc.inv_vbus = 1.5f / (pm->foc.vbus);
     pm->foc.vs = pm->foc.vbus*0.5f*0.96f;
 
+    /* 第 2 步：把本周期允许的电压、电流和速度范围交给各级 PI 控制器。 */
     pm->id_pi.out_max    =  pm->foc.vs;
     pm->id_pi.out_min    = -pm->foc.vs;
     pm->iq_pi.out_max    =  pm->foc.vs;
@@ -586,30 +590,21 @@ _RAM_FUNC void foc_para_calc(pmsm_t* pm)
     pm->pos_pi.out_max   =  pm->ctrl.pmax_vel;
     pm->pos_pi.out_min   =  pm->ctrl.nmax_vel;
 
-    //	pm->foc.vbus_f = low_pf(&pm->vbus_lpf, pm->foc.vbus);
-    //	pm->foc.id_f = low_pf(&pm->id_lpf, pm->foc.i_d);
+    /* 第 3 步：滤波 q 轴电流，并换算转子侧和减速器输出侧转矩。 */
     pm->foc.iq_f   = low_pf(&pm->iq_lpf, pm->foc.i_q);
     pm->foc.tor_r  = pm->foc.i_q    * pm->para.Kt;
     pm->foc.tor_rf = pm->foc.iq_f   * pm->para.Kt;
     pm->foc.tor_m  = pm->foc.tor_r  * pm->para.Gr;
     pm->foc.tor_mf = pm->foc.tor_rf * pm->para.Gr;
-    //	pm->foc.vd_f = low_pf(&pm->vd_lpf, pm->foc.v_d);
-    //	pm->foc.vq_f = low_pf(&pm->vq_lpf, pm->foc.v_q);
 
-    //	pm->foc.ibus   = (pm->foc.v_d * pm->foc.i_d + pm->foc.v_q * pm->foc.i_q)*pm->foc.inv_vbus;
-    //	pm->foc.ibus_f = low_pf(&pm->ibus_lpf, pm->foc.ibus);
-    //
-    //	pm->foc.i_abs  = sqrtf(SQ(pm->foc.i_d) + SQ(pm->foc.i_q));
-    //	pm->foc.iabs_f = low_pf(&pm->iabs_lpf, pm->foc.i_abs);
-
-    //	pm->foc.duty_now = SIGN(pm->foc.v_q) * NORM2_f(pm->foc.v_d, pm->foc.v_q) * TWO_BY_SQRT3*pm->foc.inv_vbus;
-
-    pm->foc.we = spd_measure_M(pm->foc.p_e, 20000);
+    /* 第 4 步：由电角度差得到电角速度，再换算转子速度和输出轴速度。 */
+    pm->foc.we = angle_speed_calc(pm->foc.p_e, 20000);
     pm->foc.wr = pm->foc.we * pm->para.div_pn; // rad/s;
 
     pm->foc.wr_f = low_pf(&pm->wr_lpf, pm->foc.wr);
     pm->foc.wm = pm->foc.wr_f * pm->para.div_Gr; // rad/s
-                                                                                                                  
+
+    /* 第 5 步：把本周期速度和转矩送入现有观测器；当前节点不改观测器算法。 */
     eh_speed_observer(&eh_vobs, pm->foc.wr, pm->foc.tor_r);
     eh_torque_observer(&eh_tobs, pm->foc.we, pm->foc.tor_r);
 }
