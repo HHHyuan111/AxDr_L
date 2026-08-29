@@ -3,28 +3,35 @@
 #include "target_encoder.h"
 //#include "spi.h"
 
-void encoder_init(void)
+/**
+ * @brief 初始化各类编码器的软件参数。
+ *
+ * @param[in,out] pos_box 接收编码器方向、分辨率和计数到弧度的换算系数。
+ *
+ * 本函数只配置软件参数，不访问 SPI，也不读取编码器。
+ */
+void encoder_init(pos_box_t *pos_box)
 {
-    pm.pos_box.ma732.dir = 1;
-    pm.pos_box.ma732.bit = 14;
-    pm.pos_box.ma732.cpr = 16384;
+    pos_box->ma732.dir = 1;
+    pos_box->ma732.bit = 14;
+    pos_box->ma732.cpr = 16384;
 
-    pm.pos_box.ma732.shift_bit = log2f(pm.pos_box.ma732.cpr / 256);
-    pm.pos_box.ma732.factor = M_2PI /  pm.pos_box.ma732.cpr;
+    pos_box->ma732.shift_bit = log2f(pos_box->ma732.cpr / 256);
+    pos_box->ma732.factor = M_2PI / pos_box->ma732.cpr;
 
-    pm.pos_box.dm485enc.dir = -1;
-    pm.pos_box.dm485enc.bit = 17;
-    pm.pos_box.dm485enc.cpr = 131072;
+    pos_box->dm485enc.dir = -1;
+    pos_box->dm485enc.bit = 17;
+    pos_box->dm485enc.cpr = 131072;
 
-    pm.pos_box.dm485enc.shift_bit = log2f(pm.pos_box.dm485enc.cpr / 256);
-    pm.pos_box.dm485enc.factor  = M_2PI / pm.pos_box.dm485enc.cpr;
-	
-	pm.pos_box.mt6816.dir = 1;
-    pm.pos_box.mt6816.bit = 14;
-    pm.pos_box.mt6816.cpr = 16384;
+    pos_box->dm485enc.shift_bit = log2f(pos_box->dm485enc.cpr / 256);
+    pos_box->dm485enc.factor = M_2PI / pos_box->dm485enc.cpr;
 
-    pm.pos_box.mt6816.shift_bit = log2f(pm.pos_box.mt6816.cpr / 256);
-    pm.pos_box.mt6816.factor = M_2PI /  pm.pos_box.mt6816.cpr;
+    pos_box->mt6816.dir = 1;
+    pos_box->mt6816.bit = 14;
+    pos_box->mt6816.cpr = 16384;
+
+    pos_box->mt6816.shift_bit = log2f(pos_box->mt6816.cpr / 256);
+    pos_box->mt6816.factor = M_2PI / pos_box->mt6816.cpr;
 }
 
 _RAM_FUNC uint8_t encoder_parity(uint16_t v)

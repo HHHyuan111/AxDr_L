@@ -1531,7 +1531,7 @@ void pmsm_quick_stop_mode(pmsm_t* pm);
 void pmsm_fault_stop_mode(pmsm_t* pm);
 
 /* Encoder functions */
-void encoder_init(void);
+void encoder_init(pos_box_t *pos_box);
 uint32_t read_mt6825_raw(void);
 void read_mt6816_raw(enc_para_t *enc);
 uint32_t read_ma732_raw(void);

@@ -310,7 +310,7 @@ void pmsm_init(void)
     scvm_init();
     nlob_init();
     alob_init();
-    encoder_init();
+    encoder_init(&pm.pos_box);
     cali_init();
     traj_init();
 
