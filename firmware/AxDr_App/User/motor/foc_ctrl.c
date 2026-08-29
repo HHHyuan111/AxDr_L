@@ -8,6 +8,8 @@
  */
 _RAM_FUNC void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
+    (void)hadc;
+
     /* 第 1 步：读取编码器，并更新机械角、电角度和多圈位置。 */
     encoder_sample(&pm.pos_box);
     position_update(&pm);
@@ -17,123 +19,228 @@ _RAM_FUNC void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
 
     /* 第 3 步：更新母线电压、控制限幅、转矩和速度反馈。 */
     foc_feedback_update(&pm);
-//    pmsm_ctrl_display(&pm);
-//    pmsm_ctrl_set(&pm);
-    //pmsm_fault_check(&pm);
 
     /* 第 4 步：运行状态机和当前选定的控制模式。 */
-    pmsm_state_ctrl(&pm);
-
-//	vofa_start();
+    pmsm_run_state_machine(&pm);
 }
 
 /**
-***********************************************************************
-* @brief:      pmsm_state_ctrl(pmsm_t* pm)
-* @param[in]:  pm  指向永磁同步电机（PMSM）控制结构体的指针
-* @retval:     void
-* @details:    PMSM 状态机控制，根据当前状态执行启动、预充、复位和运行等操作
-***********************************************************************
-**/
-_RAM_FUNC void pmsm_state_ctrl(pmsm_t* pm)
+ * @brief 运行一次 PMSM 生命周期状态机。
+ *
+ * @param[in,out] pm 电机控制对象。
+ *
+ * 本函数在快速控制回调中运行。它根据 ctrl_bit 执行启动、复位或正常运行，
+ * 可能启停 PWM、清空控制器，或进入当前选定的控制模式。
+ */
+_RAM_FUNC void pmsm_run_state_machine(pmsm_t *pm)
 {
-    // State machine for PMSM control
     switch (pm->ctrl_bit)
     {
-    case start:
-        // Initialize PWM and transition to precharge state
-        foc_pwm_start();
-        foc_pwm_duty_set(pm);
-        pmsm_reset(pm);
-        if (pm->fault.all > 0)
-            pm->state_bit = fault;
-        else
-            pm->state_bit = prech;
-        break;
-    case reset:
-         //Reset all controllers and stop PWM
-        foc_pwm_stop();
-        pmsm_reset(pm);
-        if (pm->fault.all > 0)
-            pm->state_bit = fault;
-        else
-            pm->state_bit = stop;
-        break;
-    case opera:
-        // Normal operation mode control
-        pmsm_mode_ctrl(pm);
-        if (pm->fault.all > 0)
-            pm->state_bit = fault;
-        else
-            pm->state_bit = runing;
-        break;
-    default:
-        break;
+        case start:
+            /* 保留原启动顺序：先启动 PWM，再写入中点占空比，最后清空控制器。 */
+            foc_pwm_start();
+            foc_pwm_duty_set(pm);
+            pmsm_reset(pm);
+
+            if (pm->fault.all > 0)
+            {
+                pm->state_bit = fault;
+            }
+            else
+            {
+                pm->state_bit = prech;
+            }
+            break;
+
+        case reset:
+            /* 复位请求先关闭 PWM，再清空各级控制器。 */
+            foc_pwm_stop();
+            pmsm_reset(pm);
+
+            if (pm->fault.all > 0)
+            {
+                pm->state_bit = fault;
+            }
+            else
+            {
+                pm->state_bit = stop;
+            }
+            break;
+
+        case opera:
+            /* 运行请求进入当前选定模式，本周期仍保持原有的“先控制、后判故障”顺序。 */
+            pmsm_run_selected_mode(pm);
+
+            if (pm->fault.all > 0)
+            {
+                pm->state_bit = fault;
+            }
+            else
+            {
+                pm->state_bit = runing;
+            }
+            break;
+
+        default:
+            /* 保留原行为：未知控制请求不执行动作。 */
+            break;
     }
+
+    /* 故障具有最终优先级，并把下一控制周期切换为复位请求。 */
     if (pm->fault.all > 0)
+    {
         pm->state_bit = fault;
-    if(pm->state_bit == fault)
+    }
+
+    if (pm->state_bit == fault)
+    {
         pm->ctrl_bit = reset;
+    }
 }
 
 /**
-***********************************************************************
-* @brief:      pmsm_mode_ctrl(pmsm_t* pm)
-* @param[in]:  pm  指向永磁同步电机（PMSM）控制结构体的指针
-* @retval:     void
-* @details:    PMSM模式控制，根据当前系统模式选择不同的控制策略
-***********************************************************************
-**/
-_RAM_FUNC void pmsm_mode_ctrl(pmsm_t* pm)
+ * @brief 执行当前选定的 PMSM 控制模式。
+ *
+ * @param[in,out] pm 电机控制对象。
+ *
+ * 本函数只负责模式分派，不修改各模式内部算法。旧工程中的 debug_mode 是实验控制
+ * 路径，不是日志或显示开关；本节点保留它的原有用途和全部映射关系。
+ */
+_RAM_FUNC void pmsm_run_selected_mode(pmsm_t *pm)
 {
     switch (pm->mode.sys)
     {
         case release_mode:
+            /* 对外运行模式：MIT、轮廓模式和周期同步模式。 */
             switch (pm->mode.release)
             {
-                case mit_mode: pm_mit_mode(pm); break;
-                case tor_mode: pt_tor_mode(pm); break;
-                case vel_mode: pv_vel_mode(pm); break;
-                case pos_mode: pp_pos_mode(pm); break;
-                case cst_mode: cst_tor_mode(pm);break;
-                case csv_mode: csv_vel_mode(pm);break;
-                case csp_mode: csp_pos_mode(pm);break;
-                default: break;
+                case mit_mode:
+                    pm_mit_mode(pm);
+                    break;
+
+                case tor_mode:
+                    pt_tor_mode(pm);
+                    break;
+
+                case vel_mode:
+                    pv_vel_mode(pm);
+                    break;
+
+                case pos_mode:
+                    pp_pos_mode(pm);
+                    break;
+
+                case cst_mode:
+                    cst_tor_mode(pm);
+                    break;
+
+                case csv_mode:
+                    csv_vel_mode(pm);
+                    break;
+
+                case csp_mode:
+                    csp_pos_mode(pm);
+                    break;
+
+                default:
+                    break;
             }
             break;
+
         case halt_mode:
+            /* 停车模式：快速停车或故障停车。 */
             switch (pm->mode.halt)
             {
-                case quick_mode: pmsm_quick_stop_mode(pm); break;
-                case fault_mode: pmsm_fault_stop_mode(pm); break;
+                case quick_mode:
+                    pmsm_quick_stop_mode(pm);
+                    break;
+
+                case fault_mode:
+                    pmsm_fault_stop_mode(pm);
+                    break;
+
+                default:
+                    break;
             }
             break;
+
         case calibrat_mode:
+            /* 标定与辨识模式。没有实现的分支保持空操作。 */
             switch (pm->mode.calibrat)
             {
-                case rotor_enc_cali:  cali_mag_encoder(pm);        break;// Encoder calibration
-                case output_enc_mod:                               break;
-                case output_enc_cali:                              break;
-                case iden_pm:         iden_pmsm_first(&pm->idpm); break;// Motor parameter identification
-                case anticogging_pm:  anticogging_calibration(pm); break;
-                default: break;
+                case rotor_enc_cali:
+                    cali_mag_encoder(pm);
+                    break;
+
+                case output_enc_mod:
+                    /* 当前未实现，本周期不下发新的 FOC 指令。 */
+                    break;
+
+                case output_enc_cali:
+                    /* 当前未实现，本周期不下发新的 FOC 指令。 */
+                    break;
+
+                case iden_pm:
+                    iden_pmsm_first(&pm->idpm);
+                    break;
+
+                case anticogging_pm:
+                    anticogging_calibration(pm);
+                    break;
+
+                default:
+                    break;
             }
             break;
+
         case debug_mode:
+            /* 旧实验控制路径：V/f、I/f 和各级闭环控制。 */
             switch (pm->mode.debug)
             {
-                case drag_vf:         force_volt_mode(pm); break;// V/f control mode
-                case volt_op:         foc_volt(pm, pm->ctrl.vd_set, pm->ctrl.vq_set, pm->foc.p_e); break;// Open loop voltage control
-                case drag_if:         force_curr_mode(pm); break;// Forced current control
-                case curr_cl:         foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e); break;// Current closed loop control
-                case spd_curr_cl:     foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e);  break;// Speed-current cascade control
-                case pos_spd_curr_cl: foc_pos(pm, pm->ctrl.posr_set, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e); break;// Position-speed-current cascade control
-                case spd_volt_cl:     break; // Speed-voltage control
-                case pos_spd_volt_cl: break; // Position-speed-voltage control
-                default: break;
+                case drag_vf:
+                    force_volt_mode(pm);
+                    break;
+
+                case volt_op:
+                    foc_volt(pm, pm->ctrl.vd_set, pm->ctrl.vq_set, pm->foc.p_e);
+                    break;
+
+                case drag_if:
+                    force_curr_mode(pm);
+                    break;
+
+                case curr_cl:
+                    foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e);
+                    break;
+
+                case spd_curr_cl:
+                    foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e);
+                    break;
+
+                case pos_spd_curr_cl:
+                    foc_pos(pm,
+                            pm->ctrl.posr_set,
+                            pm->ctrl.wr_set,
+                            pm->ctrl.iq_set,
+                            pm->foc.p_e);
+                    break;
+
+                case spd_volt_cl:
+                    /* 当前未实现，本周期不下发新的 FOC 指令。 */
+                    break;
+
+                case pos_spd_volt_cl:
+                    /* 当前未实现，本周期不下发新的 FOC 指令。 */
+                    break;
+
+                default:
+                    break;
             }
             break;
-        default: break;
+
+        default:
+            /* 保留原行为：未知系统模式不执行动作。 */
+            break;
     }
 }
 

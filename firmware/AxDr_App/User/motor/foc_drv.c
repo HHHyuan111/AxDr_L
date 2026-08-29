@@ -2,6 +2,9 @@
 #include "target_adc.h"
 #include "target_pwm.h"
 
+/* 快速控制和电角度差分当前都按 20 kHz 执行。 */
+#define FOC_FS_HZ (20000.0f)
+
 _RAM_DATA pmsm_t pm;
 
 
@@ -212,7 +215,7 @@ void pmsm_2312s_init(void)
 **/
 void pmsm_peroid_init(void)
 {
-    pm.period.foc_fs = 20000.0f;
+    pm.period.foc_fs = FOC_FS_HZ;
     pm.period.foc_ts = 0.00005f;
 
     pm.period.cur_pid_fs = 20000.0f;
@@ -541,26 +544,26 @@ _RAM_FUNC void foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
 /**
  * @brief 根据相邻两个控制周期的角度差计算角速度。
  *
- * @param[in] angle_rad 当前角度，单位 rad。
- * @param[in] sample_frequency_hz 调用频率，单位 Hz。
+ * @param[in] pos 当前角度，单位 rad。
+ * @param[in] fs 调用频率，单位 Hz。
  * @return 角速度，单位 rad/s。
  *
- * previous_angle_rad 会保留上一次调用的角度。角度差经过正负 pi 限幅后，
+ * pos_last 会保留上一次调用的角度。角度差经过正负 pi 限幅后，
  * 即使角度从 2*pi 跳回 0，也能得到连续的角速度。
  */
-_RAM_FUNC float angle_speed_calc(float angle_rad, float sample_frequency_hz)
+_RAM_FUNC float angle_speed_calc(float pos, float fs)
 {
-    static float angle_delta_rad;
-    static float previous_angle_rad;
+    static float d_pos;
+    static float pos_last;
+    float vel;
 
-    angle_delta_rad = angle_rad - previous_angle_rad;
-    wrap_pm_pi(angle_delta_rad);
+    d_pos = pos - pos_last;
+    wrap_pm_pi(d_pos);
 
-    float angular_speed_rad_s = angle_delta_rad * sample_frequency_hz;
+    vel = d_pos * fs;
+    pos_last = pos;
 
-    previous_angle_rad = angle_rad;
-
-    return angular_speed_rad_s;
+    return vel;
 }
 
 /**
@@ -571,7 +574,7 @@ _RAM_FUNC float angle_speed_calc(float angle_rad, float sample_frequency_hz)
  * 本函数不直接读取硬件，也不执行电流环。它使用前面已经更新的 ADC 和角度结果，
  * 依次计算母线电压、控制器限幅、转矩和速度，最后更新观测器。
  */
-_RAM_FUNC void foc_feedback_update(pmsm_t* pm)
+_RAM_FUNC void foc_feedback_update(pmsm_t *pm)
 {
     /* 第 1 步：把母线 ADC 计数换算成电压，并计算调制所需的电压系数和余量。 */
     pm->foc.vbus = ((float)pm->adc.vbus * pm->board.v_ratio);
@@ -598,7 +601,7 @@ _RAM_FUNC void foc_feedback_update(pmsm_t* pm)
     pm->foc.tor_mf = pm->foc.tor_rf * pm->para.Gr;
 
     /* 第 4 步：由电角度差得到电角速度，再换算转子速度和输出轴速度。 */
-    pm->foc.we = angle_speed_calc(pm->foc.p_e, 20000);
+    pm->foc.we = angle_speed_calc(pm->foc.p_e, FOC_FS_HZ);
     pm->foc.wr = pm->foc.we * pm->para.div_pn; // rad/s;
 
     pm->foc.wr_f = low_pf(&pm->wr_lpf, pm->foc.wr);

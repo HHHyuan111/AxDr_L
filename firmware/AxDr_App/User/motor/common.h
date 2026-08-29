@@ -1481,7 +1481,7 @@ void pmsm_init(void);
 void pmsm_peroid_init(void);
 void pmsm_protect_init(void);
 void pmsm_lpf_init(void);
-void foc_feedback_update(pmsm_t* pm);
+void foc_feedback_update(pmsm_t *pm);
 void foc_pwm_start(void);
 void foc_pwm_stop(void);
 void foc_clear(pmsm_t* pm);
@@ -1489,7 +1489,7 @@ void foc_pwm_run(pmsm_t* pm);
 void foc_pwm_duty_set(pmsm_t* pm);
 void foc_adc_sample(pmsm_t* pm);
 void foc_get_curr_off(void);
-float angle_speed_calc(float angle_rad, float sample_frequency_hz);
+float angle_speed_calc(float pos, float fs);
 
 void foc_cur_pi_calc(pmsm_t* pm);
 void foc_spd_pi_calc(pmsm_t* pm);
@@ -1500,8 +1500,8 @@ void foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos);
 void foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos);
 
 /* FOC control functions */
-void pmsm_state_ctrl(pmsm_t* pm);
-void pmsm_mode_ctrl(pmsm_t* pm);
+void pmsm_run_state_machine(pmsm_t *pm);
+void pmsm_run_selected_mode(pmsm_t *pm);
 void pmsm_observe(pmsm_t* pm);
 void pmsm_ctrl_set(pmsm_t* pm);
 void pmsm_ctrl_display(pmsm_t* pm);
@@ -1526,9 +1526,6 @@ void pp_pos_mode(pmsm_t* pm);
 void cst_tor_mode(pmsm_t* pm);
 void csv_vel_mode(pmsm_t* pm);
 void csp_pos_mode(pmsm_t* pm);
-
-void pmsm_quick_stop_mode(pmsm_t* pm);
-void pmsm_fault_stop_mode(pmsm_t* pm);
 
 /* Encoder functions */
 void encoder_init(pos_box_t *pos_box);
