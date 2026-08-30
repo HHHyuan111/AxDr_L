@@ -392,6 +392,51 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>User/bsp</GroupName>
+          <Files>
+            <File>
+              <FileName>bsp_cpu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\bsp_cpu.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_fdcan.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\bsp_fdcan.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\bsp_flash.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_gpio.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\bsp_gpio.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_uart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\bsp_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>target_adc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\target_adc.c</FilePath>
+            </File>
+            <File>
+              <FileName>target_encoder.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\target_encoder.c</FilePath>
+            </File>
+            <File>
+              <FileName>target_pwm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\target_pwm.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>Application/MDK-ARM</GroupName>
           <Files>
             <File>
