@@ -108,7 +108,7 @@ void pmsm_reset(pmsm_t *pm)
     test_log_event(TEST_EVENT_RESET);
 }
 
-void pmsm_run_selected_mode(pmsm_t *pm)
+static void test_run_mode_action(pmsm_t *pm)
 {
     test_log_event(TEST_EVENT_RUN_MODE);
 
@@ -121,6 +121,123 @@ void pmsm_run_selected_mode(pmsm_t *pm)
     {
         pm->req = DRIVE_REQ_STOP;
     }
+}
+
+void pm_mit_mode(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void pt_tor_mode(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void pv_vel_mode(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void pp_pos_mode(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void cst_tor_mode(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void csv_vel_mode(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void csp_pos_mode(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void pmsm_quick_stop_mode(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void pmsm_fault_stop_mode(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void cali_mag_encoder(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void iden_pmsm_first(idpm_t *idpm)
+{
+    (void)idpm;
+    test_log_event(TEST_EVENT_RUN_MODE);
+}
+
+void anticogging_calibration(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void force_volt_mode(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+void force_curr_mode(pmsm_t *pm)
+{
+    test_run_mode_action(pm);
+}
+
+bool foc_volt(pmsm_t *pm, float vd_ref, float vq_ref, float pos)
+{
+    (void)vd_ref;
+    (void)vq_ref;
+    (void)pos;
+    test_run_mode_action(pm);
+    return false;
+}
+
+bool foc_curr(pmsm_t *pm, float id_set, float iq_set, float pos)
+{
+    (void)id_set;
+    (void)iq_set;
+    (void)pos;
+    test_run_mode_action(pm);
+    return false;
+}
+
+bool foc_vel(pmsm_t *pm, float vel_set, float iq_set, float pos)
+{
+    (void)vel_set;
+    (void)iq_set;
+    (void)pos;
+    test_run_mode_action(pm);
+    return false;
+}
+
+bool foc_pos(pmsm_t *pm,
+             float pos_set,
+             float vel_set,
+             float iq_set,
+             float pos)
+{
+    (void)pos_set;
+    (void)vel_set;
+    (void)iq_set;
+    (void)pos;
+    test_run_mode_action(pm);
+    return false;
+}
+
+void foc_pwm_commit(pmsm_t *pm)
+{
+    (void)pm;
 }
 
 static bool test_power_on_stays_stopped(void)

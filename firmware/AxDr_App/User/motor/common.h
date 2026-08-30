@@ -1501,7 +1501,6 @@ bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos);
 bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos);
 
 /* FOC control functions */
-void pmsm_run_selected_mode(pmsm_t *pm);
 void pmsm_observe(pmsm_t* pm);
 void pmsm_ctrl_set(pmsm_t* pm);
 void pmsm_ctrl_display(pmsm_t* pm);

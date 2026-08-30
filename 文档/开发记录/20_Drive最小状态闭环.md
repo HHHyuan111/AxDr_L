@@ -103,7 +103,7 @@ axdr_app_fast_step()
     ├─ 更新速度、转矩和观测反馈
     └─ drive_fast_step()
            ├─ 判断 STOP / START / RUN
-           └─ RUN 时调用 pmsm_run_selected_mode()
+           └─ RUN 时调用 Drive 私有的模式分派函数
                     └─ 选定模式调用 FOC
                              └─ 计算成功后经 Target 提交 PWM
 ```

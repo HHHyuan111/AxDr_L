@@ -7,7 +7,6 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $testDir = Join-Path $repoRoot "tests/host"
 $focFakeIncludeDir = Join-Path $testDir "fakes"
-$driveFakeIncludeDir = Join-Path $testDir "drive_fakes"
 $motorDir = Join-Path $repoRoot "firmware/AxDr_App/User/motor"
 $driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
 $focTestSource = Join-Path $testDir "test_foc_math.c"
@@ -49,7 +48,7 @@ Write-Host "Host C11/FOC 数学测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$driveFakeIncludeDir" "-I$driveDir" `
+        "-I$focFakeIncludeDir" "-I$motorDir" "-I$driveDir" `
         $driveTestSource $driveSource `
         -o $driveExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
