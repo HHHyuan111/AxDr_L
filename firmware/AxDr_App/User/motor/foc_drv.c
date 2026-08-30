@@ -622,31 +622,6 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
 }
 
 /**
- * @brief 根据相邻两个控制周期的角度差计算角速度。
- *
- * @param[in] pos 当前角度，单位 rad。
- * @param[in] fs 调用频率，单位 Hz。
- * @return 角速度，单位 rad/s。
- *
- * pos_last 会保留上一次调用的角度。角度差经过正负 pi 限幅后，
- * 即使角度从 2*pi 跳回 0，也能得到连续的角速度。
- */
-_RAM_FUNC float angle_speed_calc(float pos, float fs)
-{
-    static float d_pos;
-    static float pos_last;
-    float vel;
-
-    d_pos = pos - pos_last;
-    wrap_pm_pi(d_pos);
-
-    vel = d_pos * fs;
-    pos_last = pos;
-
-    return vel;
-}
-
-/**
  * @brief 更新当前控制周期使用的 FOC 运行反馈。
  *
  * @param[in,out] pm 电机控制对象。

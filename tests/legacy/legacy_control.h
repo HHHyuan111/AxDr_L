@@ -32,4 +32,9 @@ float parallel_pid_ctrl(pid_para_t *pid, float ref_value, float feedback_value);
 float serial_pid_ctrl(pid_para_t *pid, float ref_value, float feedback_value);
 float pdff_ctrl(pid_para_t *pid, float ref_value, float feedback_value);
 
+float sat1_datf(float val, float up, float low);
+void low_pf_init(lpf_t *filter);
+float low_pf(lpf_t *filter, float value);
+float angle_speed_calc(float angle_rad, float sample_frequency_hz);
+
 #endif /* TESTS_LEGACY_CONTROL_H */

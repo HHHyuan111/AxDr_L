@@ -187,6 +187,41 @@ static int test_angle_speed_explicit_state(void)
                         -3.14159265358f);
 }
 
+static int test_angle_speed_migration_equivalence(void)
+{
+    static const struct
+    {
+        float angle_rad;
+        float sample_frequency_hz;
+    } cases[] = {
+        {0.1f, 1000.0f},
+        {0.2f, 1000.0f},
+        {6.2f, 1000.0f},
+        {0.1f, 1000.0f},
+        {3.14159265358f, 1.0f},
+        {-3.14159265358f, 1.0f}
+    };
+    control_angle_speed_state_t control = {0};
+    size_t index;
+
+    for (index = 0U; index < sizeof(cases) / sizeof(cases[0]); index++)
+    {
+        const float legacy = angle_speed_calc(cases[index].angle_rad,
+                                              cases[index].sample_frequency_hz);
+        const float migrated = control_angle_speed_step(&control,
+                                                        cases[index].angle_rad,
+                                                        cases[index].sample_frequency_hz);
+
+        if (!expect_same_float_bits("角度差分测速", migrated, legacy))
+        {
+            fprintf(stderr, "角度差分测速等价用例 %zu 失败。\n", index);
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 static int test_pure_transform_interface(void)
 {
     float sin_theta = 0.0f;
@@ -463,36 +498,40 @@ int main(void)
         return 2;
     }
 
-    if (!test_angle_speed_explicit_state()) {
+    if (!test_angle_speed_migration_equivalence()) {
         return 3;
     }
 
-    if (!test_pure_transform_interface()) {
+    if (!test_angle_speed_explicit_state()) {
         return 4;
     }
 
-    if (!test_sin_cos_migration_equivalence()) {
+    if (!test_pure_transform_interface()) {
         return 5;
     }
 
-    if (!test_transform_migration_equivalence()) {
+    if (!test_sin_cos_migration_equivalence()) {
         return 6;
     }
 
-    if (!test_coordinate_transforms()) {
+    if (!test_transform_migration_equivalence()) {
         return 7;
     }
 
-    if (!test_svm_migration_equivalence()) {
+    if (!test_coordinate_transforms()) {
         return 8;
     }
 
-    if (!test_svm_vectors()) {
+    if (!test_svm_migration_equivalence()) {
         return 9;
     }
 
-    if (!test_foc_zero_angle_pipeline()) {
+    if (!test_svm_vectors()) {
         return 10;
+    }
+
+    if (!test_foc_zero_angle_pipeline()) {
+        return 11;
     }
 
     return 0;

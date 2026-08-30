@@ -204,18 +204,6 @@ static const float sinTable_f32[SIN_TABLE_SIZE + 1] = {
 //};
 
 
-float sat1_datf(float val, float up, float low)
-{
-	if (val > up)
-		return up;
-	else if (val < low)
-		return low;
-	else
-		return val;
-}
-
-
-
 float sin_f32(float x)
 {
     float sinVal, fract, in;                           /* Temporary variables for input, output */
@@ -310,27 +298,6 @@ float cos_f32(float x)
     return (cosVal);
 }
 
-
-//
-void low_pf_init(lpf_t *x)
-{
-    float wf = M_2PI * x->fc;
-
-    x->filt_a = x->fs / (x->fs+wf);
-    x->filt_b = 1.0f - x->filt_a;
-
-    //
-    x->val = 0.0f;
-    x->val_f = 0.0f;
-}
-
-//
-_RAM_FUNC float low_pf(lpf_t *x, float val)
-{
-    x->val = val;
-    x->val_f = x->filt_b * x->val + x->filt_a * x->val_f;
-    return x->val_f;
-}
 
 //uint8_t crc8(const uint8_t *data, const uint32_t size)
 //{
@@ -436,7 +403,6 @@ float data_to_float(uint8_t *data)
     *(((uint8_t*)(&tmp_float)) + 3) = data[3];
     return tmp_float;
 }
-
 
 
 

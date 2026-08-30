@@ -1392,10 +1392,7 @@ extern eh_tobs_t eh_tobs;
 void temp_calc(void);
 
 /* Utility functions */
-float sat1_datf(float val, float up, float low);
 float fast_atan2(float y, float x);
-void low_pf_init(lpf_t* x);
-float low_pf(lpf_t* x, float val);
 float sin_f32(float x);
 float cos_f32(float x);
 
@@ -1431,7 +1428,6 @@ void foc_pwm_commit(pmsm_t* pm);
 void foc_pwm_duty_set(pmsm_t* pm);
 void foc_adc_sample(pmsm_t* pm);
 void foc_get_curr_off(void);
-float angle_speed_calc(float pos, float fs);
 
 void foc_cur_pi_calc(pmsm_t* pm);
 void foc_spd_pi_calc(pmsm_t* pm);
