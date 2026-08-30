@@ -19,6 +19,8 @@ $drivePwmTestSource = Join-Path $testDir "test_drive_pwm.c"
 $pidTestSource = Join-Path $testDir "test_control_pid.c"
 $cascadeTestSource = Join-Path $testDir "test_control_cascade.c"
 $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
+$fastLoopTestSource = Join-Path $testDir "test_fast_loop.c"
+$appSource = Join-Path $appDir "axdr_app.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
 $legacyFocSource = Join-Path $legacyDir "legacy_foc.c"
 $legacyFocCoreSource = Join-Path $legacyDir "legacy_foc_core.c"
@@ -43,6 +45,7 @@ $drivePwmExecutablePath = Join-Path $outputDir "test_drive_pwm.exe"
 $pidExecutablePath = Join-Path $outputDir "test_control_pid.exe"
 $cascadeExecutablePath = Join-Path $outputDir "test_control_cascade.exe"
 $debugSnapshotExecutablePath = Join-Path $outputDir "test_debug_snapshot.exe"
+$fastLoopExecutablePath = Join-Path $outputDir "test_fast_loop.exe"
 
 $compilerCommand = Get-Command $Compiler -ErrorAction SilentlyContinue
 if ($null -eq $compilerCommand) {
@@ -143,6 +146,28 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/只读调试快照测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$appDir" "-I$controlDir" `
+        "-I$motorDir" "-I$driveDir" `
+        $fastLoopTestSource $appSource `
+        -o $fastLoopExecutablePath 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host 快速周期编排测试编译失败，退出码：$compileExitCode"
+}
+
+& $fastLoopExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host 快速周期编排测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/快速周期编排与对象传递测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `

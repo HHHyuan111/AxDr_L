@@ -9,6 +9,8 @@
 #ifndef AXDR_APP_H
 #define AXDR_APP_H
 
+#include "common.h"
+
 /**
  * @brief 允许 ADC 中断开始执行快速电机控制。
  *
@@ -20,9 +22,12 @@ void axdr_app_start_fast_control(void);
 /**
  * @brief 执行一次快速电机控制周期。
  *
+ * @param[in,out] motor 本周期独占写入的电机控制对象。
+ * @pre motor 指向已初始化的有效对象。
+ *
  * 本函数由 ADC 注入转换完成中断调用，依次完成编码器采样、ADC 采样、反馈更新和
  * 电机状态机执行。初始化尚未完成时，本函数直接返回，不访问电机控制对象。
  */
-void axdr_app_fast_step(void);
+void axdr_app_fast_step(pmsm_t *motor);
 
 #endif /* AXDR_APP_H */

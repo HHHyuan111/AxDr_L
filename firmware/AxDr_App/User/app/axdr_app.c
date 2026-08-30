@@ -10,10 +10,8 @@
 
 #include <stdbool.h>
 
-#include "common.h"
 #include "debug_snapshot.h"
 #include "drive.h"
-#include "modlue.h"
 
 /*
  * 主初始化流程只把本标志从 false 写为 true 一次，ADC 中断只读取它。
@@ -26,11 +24,11 @@ void axdr_app_start_fast_control(void)
     fast_control_ready = true;
 }
 
-_RAM_FUNC void axdr_app_fast_step(void)
+_RAM_FUNC void axdr_app_fast_step(pmsm_t *motor)
 {
     /*
      * ADC 和 TIM1 通道 4 必须先运行，电流零偏校准才能取得持续更新的采样值；
-     * 但 pmsm_init() 完成以前，不能让中断访问正在初始化的 pm 对象。
+     * 但 pmsm_init() 完成以前，不能让中断访问正在初始化的电机对象。
      */
     if (!fast_control_ready)
     {
@@ -38,23 +36,23 @@ _RAM_FUNC void axdr_app_fast_step(void)
     }
 
     /* 本序号标识一次完整快速周期；自然回绕不改变周期先后关系。 */
-    pm.fast_seq++;
+    motor->fast_seq++;
 
     /* 第 1 步：读取编码器，并更新机械角、电角度和多圈位置。 */
-    encoder_sample(&pm.pos_box);
-    position_update(&pm);
+    encoder_sample(&motor->pos_box);
+    position_update(motor);
 
     /* 第 2 步：读取 ADC 原始值，并换算本周期三相电流。 */
-    foc_adc_sample(&pm);
+    foc_adc_sample(motor);
 
     /* 第 3 步：更新母线电压、控制限幅、转矩和速度反馈。 */
-    foc_feedback_update(&pm);
+    foc_feedback_update(motor);
 
     /* 第 4 步：运行状态机和当前选定的控制模式。 */
-    drive_fast_step(&pm);
+    drive_fast_step(motor);
 
     /* 第 5 步：复制本周期最终结果，仅供调试器观察，不参与控制。 */
-    debug_snapshot_publish(&pm);
+    debug_snapshot_publish(motor);
 }
 
 /**
@@ -66,5 +64,5 @@ _RAM_FUNC void axdr_app_fast_step(void)
 _RAM_FUNC void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
     (void)hadc;
-    axdr_app_fast_step();
+    axdr_app_fast_step(&pm);
 }
