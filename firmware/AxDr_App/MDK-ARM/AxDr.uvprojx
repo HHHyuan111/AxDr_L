@@ -410,6 +410,11 @@
           <GroupName>User/control</GroupName>
           <Files>
             <File>
+              <FileName>control_filter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\control\control_filter.c</FilePath>
+            </File>
+            <File>
               <FileName>control_limit.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\control\control_limit.c</FilePath>

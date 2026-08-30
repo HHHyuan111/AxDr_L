@@ -1,4 +1,5 @@
 #include "common.h"
+#include "control_filter.h"
 #include "control_limit.h"
 #include "foc_svm.h"
 #include "foc_transform.h"
@@ -268,14 +269,14 @@ void pmsm_lpf_init(void)
     pm.wr_lpf.fc = 200.0f; // Hz
     pm.wr_lpf.fs = 20000.0f; // Hz
 
-    low_pf_init(&pm.id_lpf);
-    low_pf_init(&pm.iq_lpf);
-    low_pf_init(&pm.vd_lpf);
-    low_pf_init(&pm.vq_lpf);
-    low_pf_init(&pm.ibus_lpf);
-    low_pf_init(&pm.iabs_lpf);
-    low_pf_init(&pm.vbus_lpf);
-    low_pf_init(&pm.wr_lpf);
+    control_lpf_init(&pm.id_lpf);
+    control_lpf_init(&pm.iq_lpf);
+    control_lpf_init(&pm.vd_lpf);
+    control_lpf_init(&pm.vq_lpf);
+    control_lpf_init(&pm.ibus_lpf);
+    control_lpf_init(&pm.iabs_lpf);
+    control_lpf_init(&pm.vbus_lpf);
+    control_lpf_init(&pm.wr_lpf);
 }
 
 /**
@@ -673,7 +674,7 @@ _RAM_FUNC void foc_feedback_update(pmsm_t *pm)
     pm->pos_pi.out_min   =  pm->ctrl.nmax_vel;
 
     /* 第 3 步：滤波 q 轴电流，并换算转子侧和减速器输出侧转矩。 */
-    pm->foc.iq_f   = low_pf(&pm->iq_lpf, pm->foc.i_q);
+    pm->foc.iq_f = control_lpf_step(&pm->iq_lpf, pm->foc.i_q);
     pm->foc.tor_r  = pm->foc.i_q    * pm->para.Kt;
     pm->foc.tor_rf = pm->foc.iq_f   * pm->para.Kt;
     pm->foc.tor_m  = pm->foc.tor_r  * pm->para.Gr;
@@ -683,7 +684,7 @@ _RAM_FUNC void foc_feedback_update(pmsm_t *pm)
     pm->foc.we = angle_speed_calc(pm->foc.p_e, FOC_FS_HZ);
     pm->foc.wr = pm->foc.we * pm->para.div_pn; // rad/s;
 
-    pm->foc.wr_f = low_pf(&pm->wr_lpf, pm->foc.wr);
+    pm->foc.wr_f = control_lpf_step(&pm->wr_lpf, pm->foc.wr);
     pm->foc.wm = pm->foc.wr_f * pm->para.div_Gr; // rad/s
 
     /* 第 5 步：把本周期速度和转矩送入现有观测器；当前节点不改观测器算法。 */

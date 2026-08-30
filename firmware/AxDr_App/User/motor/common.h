@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "control_filter.h"
 #include "control_pid.h"
 #include "main.h"
 #include "bsp.h"
@@ -117,17 +118,6 @@ typedef enum {
     ABC_PHASE = 0,      // 默认相序 A-B-C
     ACB_PHASE = 1,      // A-C-B
 } phase_order_e;
-
-// Low-pass filter structure
-typedef struct
-{
-    float val;
-    float val_f;
-    float fs;
-    float fc;
-    float filt_a;
-    float filt_b;
-} lpf_t;
 
 // PLL parameter structure
 typedef struct

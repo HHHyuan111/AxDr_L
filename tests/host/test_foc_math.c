@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "control_filter.h"
 #include "control_limit.h"
 #include "foc_svm.h"
 #include "foc_transform.h"
@@ -90,6 +91,52 @@ static int test_limit_migration_equivalence(void)
                                 sat1_datf(quiet_nan, 2.0f, -1.0f)))
     {
         return 0;
+    }
+
+    return 1;
+}
+
+static int test_lpf_migration_equivalence(void)
+{
+    static const float input_cases[] = {
+        0.0f,
+        1.0f,
+        2.5f,
+        -1.25f,
+        0.0f,
+        4.0f
+    };
+    lpf_t legacy = {
+        .val = 3.0f,
+        .val_f = -2.0f,
+        .fs = 20000.0f,
+        .fc = 200.0f,
+        .filt_a = 0.25f,
+        .filt_b = 0.75f
+    };
+    lpf_t control = legacy;
+    size_t index;
+
+    low_pf_init(&legacy);
+    control_lpf_init(&control);
+
+    if (memcmp(&control, &legacy, sizeof(control)) != 0)
+    {
+        fprintf(stderr, "低通滤波初始化结果未保持逐位一致。\n");
+        return 0;
+    }
+
+    for (index = 0U; index < sizeof(input_cases) / sizeof(input_cases[0]); index++)
+    {
+        const float legacy_output = low_pf(&legacy, input_cases[index]);
+        const float control_output = control_lpf_step(&control, input_cases[index]);
+
+        if (!expect_same_float_bits("低通滤波输出", control_output, legacy_output) ||
+            (memcmp(&control, &legacy, sizeof(control)) != 0))
+        {
+            fprintf(stderr, "低通滤波等价用例 %zu 失败。\n", index);
+            return 0;
+        }
     }
 
     return 1;
@@ -361,37 +408,42 @@ int main(void)
 {
     _Static_assert(sizeof(uint32_t) == 4U, "uint32_t 必须为 32 位");
     _Static_assert(sizeof(float) == sizeof(uint32_t), "测试要求 float 为 32 位");
+    _Static_assert(sizeof(lpf_t) == (6U * sizeof(float)), "lpf_t 布局发生了变化");
 
     if (!test_limit_migration_equivalence()) {
         return 1;
     }
 
-    if (!test_pure_transform_interface()) {
+    if (!test_lpf_migration_equivalence()) {
         return 2;
     }
 
-    if (!test_sin_cos_migration_equivalence()) {
+    if (!test_pure_transform_interface()) {
         return 3;
     }
 
-    if (!test_transform_migration_equivalence()) {
+    if (!test_sin_cos_migration_equivalence()) {
         return 4;
     }
 
-    if (!test_coordinate_transforms()) {
+    if (!test_transform_migration_equivalence()) {
         return 5;
     }
 
-    if (!test_svm_migration_equivalence()) {
+    if (!test_coordinate_transforms()) {
         return 6;
     }
 
-    if (!test_svm_vectors()) {
+    if (!test_svm_migration_equivalence()) {
         return 7;
     }
 
-    if (!test_foc_zero_angle_pipeline()) {
+    if (!test_svm_vectors()) {
         return 8;
+    }
+
+    if (!test_foc_zero_angle_pipeline()) {
+        return 9;
     }
 
     return 0;

@@ -18,6 +18,7 @@ $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
 $focSource = Join-Path $motorDir "foc_calc.c"
 $legacyPidSource = Join-Path $motorDir "pid.c"
+$filterSource = Join-Path $controlDir "control_filter.c"
 $limitSource = Join-Path $controlDir "control_limit.c"
 $svmSource = Join-Path $controlDir "foc_svm.c"
 $transformSource = Join-Path $controlDir "foc_transform.c"
@@ -40,7 +41,7 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" `
-        $focTestSource $focSource $limitSource $svmSource $transformSource $utilSource `
+        $focTestSource $focSource $filterSource $limitSource $svmSource $transformSource $utilSource `
         -o $focExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )
