@@ -780,11 +780,6 @@
               <FilePath>..\User\motor\foc_ctrl.c</FilePath>
             </File>
             <File>
-              <FileName>foc_calc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\foc_calc.c</FilePath>
-            </File>
-            <File>
               <FileName>foc_drv.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\motor\foc_drv.c</FilePath>
@@ -808,11 +803,6 @@
               <FileName>nlob.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\motor\nlob.c</FilePath>
-            </File>
-            <File>
-              <FileName>pid.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\pid.c</FilePath>
             </File>
             <File>
               <FileName>pll.c</FileName>

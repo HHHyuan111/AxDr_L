@@ -63,14 +63,12 @@ set(AXDR_USER_SOURCES
     User/motor/calibration.c
     User/motor/eh_observer.c
     User/motor/encoder.c
-    User/motor/foc_calc.c
     User/motor/foc_ctrl.c
     User/motor/foc_drv.c
     User/motor/hfsi.c
     User/motor/idpm.c
     User/motor/ipd_pos.c
     User/motor/nlob.c
-    User/motor/pid.c
     User/motor/pll.c
     User/motor/pos_calc.c
     User/motor/scvm.c

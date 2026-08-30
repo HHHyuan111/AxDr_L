@@ -1414,31 +1414,9 @@ uint16_t data_to_uint16(uint8_t* data);
 int16_t data_to_int16(uint8_t* data);
 float data_to_float(uint8_t* data);
 
-/* PID functions */
-void pid_para_init(pid_para_t* pid_config);
-void pid_limit_init(pid_para_t* pid_config, float i_term_max, float i_term_min, float out_max, float out_min);
-void pid_clear(pid_para_t* pid_clear);
-void pid_reset(pid_para_t* pid_config, float kp, float ki, float kd);
-float parallel_pid_ctrl(pid_para_t *pi, float ref_value, float fback_value);
-float serial_pid_ctrl(pid_para_t* pid, float ref_value, float fdback_value);
-float serial_pid_ctrl1(pid_para_t* pid, float ref_value, float fdback_value, float i_max, float out_max);
-float pdff_ctrl(pid_para_t *pid, float ref_value, float fdback_value);
-
 /* PLL functions */
 void pll_calc(pll_t* pll, float pos);
 void ort_pll_calc(pll_t* pll, float alpha, float beta, float gain);
-
-/* FOC calculation functions */
-void foc_calc(pmsm_foc_t * foc);
-void sin_cos_val(pmsm_foc_t* foc);
-void clarke_transform(pmsm_foc_t* foc);
-void inverse_clarke(pmsm_foc_t* foc);
-void park_transform(pmsm_foc_t* foc);
-void inverse_park(pmsm_foc_t* foc);
-void svpwm_midpoint(pmsm_foc_t* foc);
-void svpwm_sector(pmsm_foc_t* foc);
-int svpwm(pmsm_foc_t* foc);
-int svm(float alpha, float beta, float* ta, float* tb, float* tc);
 
 /* FOC drive functions */
 void pmsm_init(void);

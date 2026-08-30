@@ -6,6 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $testDir = Join-Path $repoRoot "tests/host"
+$legacyDir = Join-Path $repoRoot "tests/legacy"
 $focFakeIncludeDir = Join-Path $testDir "fakes"
 $appDir = Join-Path $repoRoot "firmware/AxDr_App/User/app"
 $controlDir = Join-Path $repoRoot "firmware/AxDr_App/User/control"
@@ -16,8 +17,8 @@ $driveTestSource = Join-Path $testDir "test_drive_state.c"
 $pidTestSource = Join-Path $testDir "test_control_pid.c"
 $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
-$focSource = Join-Path $motorDir "foc_calc.c"
-$legacyPidSource = Join-Path $motorDir "pid.c"
+$legacyFocSource = Join-Path $legacyDir "legacy_foc.c"
+$legacyPidSource = Join-Path $legacyDir "legacy_pid.c"
 $filterSource = Join-Path $controlDir "control_filter.c"
 $limitSource = Join-Path $controlDir "control_limit.c"
 $svmSource = Join-Path $controlDir "foc_svm.c"
@@ -41,8 +42,8 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" `
-        $focTestSource $focSource $filterSource $limitSource $speedSource `
+        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" "-I$legacyDir" `
+        $focTestSource $legacyFocSource $filterSource $limitSource $speedSource `
         $svmSource $transformSource $utilSource `
         -o $focExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -64,7 +65,7 @@ Write-Host "Host C11/FOC 数学测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         -Wno-misleading-indentation `
-        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" `
+        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" "-I$legacyDir" `
         $pidTestSource $legacyPidSource $controlPidSource `
         -o $pidExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }

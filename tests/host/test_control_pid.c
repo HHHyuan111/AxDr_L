@@ -2,8 +2,9 @@
  * @file test_control_pid.c
  * @brief 在电脑端逐拍比较新旧 PID/PDFF 实现。
  *
- * 测试直接编译生产目录中的 Legacy 实现和新 Control 实现。同一组初值和输入
- * 分别送给两个实现，每一拍都比较返回值以及 PID 上下文的全部字节。
+ * 测试用 tests/legacy 中保留的迁移前公式，对照生产目录中的新 Control
+ * 实现。同一组初值和输入分别送给两个实现，每一拍都比较返回值以及 PID
+ * 上下文的全部字节。
  */
 
 #include <stddef.h>
@@ -12,6 +13,7 @@
 
 #include "common.h"
 #include "control_pid.h"
+#include "legacy_control.h"
 
 typedef struct
 {

@@ -1,4 +1,12 @@
-#include "common.h"
+/**
+ * @file legacy_pid.c
+ * @brief 阶段 2 数值回归测试使用的旧版 PID/PDFF 公式。
+ *
+ * 本文件只由电脑端测试编译，用于确认新 Control 实现与迁移前结果一致；
+ * 不再进入 MCU 固件工程，也不是后续功能开发入口。
+ */
+
+#include "legacy_control.h"
 /**
 ***********************************************************************
 * @brief:      pid_para_init()
@@ -178,4 +186,3 @@ _RAM_FUNC float pdff_ctrl(pid_para_t *pid, float ref_value, float fdback_value)
 	
 	return pid->out_value;
 }
-

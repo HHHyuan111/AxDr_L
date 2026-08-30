@@ -2,8 +2,8 @@
  * @file test_foc_math.c
  * @brief 在电脑端直接验证现有 FOC 基础数学函数。
  *
- * 测试直接编译生产目录中的 foc_calc.c 和 util.c，不复制控制公式。
- * fakes 目录只替代当前测试不需要的 STM32/BSP 头文件。
+ * 测试用 tests/legacy 中保留的迁移前公式，对照生产目录中的新 Control
+ * 实现。旧公式不再参与 MCU 固件编译。
  */
 
 #include <math.h>
@@ -17,6 +17,7 @@
 #include "control_speed.h"
 #include "foc_svm.h"
 #include "foc_transform.h"
+#include "legacy_control.h"
 
 #if !defined(__STDC_VERSION__) || (__STDC_VERSION__ < 201112L)
 #error "需要支持 C11 的电脑端编译器"
