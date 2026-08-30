@@ -11,6 +11,7 @@
 #include <string.h>
 #include "control_filter.h"
 #include "control_pid.h"
+#include "control_speed.h"
 #include "main.h"
 #include "bsp.h"
 
@@ -1375,6 +1376,8 @@ typedef struct
     lpf_t vbus_lpf;
     lpf_t iabs_lpf;
     lpf_t wr_lpf;
+
+    control_angle_speed_state_t elec_speed_diff;
 
     traj_t traj;
 

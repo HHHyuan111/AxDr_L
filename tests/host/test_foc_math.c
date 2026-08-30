@@ -14,6 +14,7 @@
 #include "common.h"
 #include "control_filter.h"
 #include "control_limit.h"
+#include "control_speed.h"
 #include "foc_svm.h"
 #include "foc_transform.h"
 
@@ -140,6 +141,49 @@ static int test_lpf_migration_equivalence(void)
     }
 
     return 1;
+}
+
+static int test_angle_speed_explicit_state(void)
+{
+    control_angle_speed_state_t first = {0};
+    control_angle_speed_state_t second = {0};
+
+    if (!expect_close("测速实例 A 首拍",
+                      control_angle_speed_step(&first, 0.1f, 1000.0f),
+                      100.0f) ||
+        !expect_close("测速实例 B 首拍",
+                      control_angle_speed_step(&second, 0.2f, 1000.0f),
+                      200.0f) ||
+        !expect_close("测速实例 A 第二拍",
+                      control_angle_speed_step(&first, 0.2f, 1000.0f),
+                      100.0f))
+    {
+        return 0;
+    }
+
+    first.previous_angle_rad = 0.2f;
+    if (!expect_close("测速正向跨圈",
+                      control_angle_speed_step(&first, 6.2f, 1000.0f),
+                      -283.18549f) ||
+        !expect_close("测速反向跨圈",
+                      control_angle_speed_step(&first, 0.1f, 1000.0f),
+                      183.18558f))
+    {
+        return 0;
+    }
+
+    first.previous_angle_rad = 0.0f;
+    if (!expect_close("测速正 pi 边界",
+                      control_angle_speed_step(&first, 3.14159265358f, 1.0f),
+                      3.14159265358f))
+    {
+        return 0;
+    }
+
+    first.previous_angle_rad = 0.0f;
+    return expect_close("测速负 pi 边界",
+                        control_angle_speed_step(&first, -3.14159265358f, 1.0f),
+                        -3.14159265358f);
 }
 
 static int test_pure_transform_interface(void)
@@ -418,32 +462,36 @@ int main(void)
         return 2;
     }
 
-    if (!test_pure_transform_interface()) {
+    if (!test_angle_speed_explicit_state()) {
         return 3;
     }
 
-    if (!test_sin_cos_migration_equivalence()) {
+    if (!test_pure_transform_interface()) {
         return 4;
     }
 
-    if (!test_transform_migration_equivalence()) {
+    if (!test_sin_cos_migration_equivalence()) {
         return 5;
     }
 
-    if (!test_coordinate_transforms()) {
+    if (!test_transform_migration_equivalence()) {
         return 6;
     }
 
-    if (!test_svm_migration_equivalence()) {
+    if (!test_coordinate_transforms()) {
         return 7;
     }
 
-    if (!test_svm_vectors()) {
+    if (!test_svm_migration_equivalence()) {
         return 8;
     }
 
-    if (!test_foc_zero_angle_pipeline()) {
+    if (!test_svm_vectors()) {
         return 9;
+    }
+
+    if (!test_foc_zero_angle_pipeline()) {
+        return 10;
     }
 
     return 0;

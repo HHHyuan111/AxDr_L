@@ -23,6 +23,7 @@ $limitSource = Join-Path $controlDir "control_limit.c"
 $svmSource = Join-Path $controlDir "foc_svm.c"
 $transformSource = Join-Path $controlDir "foc_transform.c"
 $controlPidSource = Join-Path $controlDir "control_pid.c"
+$speedSource = Join-Path $controlDir "control_speed.c"
 $utilSource = Join-Path $motorDir "util.c"
 $driveSource = Join-Path $driveDir "drive.c"
 $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
@@ -41,7 +42,8 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" `
-        $focTestSource $focSource $filterSource $limitSource $svmSource $transformSource $utilSource `
+        $focTestSource $focSource $filterSource $limitSource $speedSource `
+        $svmSource $transformSource $utilSource `
         -o $focExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )

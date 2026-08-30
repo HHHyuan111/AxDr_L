@@ -681,7 +681,9 @@ _RAM_FUNC void foc_feedback_update(pmsm_t *pm)
     pm->foc.tor_mf = pm->foc.tor_rf * pm->para.Gr;
 
     /* 第 4 步：由电角度差得到电角速度，再换算转子速度和输出轴速度。 */
-    pm->foc.we = angle_speed_calc(pm->foc.p_e, FOC_FS_HZ);
+    pm->foc.we = control_angle_speed_step(&pm->elec_speed_diff,
+                                           pm->foc.p_e,
+                                           FOC_FS_HZ);
     pm->foc.wr = pm->foc.we * pm->para.div_pn; // rad/s;
 
     pm->foc.wr_f = control_lpf_step(&pm->wr_lpf, pm->foc.wr);

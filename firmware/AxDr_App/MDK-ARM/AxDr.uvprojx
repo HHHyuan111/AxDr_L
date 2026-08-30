@@ -425,6 +425,11 @@
               <FilePath>..\User\control\control_pid.c</FilePath>
             </File>
             <File>
+              <FileName>control_speed.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\control\control_speed.c</FilePath>
+            </File>
+            <File>
               <FileName>foc_svm.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\control\foc_svm.c</FilePath>
