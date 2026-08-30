@@ -9,8 +9,10 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "common.h"
+#include "foc_transform.h"
 
 #if !defined(__STDC_VERSION__) || (__STDC_VERSION__ < 201112L)
 #error "需要支持 C11 的电脑端编译器"
@@ -26,6 +28,112 @@ static int expect_close(const char *name, float actual, float expected)
 
     fprintf(stderr, "%s 不符合预期：实际 %.8f，期望 %.8f\n", name, actual, expected);
     return 0;
+}
+
+static int expect_same_float_bits(const char *name, float actual, float expected)
+{
+    if (memcmp(&actual, &expected, sizeof(actual)) == 0) {
+        return 1;
+    }
+
+    fprintf(stderr,
+            "%s 未保持逐位一致：新值 %.9g，Legacy 值 %.9g\n",
+            name,
+            (double)actual,
+            (double)expected);
+    return 0;
+}
+
+static int test_pure_transform_interface(void)
+{
+    float i_alpha = 0.0f;
+    float i_beta = 0.0f;
+    float i_d = 0.0f;
+    float i_q = 0.0f;
+    float v_alpha = 0.0f;
+    float v_beta = 0.0f;
+
+    foc_clarke(1.25f, -0.25f, -1.0f, &i_alpha, &i_beta);
+    foc_park(i_alpha, i_beta, 0.6f, 0.8f, &i_d, &i_q);
+    foc_inv_park(0.4f, -0.2f, 0.6f, 0.8f, &v_alpha, &v_beta);
+
+    return expect_close("纯 Clarke i_alpha", i_alpha, 1.25f) &&
+           expect_close("纯 Clarke i_beta", i_beta, 0.43301270f) &&
+           expect_close("纯 Park i_d", i_d, 1.25980762f) &&
+           expect_close("纯 Park i_q", i_q, -0.40358984f) &&
+           expect_close("纯逆 Park v_alpha", v_alpha, 0.44f) &&
+           expect_close("纯逆 Park v_beta", v_beta, 0.08f);
+}
+
+static int test_transform_migration_equivalence(void)
+{
+    static const struct {
+        float i_a;
+        float i_b;
+        float i_c;
+        float sin_theta;
+        float cos_theta;
+        float v_d;
+        float v_q;
+    } cases[] = {
+        {0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},
+        {1.25f, -0.25f, -1.0f, 0.6f, 0.8f, 0.4f, -0.2f},
+        {-2.0f, 1.25f, 0.75f, -0.8f, 0.6f, -0.3f, 0.9f},
+        {-0.0f, 0.0f, -0.0f, 1.0f, 0.0f, -0.0f, 0.0f}
+    };
+    size_t index;
+
+    for (index = 0U; index < sizeof(cases) / sizeof(cases[0]); index++) {
+        pmsm_foc_t legacy = {0};
+        float i_alpha = 0.0f;
+        float i_beta = 0.0f;
+        float i_d = 0.0f;
+        float i_q = 0.0f;
+        float v_alpha = 0.0f;
+        float v_beta = 0.0f;
+
+        legacy.i_a = cases[index].i_a;
+        legacy.i_b = cases[index].i_b;
+        legacy.i_c = cases[index].i_c;
+        legacy.sin_val = cases[index].sin_theta;
+        legacy.cos_val = cases[index].cos_theta;
+        legacy.v_d = cases[index].v_d;
+        legacy.v_q = cases[index].v_q;
+
+        clarke_transform(&legacy);
+        park_transform(&legacy);
+        inverse_park(&legacy);
+
+        foc_clarke(cases[index].i_a,
+                   cases[index].i_b,
+                   cases[index].i_c,
+                   &i_alpha,
+                   &i_beta);
+        foc_park(i_alpha,
+                 i_beta,
+                 cases[index].sin_theta,
+                 cases[index].cos_theta,
+                 &i_d,
+                 &i_q);
+        foc_inv_park(cases[index].v_d,
+                     cases[index].v_q,
+                     cases[index].sin_theta,
+                     cases[index].cos_theta,
+                     &v_alpha,
+                     &v_beta);
+
+        if (!expect_same_float_bits("Clarke i_alpha", i_alpha, legacy.i_alph) ||
+            !expect_same_float_bits("Clarke i_beta", i_beta, legacy.i_beta) ||
+            !expect_same_float_bits("Park i_d", i_d, legacy.i_d) ||
+            !expect_same_float_bits("Park i_q", i_q, legacy.i_q) ||
+            !expect_same_float_bits("逆 Park v_alpha", v_alpha, legacy.v_alph) ||
+            !expect_same_float_bits("逆 Park v_beta", v_beta, legacy.v_beta)) {
+            fprintf(stderr, "坐标变换等价用例 %zu 失败。\n", index);
+            return 0;
+        }
+    }
+
+    return 1;
 }
 
 static int test_coordinate_transforms(void)
@@ -118,16 +226,24 @@ int main(void)
 {
     _Static_assert(sizeof(uint32_t) == 4U, "uint32_t 必须为 32 位");
 
-    if (!test_coordinate_transforms()) {
+    if (!test_pure_transform_interface()) {
         return 1;
     }
 
-    if (!test_svm_vectors()) {
+    if (!test_transform_migration_equivalence()) {
         return 2;
     }
 
-    if (!test_foc_zero_angle_pipeline()) {
+    if (!test_coordinate_transforms()) {
         return 3;
+    }
+
+    if (!test_svm_vectors()) {
+        return 4;
+    }
+
+    if (!test_foc_zero_angle_pipeline()) {
+        return 5;
     }
 
     return 0;

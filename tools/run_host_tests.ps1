@@ -7,11 +7,13 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $testDir = Join-Path $repoRoot "tests/host"
 $focFakeIncludeDir = Join-Path $testDir "fakes"
+$controlDir = Join-Path $repoRoot "firmware/AxDr_App/User/control"
 $motorDir = Join-Path $repoRoot "firmware/AxDr_App/User/motor"
 $driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
 $focTestSource = Join-Path $testDir "test_foc_math.c"
 $driveTestSource = Join-Path $testDir "test_drive_state.c"
 $focSource = Join-Path $motorDir "foc_calc.c"
+$transformSource = Join-Path $controlDir "foc_transform.c"
 $utilSource = Join-Path $motorDir "util.c"
 $driveSource = Join-Path $driveDir "drive.c"
 $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
@@ -27,8 +29,8 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$motorDir" `
-        $focTestSource $focSource $utilSource `
+        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" `
+        $focTestSource $focSource $transformSource $utilSource `
         -o $focExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )

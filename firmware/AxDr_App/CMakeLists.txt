@@ -31,6 +31,7 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 include_directories(
     "User/app"
     "User/bsp/inc"
+    "User/control"
     "User/drive"
     "User/motor"
     "User/moldue/inc"
@@ -46,6 +47,7 @@ set(AXDR_USER_SOURCES
     User/bsp/target_adc.c
     User/bsp/target_encoder.c
     User/bsp/target_pwm.c
+    User/control/foc_transform.c
     User/drive/drive.c
     User/moldue/display.c
     User/moldue/lcd.c
