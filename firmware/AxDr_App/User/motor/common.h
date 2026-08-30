@@ -510,40 +510,6 @@ typedef struct
 
 } pmsm_app_ctrl_t;
 
-typedef struct
-{
-    float vbus;
-    float ibus;
-    float i_abs;
-    int rev; // Rotor revolution
-    int m_rev; // Mechanical revolution
-    float e_pr; // Encoder Position
-
-    float p_e; // Electrical position
-    float sp_r; // Rotor position
-    float mp_r; // Rotor position
-    float mp_m; // Mechanical position
-    float sp_m; // Position
-    float we; // Electrical velocity
-    float wr; // Rotor velocity
-    float wm; // Mechanical velocity
-    float tor_r;
-    float tor_m;
-    float Tcoil; // Coil temperature
-    float Tmos; // MOS temperature
-
-    float i_a;
-    float i_b;
-    float i_c;
-
-    float v_a;
-    float v_b;
-    float v_c;
-
-    float i_d;
-    float i_q;
-} pmsm_display_t;
-
 // Period structure
 typedef struct
 {
@@ -1344,7 +1310,6 @@ typedef struct
     pmsm_cmd_t cmd;
     pmsm_app_ctrl_t app_ctrl;
     pmsm_foc_t foc;
-    pmsm_display_t display;
     period_t period;
     pmsm_fault_t fault;
     pmsm_flag_t flag;
@@ -1440,7 +1405,6 @@ bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos);
 /* FOC control functions */
 void pmsm_observe(pmsm_t* pm);
 void pmsm_ctrl_set(pmsm_t* pm);
-void pmsm_ctrl_display(pmsm_t* pm);
 void pmsm_fault_check(pmsm_t* pm);
 void pmsm_slow_down(pmsm_t* pm, float dec);
 void pmsm_reset(pmsm_t* pm);

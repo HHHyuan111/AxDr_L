@@ -375,46 +375,6 @@ _RAM_FUNC void pmsm_ctrl_set(pmsm_t* pm)
     pm->ctrl.nmax_pos =  pm->app_ctrl.nmax_posm*pm->para.Gr;
 }
 
-_RAM_FUNC void pmsm_ctrl_display(pmsm_t* pm)
-{
-    pm->display.vbus     = pm->foc.vbus;
-    pm->display.ibus     = pm->foc.ibus;
-    pm->display.Tcoil    = pm->foc.Tcoil;
-    pm->display.Tmos     = pm->foc.Tmos;
-
-    if(pm->app_ctrl.polarity == motor_polarity_p)
-    {
-        pm->display.i_a      = pm->foc.i_a;
-        pm->display.i_b      = pm->foc.i_b;
-        pm->display.i_c      = pm->foc.i_c;
-        pm->display.p_e      = pm->foc.p_e;
-        pm->display.e_pr     = pm->foc.e_pr;
-        pm->display.sp_m     = pm->foc.sp_m;
-        pm->display.mp_m     = pm->foc.mp_m;
-        pm->display.we       = pm->foc.we;
-        pm->display.wr       = pm->foc.wr;
-        pm->display.wm       = pm->foc.wm;
-        pm->display.tor_r    = pm->foc.tor_rf;
-        pm->display.tor_m    = pm->foc.tor_mf;
-    }
-    else if (pm->app_ctrl.polarity == motor_polarity_n)
-    {
-        pm->display.i_a      = -1.0f * pm->foc.i_a;
-        pm->display.i_b      = -1.0f * pm->foc.i_b;
-        pm->display.i_c      = -1.0f * pm->foc.i_c;
-        pm->display.p_e      = M_2PI - pm->foc.p_e;
-        pm->display.e_pr     = M_2PI - pm->foc.e_pr;
-        pm->display.sp_m     = M_2PI - pm->foc.sp_m;
-        pm->display.mp_m     = -1.0f * pm->foc.mp_m;
-        pm->display.we       = -1.0f * pm->foc.we;
-        pm->display.wr       = -1.0f * pm->foc.wr;
-        pm->display.wm       = -1.0f * pm->foc.wm;
-        pm->display.tor_r    = -1.0f * pm->foc.tor_rf;
-        pm->display.tor_m    = -1.0f * pm->foc.tor_mf;
-    }
-
-}
-
 /**
 ***********************************************************************
 * @brief:      pmsm_fault_check(pmsm_t* pm)
