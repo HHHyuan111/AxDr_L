@@ -7,6 +7,7 @@
 
 #include "drive_pwm.h"
 
+#include "common.h"
 #include "target_pwm.h"
 
 _RAM_FUNC void drive_pwm_start(void)

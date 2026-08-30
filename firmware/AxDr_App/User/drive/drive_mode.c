@@ -5,6 +5,7 @@
 
 #include "drive_mode.h"
 
+#include "common.h"
 #include "drive_pwm.h"
 
 _RAM_FUNC void drive_mode_step(pmsm_t *pm)

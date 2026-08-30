@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "common.h"
 #include "drive_pwm.h"
 
 static unsigned int start_count;

@@ -9,7 +9,7 @@
 #ifndef AXDR_APP_H
 #define AXDR_APP_H
 
-#include "common.h"
+#include "motor_fwd.h"
 
 /**
  * @brief 允许 ADC 中断开始执行快速电机控制。

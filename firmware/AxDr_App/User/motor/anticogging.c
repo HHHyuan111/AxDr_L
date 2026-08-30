@@ -3,6 +3,7 @@
 //
 
 #include "main.h"
+#include "common.h"
 #include "drive_pwm.h"
 
 void anticog_init(void)

@@ -6,7 +6,7 @@
 #ifndef AXDR_DRIVE_H
 #define AXDR_DRIVE_H
 
-#include "common.h"
+#include "motor_fwd.h"
 
 /**
  * @brief 执行一次 Drive 状态与模式调度。

@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include "common.h"
 #include "axdr_app.h"
 
 typedef enum

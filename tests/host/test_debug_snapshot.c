@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "common.h"
 #include "debug_snapshot.h"
 
 static int expect_u32(const char *name, uint32_t actual, uint32_t expected)

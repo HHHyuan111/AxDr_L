@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 
-#include "common.h"
+#include "motor_fwd.h"
 
 /**
  * @brief 调试器观察用的单周期关键量镜像。

@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include "common.h"
 #include "drive_mode.h"
 
 typedef enum

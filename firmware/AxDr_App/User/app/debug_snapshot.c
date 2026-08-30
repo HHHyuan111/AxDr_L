@@ -5,6 +5,8 @@
 
 #include "debug_snapshot.h"
 
+#include "common.h"
+
 volatile debug_snapshot_t g_debug_snapshot;
 
 _RAM_FUNC void debug_snapshot_publish(const pmsm_t *pm)

@@ -4,6 +4,8 @@
  */
 
 #include "drive.h"
+
+#include "common.h"
 #include "drive_mode.h"
 #include "drive_pwm.h"
 

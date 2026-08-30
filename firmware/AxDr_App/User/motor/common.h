@@ -15,6 +15,7 @@
 #include "drive_io.h"
 #include "main.h"
 #include "bsp.h"
+#include "motor_fwd.h"
 
 #define _RAM_FUNC   __attribute__((section(".RamFunc")))
 #define _RAM_DATA   __attribute__((section(".data")))
@@ -1297,7 +1298,7 @@ typedef struct
 } pmsm_map_t;
 
 // PMSM structure
-typedef struct
+struct pmsm
 {
     uint32_t fast_seq;
     mode_ctrl_e mode;
@@ -1351,7 +1352,7 @@ typedef struct
     traj_t traj;
 
     pmsm_map_t map;
-} pmsm_t;
+};
 
 extern pmsm_t pm;
 

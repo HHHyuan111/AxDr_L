@@ -6,7 +6,7 @@
 #ifndef AXDR_DRIVE_PWM_H
 #define AXDR_DRIVE_PWM_H
 
-#include "common.h"
+#include "motor_fwd.h"
 
 /**
  * @brief 启动三相主输出和互补输出。

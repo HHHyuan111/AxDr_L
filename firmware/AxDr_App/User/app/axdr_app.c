@@ -10,6 +10,7 @@
 
 #include <stdbool.h>
 
+#include "common.h"
 #include "debug_snapshot.h"
 #include "drive.h"
 

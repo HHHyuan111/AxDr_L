@@ -6,7 +6,7 @@
 #ifndef AXDR_DRIVE_MODE_H
 #define AXDR_DRIVE_MODE_H
 
-#include "common.h"
+#include "motor_fwd.h"
 
 /**
  * @brief 执行当前选定的 PMSM 控制、标定或辨识模式。
