@@ -81,7 +81,7 @@ _RAM_FUNC void pt_tor_mode(pmsm_t* pm)
         {
             pm->period.spd_pid_cnt = 0;
             pm->ctrl.wr_set = pm->ctrl.wm_set * pm->para.Gr;
-            serial_pid_ctrl(&pm->spd_pi, pm->ctrl.wr_set, pm->foc.wr);
+            control_pid_serial_step(&pm->spd_pi, pm->ctrl.wr_set, pm->foc.wr);
             pm->ctrl.iq_set = pm->spd_pi.out_value;
         }
     }
@@ -242,7 +242,7 @@ _RAM_FUNC void cst_tor_mode(pmsm_t* pm)
         {
             pm->period.spd_pid_cnt = 0;
             pm->ctrl.wr_set = pm->ctrl.wm_set * pm->para.Gr;
-            serial_pid_ctrl(&pm->spd_pi, pm->ctrl.wr_set, pm->foc.wr);
+            control_pid_serial_step(&pm->spd_pi, pm->ctrl.wr_set, pm->foc.wr);
             pm->ctrl.iq_set = pm->spd_pi.out_value;
         }
     }
@@ -327,10 +327,10 @@ _RAM_FUNC void pmsm_slow_down(pmsm_t* pm, float dec)
 
 _RAM_FUNC void pmsm_reset(pmsm_t* pm)
 {
-    pid_clear(&pm->id_pi);
-    pid_clear(&pm->iq_pi);
-    pid_clear(&pm->spd_pi);
-    pid_clear(&pm->pos_pi);
+    control_pid_clear(&pm->id_pi);
+    control_pid_clear(&pm->iq_pi);
+    control_pid_clear(&pm->spd_pi);
+    control_pid_clear(&pm->pos_pi);
     foc_clear(pm);
 }
 

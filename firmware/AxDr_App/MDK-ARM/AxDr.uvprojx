@@ -405,6 +405,11 @@
           <GroupName>User/control</GroupName>
           <Files>
             <File>
+              <FileName>control_pid.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\control\control_pid.c</FilePath>
+            </File>
+            <File>
               <FileName>foc_svm.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\control\foc_svm.c</FilePath>

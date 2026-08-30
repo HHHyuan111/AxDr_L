@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "control_pid.h"
 #include "main.h"
 #include "bsp.h"
 
@@ -127,37 +128,6 @@ typedef struct
     float filt_a;
     float filt_b;
 } lpf_t;
-
-// PID parameter structure
-typedef struct
-{
-    volatile float kp; // Proportional gain
-    volatile float ki; // Integral gain
-    volatile float kd; // Derivative gain
-
-    volatile float kfp; // Proportional gain
-    volatile float kf_damp; // Integral gain
-
-    volatile float p_term; // Proportional term
-    volatile float i_term; // Integral term
-    volatile float d_term; // Derivative term
-
-    volatile float i_term_max; // Maximum integral term
-    volatile float i_term_min; // Minimum integral term
-
-    volatile float ts; // Sampling time
-
-    volatile float ref_value; // Reference value
-    volatile float fback_value; // Feedback value
-
-    volatile float error; // Error
-    volatile float pre_err; // Previous error
-
-    volatile float out_min; // Minimum output
-    volatile float out_max; // Maximum output
-
-    volatile float out_value;
-} pid_para_t;
 
 // PLL parameter structure
 typedef struct

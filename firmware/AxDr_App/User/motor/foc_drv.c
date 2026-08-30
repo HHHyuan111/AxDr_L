@@ -306,10 +306,10 @@ void pmsm_init(void)
 
     pm.pos_pi.kp = 12.0f;//pm.spd_pi.kp * 1.4f * pm.period.pos_pid_fs;//24.0f;
 
-    pid_limit_init(&pm.id_pi, 11.0f, -11.0f, 11.0f, -11.0f);
-    pid_limit_init(&pm.iq_pi, 11.0f, -11.0f, 11.0f, -11.0f);
-    pid_limit_init(&pm.spd_pi, 20.0f, -20.0f, 20.0f, -20.0f);
-    pid_limit_init(&pm.pos_pi, 200.0f, -200.0f, 200.0f, -200.0f);
+    control_pid_set_limits(&pm.id_pi, 11.0f, -11.0f, 11.0f, -11.0f);
+    control_pid_set_limits(&pm.iq_pi, 11.0f, -11.0f, 11.0f, -11.0f);
+    control_pid_set_limits(&pm.spd_pi, 20.0f, -20.0f, 20.0f, -20.0f);
+    control_pid_set_limits(&pm.pos_pi, 200.0f, -200.0f, 200.0f, -200.0f);
     
     iden_init();
     scvm_init();
@@ -461,9 +461,9 @@ _RAM_FUNC bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
 
     if (++pm->period.cur_pid_cnt >= pm->period.cur_pid_cnt_val)
     {
-        parallel_pid_ctrl(&pm->id_pi, id_set, pm->foc.i_d);
+        control_pid_parallel_step(&pm->id_pi, id_set, pm->foc.i_d);
         pm->foc.v_d = pm->id_pi.out_value;
-        parallel_pid_ctrl(&pm->iq_pi, iq_set, pm->foc.i_q);
+        control_pid_parallel_step(&pm->iq_pi, iq_set, pm->foc.i_q);
         pm->foc.v_q = pm->iq_pi.out_value;
     }
 
@@ -512,7 +512,7 @@ _RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
     if (++pm->period.spd_pid_cnt >= pm->period.spd_pid_cnt_val)
     {
         pm->period.spd_pid_cnt = 0;
-        pdff_ctrl(&pm->spd_pi, vel_set, pm->foc.wr_f);
+        control_pid_pdff_step(&pm->spd_pi, vel_set, pm->foc.wr_f);
         pm->ctrl.iq_lim = pm->spd_pi.out_value;
 
         if (ABS(iq_set) > 0)
@@ -521,9 +521,9 @@ _RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
 
     if (++pm->period.cur_pid_cnt >= pm->period.cur_pid_cnt_val)
     {
-        parallel_pid_ctrl(&pm->id_pi, pm->ctrl.id_set, pm->foc.i_d);
+        control_pid_parallel_step(&pm->id_pi, pm->ctrl.id_set, pm->foc.i_d);
         pm->foc.v_d = pm->id_pi.out_value;
-        parallel_pid_ctrl(&pm->iq_pi, pm->ctrl.iq_lim, pm->foc.i_q);
+        control_pid_parallel_step(&pm->iq_pi, pm->ctrl.iq_lim, pm->foc.i_q);
         pm->foc.v_q = pm->iq_pi.out_value;
     }
 
@@ -574,7 +574,7 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
     if (++pm->period.pos_pid_cnt >= pm->period.pos_pid_cnt_val)
     {
         pm->period.pos_pid_cnt = 0;
-        parallel_pid_ctrl(&pm->pos_pi, pos_set, pm->foc.mp_r);
+        control_pid_parallel_step(&pm->pos_pi, pos_set, pm->foc.mp_r);
         pm->ctrl.wr_lim = pm->pos_pi.out_value;
 
         if (ABS(vel_set) > 0)
@@ -584,7 +584,7 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
     if (++pm->period.spd_pid_cnt >= pm->period.spd_pid_cnt_val)
     {
         pm->period.spd_pid_cnt = 0;
-        pdff_ctrl(&pm->spd_pi, pm->ctrl.wr_lim, pm->foc.wr_f);
+        control_pid_pdff_step(&pm->spd_pi, pm->ctrl.wr_lim, pm->foc.wr_f);
         pm->ctrl.iq_lim = pm->spd_pi.out_value;
 
         if (ABS(iq_set) > 0)
@@ -593,9 +593,9 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
 
     if (++pm->period.cur_pid_cnt >= pm->period.cur_pid_cnt_val)
     {
-        parallel_pid_ctrl(&pm->id_pi, pm->ctrl.id_set, pm->foc.i_d);
+        control_pid_parallel_step(&pm->id_pi, pm->ctrl.id_set, pm->foc.i_d);
         pm->foc.v_d = pm->id_pi.out_value;
-        parallel_pid_ctrl(&pm->iq_pi, pm->ctrl.iq_lim, pm->foc.i_q);
+        control_pid_parallel_step(&pm->iq_pi, pm->ctrl.iq_lim, pm->foc.i_q);
         pm->foc.v_q = pm->iq_pi.out_value;
     }
 
