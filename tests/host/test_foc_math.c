@@ -97,6 +97,8 @@ static int test_limit_migration_equivalence(void)
 
 static int test_pure_transform_interface(void)
 {
+    float sin_theta = 0.0f;
+    float cos_theta = 0.0f;
     float i_alpha = 0.0f;
     float i_beta = 0.0f;
     float i_d = 0.0f;
@@ -104,16 +106,51 @@ static int test_pure_transform_interface(void)
     float v_alpha = 0.0f;
     float v_beta = 0.0f;
 
+    foc_sin_cos(0.0f, &sin_theta, &cos_theta);
     foc_clarke(1.25f, -0.25f, -1.0f, &i_alpha, &i_beta);
     foc_park(i_alpha, i_beta, 0.6f, 0.8f, &i_d, &i_q);
     foc_inv_park(0.4f, -0.2f, 0.6f, 0.8f, &v_alpha, &v_beta);
 
-    return expect_close("纯 Clarke i_alpha", i_alpha, 1.25f) &&
+    return expect_close("纯 sin", sin_theta, 0.0f) &&
+           expect_close("纯 cos", cos_theta, 1.0f) &&
+           expect_close("纯 Clarke i_alpha", i_alpha, 1.25f) &&
            expect_close("纯 Clarke i_beta", i_beta, 0.43301270f) &&
            expect_close("纯 Park i_d", i_d, 1.25980762f) &&
            expect_close("纯 Park i_q", i_q, -0.40358984f) &&
            expect_close("纯逆 Park v_alpha", v_alpha, 0.44f) &&
            expect_close("纯逆 Park v_beta", v_beta, 0.08f);
+}
+
+static int test_sin_cos_migration_equivalence(void)
+{
+    static const float theta_cases[] = {
+        0.0f,
+        -0.0f,
+        0.6f,
+        -1.2f,
+        6.28318530f
+    };
+    size_t index;
+
+    for (index = 0U; index < sizeof(theta_cases) / sizeof(theta_cases[0]); index++)
+    {
+        pmsm_foc_t legacy = {0};
+        float sin_theta = 0.0f;
+        float cos_theta = 0.0f;
+
+        legacy.theta = theta_cases[index];
+        sin_cos_val(&legacy);
+        foc_sin_cos(theta_cases[index], &sin_theta, &cos_theta);
+
+        if (!expect_same_float_bits("角度 sin", sin_theta, legacy.sin_val) ||
+            !expect_same_float_bits("角度 cos", cos_theta, legacy.cos_val))
+        {
+            fprintf(stderr, "正余弦等价用例 %zu 失败。\n", index);
+            return 0;
+        }
+    }
+
+    return 1;
 }
 
 static int test_transform_migration_equivalence(void)
@@ -333,24 +370,28 @@ int main(void)
         return 2;
     }
 
-    if (!test_transform_migration_equivalence()) {
+    if (!test_sin_cos_migration_equivalence()) {
         return 3;
     }
 
-    if (!test_coordinate_transforms()) {
+    if (!test_transform_migration_equivalence()) {
         return 4;
     }
 
-    if (!test_svm_migration_equivalence()) {
+    if (!test_coordinate_transforms()) {
         return 5;
     }
 
-    if (!test_svm_vectors()) {
+    if (!test_svm_migration_equivalence()) {
         return 6;
     }
 
-    if (!test_foc_zero_angle_pipeline()) {
+    if (!test_svm_vectors()) {
         return 7;
+    }
+
+    if (!test_foc_zero_angle_pipeline()) {
+        return 8;
     }
 
     return 0;

@@ -1,13 +1,23 @@
 /**
  * @file foc_transform.c
- * @brief FOC Clarke、Park 和逆 Park 的无状态数值实现。
+ * @brief FOC 角度、Clarke、Park 和逆 Park 的无状态数值实现。
  */
 
 #include "foc_transform.h"
 
+#include <math.h>
+
 #define FOC_TRANSFORM_RAM_FUNC __attribute__((section(".RamFunc")))
 
 static const float foc_one_by_sqrt3 = 0.57735026919f;
+
+FOC_TRANSFORM_RAM_FUNC void foc_sin_cos(float theta_e_rad,
+                                        float *sin_theta,
+                                        float *cos_theta)
+{
+    *sin_theta = sinf(theta_e_rad);
+    *cos_theta = cosf(theta_e_rad);
+}
 
 FOC_TRANSFORM_RAM_FUNC void foc_clarke(float i_a,
                                        float i_b,

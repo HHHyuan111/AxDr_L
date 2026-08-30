@@ -406,7 +406,7 @@ _RAM_FUNC bool foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
                &pm->foc.i_beta);
     pm->foc.theta = pos;
     wrap_0_2pi(pm->foc.theta);
-    sin_cos_val(&pm->foc);
+    foc_sin_cos(pm->foc.theta, &pm->foc.sin_val, &pm->foc.cos_val);
     foc_park(pm->foc.i_alph,
              pm->foc.i_beta,
              pm->foc.sin_val,
@@ -451,7 +451,7 @@ _RAM_FUNC bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
                &pm->foc.i_beta);
     pm->foc.theta = pos;
     wrap_0_2pi(pm->foc.theta);
-    sin_cos_val(&pm->foc);
+    foc_sin_cos(pm->foc.theta, &pm->foc.sin_val, &pm->foc.cos_val);
 
     foc_park(pm->foc.i_alph,
              pm->foc.i_beta,
@@ -502,7 +502,7 @@ _RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
                &pm->foc.i_beta);
     pm->foc.theta = pos;
     wrap_0_2pi(pm->foc.theta);
-    sin_cos_val(&pm->foc);
+    foc_sin_cos(pm->foc.theta, &pm->foc.sin_val, &pm->foc.cos_val);
     foc_park(pm->foc.i_alph,
              pm->foc.i_beta,
              pm->foc.sin_val,
@@ -566,7 +566,7 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
                &pm->foc.i_beta);
     pm->foc.theta = pos;
     wrap_0_2pi(pm->foc.theta);
-    sin_cos_val(&pm->foc);
+    foc_sin_cos(pm->foc.theta, &pm->foc.sin_val, &pm->foc.cos_val);
     foc_park(pm->foc.i_alph,
              pm->foc.i_beta,
              pm->foc.sin_val,

@@ -1,10 +1,22 @@
 /**
  * @file foc_transform.h
- * @brief 与板卡和电机对象无关的 FOC 坐标变换接口。
+ * @brief 与板卡和电机对象无关的 FOC 角度与坐标变换接口。
  */
 
 #ifndef AXDR_FOC_TRANSFORM_H
 #define AXDR_FOC_TRANSFORM_H
+
+/**
+ * @brief 计算电角度对应的正弦值和余弦值。
+ *
+ * @param[in] theta_e_rad 电角度，单位 rad。
+ * @param[out] sin_theta 电角度的正弦值。
+ * @param[out] cos_theta 电角度的余弦值。
+ * @pre 两个输出指针必须有效且互不重叠。
+ */
+void foc_sin_cos(float theta_e_rad,
+                 float *sin_theta,
+                 float *cos_theta);
 
 /**
  * @brief 把三相静止坐标电流变换为 alpha-beta 电流。
