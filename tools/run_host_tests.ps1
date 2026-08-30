@@ -49,7 +49,8 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" "-I$legacyDir" `
+        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" `
+        "-I$driveDir" "-I$legacyDir" `
         $focTestSource $legacyFocSource $legacyFocCoreSource $legacyUtilSource `
         $filterSource $limitSource $speedSource $focCoreSource `
         $svmSource $transformSource $utilSource `
@@ -73,7 +74,8 @@ Write-Host "Host C11/FOC 数学测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         -Wno-misleading-indentation `
-        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" "-I$legacyDir" `
+        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" `
+        "-I$driveDir" "-I$legacyDir" `
         $pidTestSource $legacyPidSource $controlPidSource `
         -o $pidExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -95,7 +97,8 @@ Write-Host "Host C11/PID 与 PDFF 逐位对照测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         -Wno-misleading-indentation `
-        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" "-I$legacyDir" `
+        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" `
+        "-I$driveDir" "-I$legacyDir" `
         $cascadeTestSource $legacyCascadeSource $legacyPidSource $legacyUtilSource `
         $cascadeSource $controlPidSource $limitSource `
         -o $cascadeExecutablePath 2>&1 |
@@ -117,7 +120,8 @@ Write-Host "Host C11/电流速度位置级联逐拍对照测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$appDir" "-I$controlDir" "-I$motorDir" `
+        "-I$focFakeIncludeDir" "-I$appDir" "-I$controlDir" `
+        "-I$motorDir" "-I$driveDir" `
         $debugSnapshotTestSource $debugSnapshotSource `
         -o $debugSnapshotExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }

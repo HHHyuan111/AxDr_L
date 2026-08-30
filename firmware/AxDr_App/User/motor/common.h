@@ -12,6 +12,7 @@
 #include "control_filter.h"
 #include "control_pid.h"
 #include "control_speed.h"
+#include "drive_io.h"
 #include "main.h"
 #include "bsp.h"
 
@@ -1298,10 +1299,13 @@ typedef struct
 // PMSM structure
 typedef struct
 {
+    uint32_t fast_seq;
     mode_ctrl_e mode;
     drive_req_e req;
     drive_state_e state;
     bool pwm_active;
+    drive_pwm_cmd_t pwm_cmd;
+    drive_pwm_commit_t pwm_commit;
 
     pmsm_board_t board;
     pmsm_adc_val_t adc;

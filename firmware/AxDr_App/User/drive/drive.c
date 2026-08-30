@@ -292,6 +292,10 @@ _RAM_FUNC void drive_fast_step(pmsm_t *pm)
 {
     const drive_req_e req = pm->req;
 
+    /* 每周期从空命令开始；只有实际执行的启动或控制路径可以重新生成命令。 */
+    pm->pwm_cmd.seq = pm->fast_seq;
+    pm->pwm_cmd.valid = false;
+
     /* 保持原快速链先执行本周期动作、再汇总故障的先后关系。 */
     drive_exec_action(pm, req);
 

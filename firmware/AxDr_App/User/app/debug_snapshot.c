@@ -40,6 +40,12 @@ _RAM_FUNC void debug_snapshot_publish(const pmsm_t *pm)
     g_debug_snapshot.fault = pm->fault.all;
     g_debug_snapshot.sys_mode = (uint32_t)pm->mode.sys;
     g_debug_snapshot.op_mode = op_mode;
+    g_debug_snapshot.pwm_cmd_seq = pm->pwm_cmd.seq;
+    g_debug_snapshot.pwm_commit_seq = pm->pwm_commit.seq;
+    g_debug_snapshot.pwm_cmd_valid = (uint32_t)pm->pwm_cmd.valid;
+    g_debug_snapshot.pwm_committed =
+        (uint32_t)(pm->pwm_commit.valid &&
+                   (pm->pwm_commit.seq == pm->fast_seq));
 
     g_debug_snapshot.v_bus = pm->foc.vbus;
     g_debug_snapshot.i_a = pm->foc.i_a;
@@ -64,6 +70,13 @@ _RAM_FUNC void debug_snapshot_publish(const pmsm_t *pm)
     g_debug_snapshot.duty_b = pm->foc.dtc_b;
     g_debug_snapshot.duty_c = pm->foc.dtc_c;
 
-    /* 最后更新序号，表示上面各字段已经完成本次发布。 */
-    g_debug_snapshot.seq++;
+    g_debug_snapshot.duty_cmd_a = pm->pwm_cmd.duty_a;
+    g_debug_snapshot.duty_cmd_b = pm->pwm_cmd.duty_b;
+    g_debug_snapshot.duty_cmd_c = pm->pwm_cmd.duty_c;
+    g_debug_snapshot.duty_commit_a = pm->pwm_commit.duty_a;
+    g_debug_snapshot.duty_commit_b = pm->pwm_commit.duty_b;
+    g_debug_snapshot.duty_commit_c = pm->pwm_commit.duty_c;
+
+    /* 最后更新序号，表示上面各字段已经完成本周期发布。 */
+    g_debug_snapshot.seq = pm->fast_seq;
 }

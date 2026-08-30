@@ -823,6 +823,14 @@ _RAM_FUNC void foc_adc_sample(pmsm_t* pm)
  */
 _RAM_FUNC void foc_pwm_commit(pmsm_t* pm)
 {
+    pm->pwm_cmd = (drive_pwm_cmd_t){
+        .seq = pm->fast_seq,
+        .valid = true,
+        .duty_a = pm->foc.dtc_a,
+        .duty_b = pm->foc.dtc_b,
+        .duty_c = pm->foc.dtc_c
+    };
+
     switch (pm->para.phase_order) {
     case ABC_PHASE:
         /* ABC 接线：TIM1 通道顺序为 A、B、C。 */
@@ -838,8 +846,16 @@ _RAM_FUNC void foc_pwm_commit(pmsm_t* pm)
         break;
     default:
         /* 保留原有行为：相序无效时不更新本周期占空比。 */
-        break;
+        return;
     }
+
+    pm->pwm_commit = (drive_pwm_commit_t){
+        .seq = pm->fast_seq,
+        .valid = true,
+        .duty_a = pm->foc.dtc_a,
+        .duty_b = pm->foc.dtc_b,
+        .duty_c = pm->foc.dtc_c
+    };
 }
 
 /**
@@ -851,9 +867,22 @@ _RAM_FUNC void foc_pwm_commit(pmsm_t* pm)
  */
 _RAM_FUNC void foc_pwm_duty_set(pmsm_t* pm)
 {
-    /* 旧接口带有 pm 参数，但固定 50% 占空比不需要读取电机控制数据。 */
-    (void)pm;
+    pm->pwm_cmd = (drive_pwm_cmd_t){
+        .seq = pm->fast_seq,
+        .valid = true,
+        .duty_a = 0.5f,
+        .duty_b = 0.5f,
+        .duty_c = 0.5f
+    };
 
     /* 三个物理通道都设置为 0.5，即 PWM 周期的一半。 */
     target_pwm_set_duty_ratios(0.5f, 0.5f, 0.5f);
+
+    pm->pwm_commit = (drive_pwm_commit_t){
+        .seq = pm->fast_seq,
+        .valid = true,
+        .duty_a = 0.5f,
+        .duty_b = 0.5f,
+        .duty_c = 0.5f
+    };
 }

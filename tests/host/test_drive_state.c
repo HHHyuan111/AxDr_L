@@ -242,7 +242,16 @@ void foc_pwm_commit(pmsm_t *pm)
 
 static bool test_power_on_stays_stopped(void)
 {
-    pmsm_t pm = {0};
+    pmsm_t pm = {
+        .fast_seq = 17U,
+        .pwm_cmd = {
+            .seq = 3U,
+            .valid = true,
+            .duty_a = 0.1f,
+            .duty_b = 0.2f,
+            .duty_c = 0.3f
+        }
+    };
 
     test_reset_fakes();
     drive_fast_step(&pm);
@@ -254,7 +263,11 @@ static bool test_power_on_stays_stopped(void)
            test_expect(pm.state == DRIVE_STATE_STOP,
                        "上电状态应保持 STOP。") &&
            test_expect(!pm.pwm_active,
-                       "上电时三相 PWM 软件状态应为关闭。");
+                       "上电时三相 PWM 软件状态应为关闭。") &&
+           test_expect(pm.pwm_cmd.seq == 17U,
+                       "本周期占空比请求应使用当前快速周期序号。") &&
+           test_expect(!pm.pwm_cmd.valid,
+                       "没有运行控制模式时不得沿用上一周期占空比请求。");
 }
 
 static bool test_start_then_run(void)

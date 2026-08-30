@@ -37,6 +37,9 @@ _RAM_FUNC void axdr_app_fast_step(void)
         return;
     }
 
+    /* 本序号标识一次完整快速周期；自然回绕不改变周期先后关系。 */
+    pm.fast_seq++;
+
     /* 第 1 步：读取编码器，并更新机械角、电角度和多圈位置。 */
     encoder_sample(&pm.pos_box);
     position_update(&pm);

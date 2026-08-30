@@ -18,7 +18,7 @@
  */
 typedef struct
 {
-    /* 发布序号、Drive 请求/状态和模式枚举值。 */
+    /* 快速周期序号、Drive 请求/状态和模式枚举值。 */
     uint32_t seq;
     uint32_t req;
     uint32_t state;
@@ -26,6 +26,12 @@ typedef struct
     uint32_t fault;    /* pmsm_fault_t 的原始故障位图。 */
     uint32_t sys_mode;
     uint32_t op_mode;
+
+    /* 本周期 PWM 命令和最近一次 Target 寄存器提交的关联序号。 */
+    uint32_t pwm_cmd_seq;
+    uint32_t pwm_commit_seq;
+    uint32_t pwm_cmd_valid;
+    uint32_t pwm_committed;
 
     /* 母线电压单位 V；三相电流单位 A；电角度单位 rad。 */
     float v_bus;
@@ -53,6 +59,14 @@ typedef struct
     float duty_a;
     float duty_b;
     float duty_c;
+
+    /* Drive 本周期命令值，以及 Target 最近一次完成寄存器写入的逻辑三相值。 */
+    float duty_cmd_a;
+    float duty_cmd_b;
+    float duty_cmd_c;
+    float duty_commit_a;
+    float duty_commit_b;
+    float duty_commit_c;
 } debug_snapshot_t;
 
 /**
@@ -69,7 +83,8 @@ extern volatile debug_snapshot_t g_debug_snapshot;
  * @param[in] pm 本周期已经完成采样、反馈更新和 Drive 执行的电机控制对象。
  * @pre pm 指向快速周期独占写入的有效对象；每个快速周期最多调用一次。
  *
- * 本函数只从 pm 复制标量，不修改 pm，不执行通信、动态分配或阻塞操作。
+ * 本函数只从 pm 复制标量，不修改 pm，不执行通信、动态分配或阻塞操作。seq 在
+ * 最后写入，与本周期 pwm_cmd 和 pwm_commit 的 seq 使用同一快速周期编号。
  */
 void debug_snapshot_publish(const pmsm_t *pm);
 
