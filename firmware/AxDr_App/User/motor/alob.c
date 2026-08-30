@@ -35,15 +35,15 @@ void alob_init(void)
     alob.flux_beta = 0;
     
     // Initialize PLL parameters
-    alob.pll.wn   = 100 * 2 * M_PI;  // Natural frequency
+    alob.pll.wn   = 100 * 2 * AXDR_PI;  // Natural frequency
     alob.pll.damp = 0.707f;          // Damping ratio
     alob.pll.ts   = 0.00005f;
     
     // Calculate PLL gains
     alob.pll.kp = 2 * alob.pll.damp * alob.pll.wn;
     alob.pll.ki = alob.pll.wn * alob.pll.wn;
-    alob.pll.i_term_max = 333 * 2 * M_PI * 2;
-    alob.pll.out_max = 333 * 2 * M_PI * 2;
+    alob.pll.i_term_max = 333 * 2 * AXDR_PI * 2;
+    alob.pll.out_max = 333 * 2 * AXDR_PI * 2;
 }
 
 _RAM_FUNC void alob_flux(alob_t *obj)

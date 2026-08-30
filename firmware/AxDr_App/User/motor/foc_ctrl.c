@@ -2,122 +2,6 @@
 #include "modlue.h"
 
 /**
- * @brief 执行本周期控制请求对应的动作。
- *
- * @param[in,out] pm 电机控制对象。
- * @param[in] ctrl_req 本周期入口接收到的控制请求。
- *
- * 本函数只执行启动、复位或运行动作，不判断动作完成后的状态。启动和复位路径中的
- * PWM 启停、50% 占空比和控制器清零顺序保持不变。
- */
-static _RAM_FUNC void pmsm_exec_action(pmsm_t *pm, pm_ctrl_bit_e ctrl_req)
-{
-    switch (ctrl_req)
-    {
-        case start:
-            /* 保留原启动顺序：先启动 PWM，再写入中点占空比，最后清空控制器。 */
-            foc_pwm_start();
-            foc_pwm_duty_set(pm);
-            pmsm_reset(pm);
-            break;
-
-        case reset:
-            /* 复位请求先关闭 PWM，再清空各级控制器。 */
-            foc_pwm_stop();
-            pmsm_reset(pm);
-            break;
-
-        case opera:
-            /* 运行请求先执行当前模式，故障状态在模式执行完成后统一判断。 */
-            pmsm_run_selected_mode(pm);
-            break;
-
-        default:
-            /* 保留原行为：未知控制请求不执行动作。 */
-            break;
-    }
-}
-
-/**
- * @brief 根据本周期控制请求和故障结果更新运行状态。
- *
- * @param[in,out] pm 电机控制对象。
- * @param[in] ctrl_req 本周期入口接收到的控制请求。
- *
- * 本函数只更新 state_bit，不启停 PWM，也不运行控制算法。
- */
-static _RAM_FUNC void pmsm_eval_state(pmsm_t *pm, pm_ctrl_bit_e ctrl_req)
-{
-    switch (ctrl_req)
-    {
-        case start:
-            if (pm->fault.all > 0)
-            {
-                pm->state_bit = fault;
-            }
-            else
-            {
-                pm->state_bit = prech;
-            }
-            break;
-
-        case reset:
-            if (pm->fault.all > 0)
-            {
-                pm->state_bit = fault;
-            }
-            else
-            {
-                pm->state_bit = stop;
-            }
-            break;
-
-        case opera:
-            if (pm->fault.all > 0)
-            {
-                pm->state_bit = fault;
-            }
-            else
-            {
-                pm->state_bit = runing;
-            }
-            break;
-
-        default:
-            /* 未知请求保持原状态。 */
-            break;
-    }
-}
-
-/**
- * @brief 运行一次 PMSM 生命周期状态机。
- *
- * @param[in,out] pm 电机控制对象。
- *
- * 本函数在快速控制回调中运行。它根据 ctrl_bit 执行启动、复位或正常运行，
- * 可能启停 PWM、清空控制器，或进入当前选定的控制模式。
- */
-_RAM_FUNC void pmsm_run_state_machine(pmsm_t *pm)
-{
-    const pm_ctrl_bit_e ctrl_req = pm->ctrl_bit;
-
-    /* 某些模式会修改下一周期请求，本周期结果仍按入口时接收的请求判断。 */
-    pmsm_exec_action(pm, ctrl_req);
-    pmsm_eval_state(pm, ctrl_req);
-
-    /* 故障具有最终优先级，并把下一控制周期切换为复位请求。 */
-    if (pm->fault.all > 0)
-    {
-        pm->state_bit = fault;
-    }
-
-    if (pm->state_bit == fault)
-    {
-        pm->ctrl_bit = reset;
-    }
-}
-
-/**
  * @brief 执行当前选定的 PMSM 控制模式。
  *
  * @param[in,out] pm 电机控制对象。
@@ -555,7 +439,7 @@ _RAM_FUNC void pmsm_quick_stop_mode(pmsm_t* pm)
 {
     pmsm_slow_down(pm, pm->app_ctrl.quick_stop_dec);
     if (fabsf(pm->foc.wr_f) < 0.5f) {
-        pm->ctrl_bit = reset;
+        pm->req = DRIVE_REQ_STOP;
         pm->mode.sys = release_mode;
     }
 }
@@ -564,14 +448,14 @@ _RAM_FUNC void pmsm_fault_stop_mode(pmsm_t* pm)
 {
     if(pm->app_ctrl.fault_stop_dec == 0)
     {
-        pm->ctrl_bit = reset;
+        pm->req = DRIVE_REQ_STOP;
         pm->mode.sys = release_mode;
         return ;
     }
     
     pmsm_slow_down(pm, pm->app_ctrl.fault_stop_dec);
     if (fabsf(pm->foc.wr_f) < 0.5f) {
-        pm->ctrl_bit = reset;
+        pm->req = DRIVE_REQ_STOP;
         pm->mode.sys = release_mode;
     }
 }
@@ -659,9 +543,9 @@ _RAM_FUNC void pmsm_ctrl_display(pmsm_t* pm)
         pm->display.i_a      = -1.0f * pm->foc.i_a;
         pm->display.i_b      = -1.0f * pm->foc.i_b;
         pm->display.i_c      = -1.0f * pm->foc.i_c;
-        pm->display.p_e      = M_2_PI - pm->foc.p_e;
-        pm->display.e_pr     = M_2_PI - pm->foc.e_pr;
-        pm->display.sp_m     = M_2_PI - pm->foc.sp_m;
+        pm->display.p_e      = M_2PI - pm->foc.p_e;
+        pm->display.e_pr     = M_2PI - pm->foc.e_pr;
+        pm->display.sp_m     = M_2PI - pm->foc.sp_m;
         pm->display.mp_m     = -1.0f * pm->foc.mp_m;
         pm->display.we       = -1.0f * pm->foc.we;
         pm->display.wr       = -1.0f * pm->foc.wr;

@@ -60,7 +60,7 @@ _RAM_FUNC void anticogging_calibration(pmsm_t *pm)
     {
         x->wr_set = 0.0f;  // 停止电机
         pm->flag.bit.anticog_done = 1; // 置完成标志
-        pm->ctrl_bit = reset;
+        pm->req = DRIVE_REQ_STOP;
         pm->mode.sys = release_mode;
     }
 }

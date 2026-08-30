@@ -11,6 +11,7 @@
 #include <stdbool.h>
 
 #include "common.h"
+#include "drive.h"
 #include "modlue.h"
 
 /*
@@ -46,7 +47,7 @@ _RAM_FUNC void axdr_app_fast_step(void)
     foc_feedback_update(&pm);
 
     /* 第 4 步：运行状态机和当前选定的控制模式。 */
-    pmsm_run_state_machine(&pm);
+    drive_fast_step(&pm);
 }
 
 /**

@@ -6,13 +6,18 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $testDir = Join-Path $repoRoot "tests/host"
-$fakeIncludeDir = Join-Path $testDir "fakes"
+$focFakeIncludeDir = Join-Path $testDir "fakes"
+$driveFakeIncludeDir = Join-Path $testDir "drive_fakes"
 $motorDir = Join-Path $repoRoot "firmware/AxDr_App/User/motor"
-$testSource = Join-Path $testDir "test_foc_math.c"
+$driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
+$focTestSource = Join-Path $testDir "test_foc_math.c"
+$driveTestSource = Join-Path $testDir "test_drive_state.c"
 $focSource = Join-Path $motorDir "foc_calc.c"
 $utilSource = Join-Path $motorDir "util.c"
+$driveSource = Join-Path $driveDir "drive.c"
 $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
-$executablePath = Join-Path $outputDir "test_foc_math.exe"
+$focExecutablePath = Join-Path $outputDir "test_foc_math.exe"
+$driveExecutablePath = Join-Path $outputDir "test_drive_state.exe"
 
 $compilerCommand = Get-Command $Compiler -ErrorAction SilentlyContinue
 if ($null -eq $compilerCommand) {
@@ -23,9 +28,9 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$fakeIncludeDir" "-I$motorDir" `
-        $testSource $focSource $utilSource `
-        -o $executablePath -lm 2>&1 |
+        "-I$focFakeIncludeDir" "-I$motorDir" `
+        $focTestSource $focSource $utilSource `
+        -o $focExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )
 $compileExitCode = $LASTEXITCODE
@@ -35,9 +40,30 @@ if ($compileExitCode -ne 0) {
     throw "Host FOC 数学测试编译失败，退出码：$compileExitCode"
 }
 
-& $executablePath
+& $focExecutablePath
 if ($LASTEXITCODE -ne 0) {
     throw "Host FOC 数学测试运行失败，退出码：$LASTEXITCODE"
 }
 
 Write-Host "Host C11/FOC 数学测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$driveFakeIncludeDir" "-I$driveDir" `
+        $driveTestSource $driveSource `
+        -o $driveExecutablePath 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host Drive 状态测试编译失败，退出码：$compileExitCode"
+}
+
+& $driveExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host Drive 状态测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/Drive 状态测试通过。"

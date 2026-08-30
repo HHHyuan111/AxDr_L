@@ -37,9 +37,9 @@ _RAM_FUNC void cali_mag_encoder(pmsm_t *pm)
             {
                 x->pe_set += x->pe_acc;
 
-                if (x->pe_set > 0.5f * M_PI)
+                if (x->pe_set > 0.5f * AXDR_PI)
                 {
-                    if (x->pe_set < 0.55f * M_PI)
+                    if (x->pe_set < 0.55f * AXDR_PI)
                         x->pos_dir_end = x->pos;
 
                     if (fabsf(x->pos_start - x->pos) < 0.001f) // 比较位置
@@ -208,7 +208,7 @@ _RAM_FUNC void cali_mag_encoder(pmsm_t *pm)
         }
         case cali_lut_end:
             x->state = cali_pp_start;
-            pm->ctrl_bit = reset;
+            pm->req = DRIVE_REQ_STOP;
             pm->mode.sys = release_mode;
             //pm->pos_box.dir_1 = x->dir;
             pm->para.pn = x->pn;
@@ -266,8 +266,6 @@ _RAM_FUNC void cali_reset_state(cali_t *x)
     x->mean = 0.0f;
     x->ind  = 0;
 }
-
-
 
 
 

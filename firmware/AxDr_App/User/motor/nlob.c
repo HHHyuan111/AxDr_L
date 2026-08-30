@@ -28,14 +28,14 @@ void nlob_init(void)
 	pm.nlob.x1 = pm.nlob.flux[0];
 	pm.nlob.x2 = 0;
 	
-	pm.nlob.pll.wn   = 100*2*M_PI;		// 带宽
+    pm.nlob.pll.wn = 100 * 2 * AXDR_PI;  // 带宽
 	pm.nlob.pll.damp = 0.707f; 		// 阻尼系数
 	pm.nlob.pll.ts   = 0.00005f;
 	
 	pm.nlob.pll.kp = 2*pm.nlob.pll.damp*pm.nlob.pll.wn;
 	pm.nlob.pll.ki = pm.nlob.pll.wn*pm.nlob.pll.wn;
-	pm.nlob.pll.i_term_max = 333*2*M_PI*2;
-	pm.nlob.pll.out_max = 333*2*M_PI*2;
+    pm.nlob.pll.i_term_max = 333 * 2 * AXDR_PI * 2;
+    pm.nlob.pll.out_max = 333 * 2 * AXDR_PI * 2;
 }
 
 
@@ -96,6 +96,4 @@ _RAM_FUNC void nlob_vesc(nlob_t *obj)
     obj->v_alph_lst = obj->v_alph[0];
     obj->v_beta_lst = obj->v_beta[0];
 }
-
-
 

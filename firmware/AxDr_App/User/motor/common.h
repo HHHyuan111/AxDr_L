@@ -84,16 +84,15 @@ typedef __I uint8_t vcu8;
 #define FLOAT_EQU(floatA, floatB) ((ABS((floatA) - (floatB))) < 0.000001f)
 
 #define wrap_pm_pi(theta)                                                      \
-  theta = (theta > M_PI) ? theta - M_2PI : theta;                              \
-  theta = (theta < -M_PI) ? theta + M_2PI : theta;
+  theta = (theta > AXDR_PI) ? theta - M_2PI : theta;                           \
+  theta = (theta < -AXDR_PI) ? theta + M_2PI : theta;
 #define wrap_0_2pi(theta)                                                      \
   theta = (theta > M_2PI) ? theta - M_2PI : theta;                             \
   theta = (theta < 0.0f) ? theta + M_2PI : theta;
 
 // Mathematical constants
-#define M_PI (3.14159265358f)         // Pi
+#define AXDR_PI (3.14159265358f)      // Pi
 #define M_2PI (6.28318530716f)        // 2 * Pi
-#define M_2_PI (6.28318530716f)        // 2 * Pi
 #define div_M_2PI (0.159154943092391467f)        // 1/(2 * Pi)
 #define SQRT3 (1.73205080757f)        // Square root of 3
 #define SQRT3_BY_2 (0.86602540378f)   // Square root of 3 divided by 2
@@ -281,21 +280,22 @@ typedef struct
     float dtc_c;
 } pmsm_foc_t;
 
-// Power management state enumeration
+/* Drive 请求：STOP 保持禁能，START 执行一次启动，RUN 持续运行当前模式。 */
 typedef enum
 {
-    reset = 0,
-    start = 1,
-    opera = 2,
-} pm_ctrl_bit_e;
+    DRIVE_REQ_STOP = 0,
+    DRIVE_REQ_START = 1,
+    DRIVE_REQ_RUN = 2,
+} drive_req_e;
 
+/* Drive 状态与请求分开，状态只描述本周期实际处于哪个阶段。 */
 typedef enum
 {
-    stop = 0,
-    prech = 1,
-    runing = 2,
-    fault = 3,
-} pm_state_bit_e;
+    DRIVE_STATE_STOP = 0,
+    DRIVE_STATE_STARTING = 1,
+    DRIVE_STATE_RUN = 2,
+    DRIVE_STATE_FAULT = 3,
+} drive_state_e;
 
 typedef enum
 {
@@ -1371,9 +1371,10 @@ typedef struct
 // PMSM structure
 typedef struct
 {
-    mode_ctrl_e  mode;
-    pm_ctrl_bit_e ctrl_bit;
-    pm_state_bit_e state_bit;
+    mode_ctrl_e mode;
+    drive_req_e req;
+    drive_state_e state;
+    bool pwm_active;
 
     pmsm_board_t board;
     pmsm_adc_val_t adc;
@@ -1500,7 +1501,6 @@ bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos);
 bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos);
 
 /* FOC control functions */
-void pmsm_run_state_machine(pmsm_t *pm);
 void pmsm_run_selected_mode(pmsm_t *pm);
 void pmsm_observe(pmsm_t* pm);
 void pmsm_ctrl_set(pmsm_t* pm);

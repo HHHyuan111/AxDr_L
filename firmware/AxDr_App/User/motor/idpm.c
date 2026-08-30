@@ -131,10 +131,10 @@ _RAM_FUNC void iden_pmsm_first(idpm_t *x)
             x->id_Ls_state  = id_Ls_init;
             x->id_Fs_state  = id_Fs_init;
             x->id_Js_state  = id_Js_init;
-		
-			pm.ctrl_bit = reset;
-			pm.mode.sys = release_mode;
-			pm.flag.bit.idpm_done = 1;
+
+            pm.req = DRIVE_REQ_STOP;
+            pm.mode.sys = release_mode;
+            pm.flag.bit.idpm_done = 1;
             break;
 
         default:

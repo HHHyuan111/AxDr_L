@@ -26,14 +26,14 @@ void hfsi_init(void)
 {
 	hfsi.vdh =  2.0f;
 	
-	hfsi.pll.wn   = 100*2*M_PI;		// 带宽
+    hfsi.pll.wn = 100 * 2 * AXDR_PI;  // 带宽
 	hfsi.pll.damp = 0.707f; 		// 阻尼系数
 	hfsi.pll.ts   = 0.00005f;
 	
 	hfsi.pll.kp = 2*hfsi.pll.damp*hfsi.pll.wn;
 	hfsi.pll.ki = hfsi.pll.wn*hfsi.pll.wn;
-	hfsi.pll.i_term_max = 333*2*M_PI*2;
-	hfsi.pll.out_max = 333*2*M_PI*2;
+    hfsi.pll.i_term_max = 333 * 2 * AXDR_PI * 2;
+    hfsi.pll.out_max = 333 * 2 * AXDR_PI * 2;
 
 }
 
@@ -109,7 +109,7 @@ _RAM_FUNC void hfsi_input(void)
 			else if(SQ_HFI_POLE_0_SUM_1<SQ_HFI_POLE_180_SUM_1)
 			{
 				SQ_HFI_POLE_ERR_FALG = 1;
-				SQHFI_POLE_ERR_OFFSTE_ANGLE = M_PI;
+                SQHFI_POLE_ERR_OFFSTE_ANGLE = AXDR_PI;
 			}
 				SQ_HFI_POLE_INJ_VOLT = 0.0f;
 				SQ_HFI_POLE_JUDGE_FLAG = 0;
@@ -143,7 +143,7 @@ _RAM_FUNC void hfsi_input(void)
 	
 	#if 1
     // Calculate electrical position using atan2
-    hfsi.pos_e = atan2f(hfsi.dibeta_h, hfsi.dialph_h) + M_PI;
+    hfsi.pos_e = atan2f(hfsi.dibeta_h, hfsi.dialph_h) + AXDR_PI;
     wrap_0_2pi(hfsi.pos_e);
     pll_calc(&hfsi.pll, hfsi.pos_e);
 	#endif
@@ -164,6 +164,4 @@ _RAM_FUNC void hfsi_input(void)
 	hfsi.id_lst = pm.foc.i_d;
 	hfsi.iq_lst = pm.foc.i_q;
 }
-
-
 

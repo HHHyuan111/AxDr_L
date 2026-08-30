@@ -125,7 +125,6 @@ int main(void)
   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 3900);
 
   pmsm_init();
-  foc_pwm_start();
   axdr_app_start_fast_control();
   
   

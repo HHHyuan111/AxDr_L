@@ -319,7 +319,10 @@ void pmsm_init(void)
 
     eh_observer_init();
 
-    pm.ctrl_bit = start;
+    /* 上电默认保持三相功率输出关闭，等待明确的 START 请求。 */
+    pm.req = DRIVE_REQ_STOP;
+    pm.state = DRIVE_STATE_STOP;
+    pm.pwm_active = false;
 
     pm.pos_box.pos_mode = Sensorsory_s; //Sensorsory_s; Sensorsory_d; //Sensorless;
     pm.pos_box.sensory1 = MT6816; //DMENC; //MT6825; //MT6816; //MA732; // DMENC; //Hall; //Xhall;
@@ -716,7 +719,7 @@ void temp_calc(void)
 /**
  * @brief 启动三相 PWM 的主输出和互补输出。
  *
- * 当前由系统初始化流程和电机 start 状态调用。FOC 层不直接操作 TIM1，
+ * 当前仅由 Drive 的 START 过程调用。FOC 层不直接操作 TIM1，
  * 而是调用 target_pwm_start_phase_outputs()，让板级适配层完成硬件启动。
  * 本函数只把启动请求交给板级适配层，不修改占空比，也不处理故障状态。
  */
@@ -827,7 +830,7 @@ _RAM_FUNC void foc_pwm_commit(pmsm_t* pm)
  *
  * @param[in] pm 为兼容现有接口保留，本函数不使用该参数。
  *
- * start 状态调用本函数后转入 prech；此处只保留原有的 50% 设置。
+ * Drive 的 START 过程调用本函数后进入 STARTING；此处只保留原有的 50% 设置。
  */
 _RAM_FUNC void foc_pwm_duty_set(pmsm_t* pm)
 {
