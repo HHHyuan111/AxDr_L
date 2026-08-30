@@ -69,7 +69,9 @@ _RAM_FUNC void iden_pmsm_first(idpm_t *x)
 
     switch (x->id_state) {
         case id_Rs:
-            foc_volt(&pm, x->vd_ref, x->vq_ref, 0.0f);
+            if (foc_volt(&pm, x->vd_ref, x->vq_ref, 0.0f)) {
+                foc_pwm_commit(&pm);
+            }
             iden_Rs(x);
             if (x->id_Rs_state == id_Rs_end) {
                 pm.para.Rs = x->Rs;
@@ -79,7 +81,9 @@ _RAM_FUNC void iden_pmsm_first(idpm_t *x)
             break;
 
         case id_Ls:
-            foc_volt(&pm, x->vd_ref, x->vq_ref, 0.0f);
+            if (foc_volt(&pm, x->vd_ref, x->vq_ref, 0.0f)) {
+                foc_pwm_commit(&pm);
+            }
             iden_Ls(x);
             if (x->id_Ls_state == id_Ls_end) {
                 pm.para.Ls = x->Ls;
@@ -93,7 +97,9 @@ _RAM_FUNC void iden_pmsm_first(idpm_t *x)
             break;
 
         case id_Fs:
-            foc_curr(&pm, 0.0f, x->fiq_ref, x->p_e);
+            if (foc_curr(&pm, 0.0f, x->fiq_ref, x->p_e)) {
+                foc_pwm_commit(&pm);
+            }
             iden_Fs(x);
             if (x->id_Fs_state == id_Fs_end){
                 pm.para.flux = x->flux;
@@ -103,7 +109,9 @@ _RAM_FUNC void iden_pmsm_first(idpm_t *x)
             break;
 
         case id_Js:
-            foc_curr(&pm, 0.0f, x->Jiq_ref, pm.foc.p_e);
+            if (foc_curr(&pm, 0.0f, x->Jiq_ref, pm.foc.p_e)) {
+                foc_pwm_commit(&pm);
+            }
             iden_Js(x);
             if (x->id_Js_state == id_Js_end) {
                 if (++wait_cnt == 10000) { // 50us * 10000
@@ -624,4 +632,3 @@ _RAM_FUNC void iden_Js(idpm_t *x)
 			break;
 	}
 }
-

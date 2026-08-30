@@ -17,7 +17,9 @@ _RAM_FUNC void cali_mag_encoder(pmsm_t *pm)
     x->raw = pm->pos_box.raw_1;
     x->pos = pm->pos_box.pos_1;
     x->bit = pm->pos_box.bit_1;
-    foc_volt(pm, x->vd_ref, x->vq_ref, x->pe_set);
+    if (foc_volt(pm, x->vd_ref, x->vq_ref, x->pe_set)) {
+        foc_pwm_commit(pm);
+    }
     
     switch (x->state)
     {
@@ -264,7 +266,6 @@ _RAM_FUNC void cali_reset_state(cali_t *x)
     x->mean = 0.0f;
     x->ind  = 0;
 }
-
 
 
 

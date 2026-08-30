@@ -1485,7 +1485,7 @@ void foc_feedback_update(pmsm_t *pm);
 void foc_pwm_start(void);
 void foc_pwm_stop(void);
 void foc_clear(pmsm_t* pm);
-void foc_pwm_run(pmsm_t* pm);
+void foc_pwm_commit(pmsm_t* pm);
 void foc_pwm_duty_set(pmsm_t* pm);
 void foc_adc_sample(pmsm_t* pm);
 void foc_get_curr_off(void);
@@ -1494,10 +1494,10 @@ float angle_speed_calc(float pos, float fs);
 void foc_cur_pi_calc(pmsm_t* pm);
 void foc_spd_pi_calc(pmsm_t* pm);
 
-void foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos);
-void foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos);
-void foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos);
-void foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos);
+bool foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos);
+bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos);
+bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos);
+bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos);
 
 /* FOC control functions */
 void pmsm_run_state_machine(pmsm_t *pm);

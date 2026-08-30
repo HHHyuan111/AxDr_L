@@ -179,7 +179,9 @@ _RAM_FUNC void pmsm_run_selected_mode(pmsm_t *pm)
                     break;
 
                 case volt_op:
-                    foc_volt(pm, pm->ctrl.vd_set, pm->ctrl.vq_set, pm->foc.p_e);
+                    if (foc_volt(pm, pm->ctrl.vd_set, pm->ctrl.vq_set, pm->foc.p_e)) {
+                        foc_pwm_commit(pm);
+                    }
                     break;
 
                 case drag_if:
@@ -187,19 +189,25 @@ _RAM_FUNC void pmsm_run_selected_mode(pmsm_t *pm)
                     break;
 
                 case curr_cl:
-                    foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e);
+                    if (foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e)) {
+                        foc_pwm_commit(pm);
+                    }
                     break;
 
                 case spd_curr_cl:
-                    foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e);
+                    if (foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e)) {
+                        foc_pwm_commit(pm);
+                    }
                     break;
 
                 case pos_spd_curr_cl:
-                    foc_pos(pm,
-                            pm->ctrl.posr_set,
-                            pm->ctrl.wr_set,
-                            pm->ctrl.iq_set,
-                            pm->foc.p_e);
+                    if (foc_pos(pm,
+                                pm->ctrl.posr_set,
+                                pm->ctrl.wr_set,
+                                pm->ctrl.iq_set,
+                                pm->foc.p_e)) {
+                        foc_pwm_commit(pm);
+                    }
                     break;
 
                 case spd_volt_cl:
@@ -240,7 +248,9 @@ _RAM_FUNC void force_volt_mode(pmsm_t* pm)
     // Wrap angle to [0, 2π)
     wrap_0_2pi(pm->ctrl.drag_pe);
     // Apply voltage control
-    foc_volt(pm, pm->ctrl.vd_set, pm->ctrl.vq_set, pm->ctrl.drag_pe);
+    if (foc_volt(pm, pm->ctrl.vd_set, pm->ctrl.vq_set, pm->ctrl.drag_pe)) {
+        foc_pwm_commit(pm);
+    }
 }
 /**
 ***********************************************************************
@@ -256,7 +266,9 @@ _RAM_FUNC void force_curr_mode(pmsm_t* pm)
     pm->ctrl.pos_acc = pm->ctrl.we_set * pm->period.foc_ts;
     pm->ctrl.drag_pe += pm->ctrl.pos_acc;
     wrap_0_2pi(pm->ctrl.drag_pe);
-    foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->ctrl.drag_pe);
+    if (foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->ctrl.drag_pe)) {
+        foc_pwm_commit(pm);
+    }
 }
 
 /**
@@ -276,7 +288,9 @@ _RAM_FUNC void pm_mit_mode(pmsm_t* pm)
     pm->ctrl.tor_set = pm->ctrl.torm_set * pm->para.div_Gr;
     pm->ctrl.iq_set = pm->ctrl.tor_set * pm->para.div_Kt;
 
-    foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e);
+    if (foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e)) {
+        foc_pwm_commit(pm);
+    }
 }
 
 /**
@@ -303,7 +317,9 @@ _RAM_FUNC void pt_tor_mode(pmsm_t* pm)
     pm->ctrl.tor_set = pm->ctrl.torm_set * pm->para.div_Gr;
     pm->ctrl.iq_set = pm->ctrl.tor_set * pm->para.div_Kt;
 
-    foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e);
+    if (foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e)) {
+        foc_pwm_commit(pm);
+    }
 }
 /**
 ***********************************************************************
@@ -340,7 +356,9 @@ _RAM_FUNC void pv_vel_mode(pmsm_t* pm)
     pm->ctrl.wr_set = pm->ctrl.wm_ref * pm->para.Gr;
     pm->ctrl.tor_set = pm->ctrl.torm_set * pm->para.div_Gr;
     pm->ctrl.iq_set = pm->ctrl.tor_set * pm->para.div_Kt;
-    foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e);
+    if (foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e)) {
+        foc_pwm_commit(pm);
+    }
 }
 /**
 ***********************************************************************
@@ -432,7 +450,13 @@ _RAM_FUNC void pp_pos_mode(pmsm_t* pm)
         pm->ctrl.wr_set   = pm->ctrl.wm_set * pm->para.Gr;
         pm->ctrl.tor_set  = pm->ctrl.torm_set * pm->para.div_Gr;
         pm->ctrl.iq_set   = pm->ctrl.tor_set  * pm->para.div_Kt;
-        foc_pos(pm, pm->ctrl.posr_set, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e);
+        if (foc_pos(pm,
+                    pm->ctrl.posr_set,
+                    pm->ctrl.wr_set,
+                    pm->ctrl.iq_set,
+                    pm->foc.p_e)) {
+            foc_pwm_commit(pm);
+        }
     }
     // 🔑 更新暂停状态记录
     pm->app_ctrl.last_pos_pause = pm->app_ctrl.pos_pause;
@@ -453,7 +477,9 @@ _RAM_FUNC void cst_tor_mode(pmsm_t* pm)
 
     pm->ctrl.tor_set = pm->ctrl.torm_set * pm->para.div_Gr;
     pm->ctrl.iq_set = pm->ctrl.tor_set * pm->para.div_Kt;
-    foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e);
+    if (foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e)) {
+        foc_pwm_commit(pm);
+    }
 }
 
 _RAM_FUNC void csv_vel_mode(pmsm_t* pm)
@@ -462,7 +488,9 @@ _RAM_FUNC void csv_vel_mode(pmsm_t* pm)
     pm->ctrl.wr_set = pm->ctrl.wm_ref * pm->para.Gr;
     pm->ctrl.tor_set = pm->ctrl.torm_set * pm->para.div_Gr;
     pm->ctrl.iq_set = pm->ctrl.tor_set * pm->para.div_Kt;
-    foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e);
+    if (foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e)) {
+        foc_pwm_commit(pm);
+    }
 }
 
 _RAM_FUNC void csp_pos_mode(pmsm_t* pm)
@@ -472,7 +500,13 @@ _RAM_FUNC void csp_pos_mode(pmsm_t* pm)
     pm->ctrl.wr_set   = pm->ctrl.wm_set * pm->para.Gr;
     pm->ctrl.tor_set  = pm->ctrl.torm_set * pm->para.div_Gr;
     pm->ctrl.iq_set   = pm->ctrl.tor_set  * pm->para.div_Kt;
-    foc_pos(pm, pm->ctrl.posr_set, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e);
+    if (foc_pos(pm,
+                pm->ctrl.posr_set,
+                pm->ctrl.wr_set,
+                pm->ctrl.iq_set,
+                pm->foc.p_e)) {
+        foc_pwm_commit(pm);
+    }
 }
 
 _RAM_FUNC void pmsm_quick_stop_mode(pmsm_t* pm)
@@ -514,7 +548,9 @@ _RAM_FUNC void pmsm_slow_down(pmsm_t* pm, float dec)
         if (pm->ctrl.wr_set > 0.0f)
             pm->ctrl.wr_set = 0.0f;
     }
-    foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e);
+    if (foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e)) {
+        foc_pwm_commit(pm);
+    }
 }
 
 _RAM_FUNC void pmsm_reset(pmsm_t* pm)

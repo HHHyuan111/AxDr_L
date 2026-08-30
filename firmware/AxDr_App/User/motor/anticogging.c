@@ -23,7 +23,13 @@ _RAM_FUNC void anticogging_calibration(pmsm_t *pm)
     pm->ctrl.wr_set   = x->wr_set;
     pm->ctrl.iq_set   = 0.0f;
 
-    foc_pos(pm, pm->ctrl.posr_set, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e);
+    if (foc_pos(pm,
+                pm->ctrl.posr_set,
+                pm->ctrl.wr_set,
+                pm->ctrl.iq_set,
+                pm->foc.p_e)) {
+        foc_pwm_commit(pm);
+    }
 
     if (++x->count < 700) {
         return;
@@ -65,4 +71,3 @@ _RAM_FUNC void anticogging_calibration(pmsm_t *pm)
 //     uint16_t index0 = (uint16_t)index_f;
 //     // 将补偿电流加入目标
 //     pm->ctrl.iq_lim += map[index0];
-

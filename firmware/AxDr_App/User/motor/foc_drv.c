@@ -386,11 +386,11 @@ _RAM_FUNC void foc_spd_pi_calc(pmsm_t* pm)
 * @param[in]:  vd_ref d轴电压参考值
 * @param[in]:  vq_ref q轴电压参考值
 * @param[in]:  pos    电机电气位置（角度/弧度）
-* @retval:     void
-* @details:    电压控制，设置d/q轴电压参考值，完成Clarke、Park变换及SVPWM输出
+* @retval:     true 占空比有效，可提交到 PWM；false 不应更新 PWM
+* @details:    电压控制，设置d/q轴电压参考值，完成Clarke、Park变换及SVPWM计算
 ***********************************************************************
 **/
-_RAM_FUNC void foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
+_RAM_FUNC bool foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
 {
 	pm->foc.mode = foc_volt_mode;
     clarke_transform(&pm->foc);
@@ -401,9 +401,12 @@ _RAM_FUNC void foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
     pm->foc.v_d = vd_ref;
     pm->foc.v_q = vq_ref;
     inverse_park(&pm->foc);
-    if(svm(pm->foc.v_alph * (pm->foc.inv_vbus), pm->foc.v_beta * (pm->foc.inv_vbus), &pm->foc.dtc_a, &pm->foc.dtc_b, &pm->foc.dtc_c)==0) {
-        foc_pwm_run(pm);
-    }
+
+    return svm(pm->foc.v_alph * pm->foc.inv_vbus,
+               pm->foc.v_beta * pm->foc.inv_vbus,
+               &pm->foc.dtc_a,
+               &pm->foc.dtc_b,
+               &pm->foc.dtc_c) == 0;
 }
 
 
@@ -414,11 +417,11 @@ _RAM_FUNC void foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
 * @param[in]:  id_set  d轴电流设定值
 * @param[in]:  iq_set  q轴电流设定值
 * @param[in]:  pos     电机电气位置（角度/弧度）
-* @retval:     void
-* @details:    电流环控制，完成Clarke、Park变换，PI调节，SVPWM输出等
+* @retval:     true 占空比有效，可提交到 PWM；false 不应更新 PWM
+* @details:    电流环控制，完成Clarke、Park变换、PI调节和SVPWM计算
 ***********************************************************************
 **/
-_RAM_FUNC void foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
+_RAM_FUNC bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
 {
 	pm->foc.mode = foc_curr_mode;
     clarke_transform(&pm->foc);
@@ -437,9 +440,12 @@ _RAM_FUNC void foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
     }
 
     inverse_park(&pm->foc);
-    if(0 == svm(pm->foc.v_alph * (pm->foc.inv_vbus), pm->foc.v_beta * (pm->foc.inv_vbus), &pm->foc.dtc_a, &pm->foc.dtc_b, &pm->foc.dtc_c)) {
-        foc_pwm_run(pm);
-    }
+
+    return svm(pm->foc.v_alph * pm->foc.inv_vbus,
+               pm->foc.v_beta * pm->foc.inv_vbus,
+               &pm->foc.dtc_a,
+               &pm->foc.dtc_b,
+               &pm->foc.dtc_c) == 0;
 }
 /**
 ***********************************************************************
@@ -448,11 +454,11 @@ _RAM_FUNC void foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
 * @param[in]:  vel_set 速度设定值
 * @param[in]:  iq_set  q轴电流设定值，实则是电流限制值
 * @param[in]:  pos     电机电气位置（角度/弧度）
-* @retval:     void
-* @details:    速度环控制，完成Clarke、Park变换，PI调节，电流限制，SVPWM输出等
+* @retval:     true 占空比有效，可提交到 PWM；false 不应更新 PWM
+* @details:    速度环控制，完成Clarke、Park变换、PI调节、电流限制和SVPWM计算
 ***********************************************************************
 **/
-_RAM_FUNC void foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
+_RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
 {
 	pm->foc.mode = foc_vel_mode;
     clarke_transform(&pm->foc);
@@ -480,9 +486,12 @@ _RAM_FUNC void foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
     }
 
     inverse_park(&pm->foc);
-    if(0 == svm(pm->foc.v_alph * (pm->foc.inv_vbus), pm->foc.v_beta * (pm->foc.inv_vbus), &pm->foc.dtc_a, &pm->foc.dtc_b, &pm->foc.dtc_c)) {
-        foc_pwm_run(pm);
-    }
+
+    return svm(pm->foc.v_alph * pm->foc.inv_vbus,
+               pm->foc.v_beta * pm->foc.inv_vbus,
+               &pm->foc.dtc_a,
+               &pm->foc.dtc_b,
+               &pm->foc.dtc_c) == 0;
 }
 
 /**
@@ -493,11 +502,11 @@ _RAM_FUNC void foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
 * @param[in]:  vel_set  速度设定值，实则是速度限制
 * @param[in]:  iq_set   q轴电流设定值，实则是电流限制值
 * @param[in]:  pos      电机电气位置（角度/弧度）
-* @retval:     void
-* @details:    位置环控制，完成Clarke、Park变换，PI调节，速度/电流限制，SVPWM输出等
+* @retval:     true 占空比有效，可提交到 PWM；false 不应更新 PWM
+* @details:    位置环控制，完成Clarke、Park变换、PI调节、速度/电流限制和SVPWM计算
 ***********************************************************************
 **/
-_RAM_FUNC void foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos)
+_RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos)
 {
 	pm->foc.mode = foc_pos_mode;
     clarke_transform(&pm->foc);
@@ -535,10 +544,12 @@ _RAM_FUNC void foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
     }
 
     inverse_park(&pm->foc);
-    if (0 == svm(pm->foc.v_alph * (pm->foc.inv_vbus), pm->foc.v_beta * (pm->foc.inv_vbus), &pm->foc.dtc_a, &pm->foc.dtc_b, &pm->foc.dtc_c)) 
-    {
-         foc_pwm_run(pm);
-    }
+
+    return svm(pm->foc.v_alph * pm->foc.inv_vbus,
+               pm->foc.v_beta * pm->foc.inv_vbus,
+               &pm->foc.dtc_a,
+               &pm->foc.dtc_b,
+               &pm->foc.dtc_c) == 0;
 }
 
 /**
@@ -786,10 +797,11 @@ _RAM_FUNC void foc_adc_sample(pmsm_t* pm)
  *
  * @param[in] pm 电机控制对象，使用其中的相序和 A、B、C 三相占空比。
  *
- * 电流控制函数先调用 svm()，把计算结果保存到 dtc_a、dtc_b、dtc_c，随后调用
- * 本函数。这里先根据电机接线顺序排列三相占空比，再交给板级适配层写入 TIM1。
+ * FOC 计算函数把结果保存到 dtc_a、dtc_b、dtc_c，并返回占空比是否有效。
+ * 调用者确认有效后立即调用本函数；本函数根据接线顺序排列三相占空比，再交给
+ * 板级适配层写入 TIM1。
  */
-_RAM_FUNC void foc_pwm_run(pmsm_t* pm)
+_RAM_FUNC void foc_pwm_commit(pmsm_t* pm)
 {
     switch (pm->para.phase_order) {
     case ABC_PHASE:
