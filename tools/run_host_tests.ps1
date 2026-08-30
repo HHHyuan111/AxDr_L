@@ -15,13 +15,16 @@ $driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
 $focTestSource = Join-Path $testDir "test_foc_math.c"
 $driveTestSource = Join-Path $testDir "test_drive_state.c"
 $pidTestSource = Join-Path $testDir "test_control_pid.c"
+$cascadeTestSource = Join-Path $testDir "test_control_cascade.c"
 $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
 $legacyFocSource = Join-Path $legacyDir "legacy_foc.c"
 $legacyFocCoreSource = Join-Path $legacyDir "legacy_foc_core.c"
+$legacyCascadeSource = Join-Path $legacyDir "legacy_control_cascade.c"
 $legacyPidSource = Join-Path $legacyDir "legacy_pid.c"
 $legacyUtilSource = Join-Path $legacyDir "legacy_util.c"
 $filterSource = Join-Path $controlDir "control_filter.c"
+$cascadeSource = Join-Path $controlDir "control_cascade.c"
 $focCoreSource = Join-Path $controlDir "foc_core.c"
 $limitSource = Join-Path $controlDir "control_limit.c"
 $svmSource = Join-Path $controlDir "foc_svm.c"
@@ -34,6 +37,7 @@ $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
 $focExecutablePath = Join-Path $outputDir "test_foc_math.exe"
 $driveExecutablePath = Join-Path $outputDir "test_drive_state.exe"
 $pidExecutablePath = Join-Path $outputDir "test_control_pid.exe"
+$cascadeExecutablePath = Join-Path $outputDir "test_control_cascade.exe"
 $debugSnapshotExecutablePath = Join-Path $outputDir "test_debug_snapshot.exe"
 
 $compilerCommand = Get-Command $Compiler -ErrorAction SilentlyContinue
@@ -87,6 +91,29 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/PID 与 PDFF 逐位对照测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        -Wno-misleading-indentation `
+        "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" "-I$legacyDir" `
+        $cascadeTestSource $legacyCascadeSource $legacyPidSource $legacyUtilSource `
+        $cascadeSource $controlPidSource $limitSource `
+        -o $cascadeExecutablePath 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host 级联控制测试编译失败，退出码：$compileExitCode"
+}
+
+& $cascadeExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host 级联控制测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/电流速度位置级联逐拍对照测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `

@@ -1,6 +1,6 @@
 #include "common.h"
+#include "control_cascade.h"
 #include "control_filter.h"
-#include "control_limit.h"
 #include "foc_core.h"
 #include "target_adc.h"
 #include "target_pwm.h"
@@ -434,6 +434,72 @@ static _RAM_FUNC bool foc_finish_frame(pmsm_t *pm,
 }
 
 /**
+ * @brief 执行现有 d、q 轴电流环，并把分频状态写回兼容对象。
+ */
+static _RAM_FUNC void foc_run_cur_loop(pmsm_t *pm,
+                                       float id_ref,
+                                       float iq_ref)
+{
+    control_rate_t rate = {
+        .count = pm->period.cur_pid_cnt,
+        .divider = pm->period.cur_pid_cnt_val,
+    };
+
+    (void)control_cur_step(&rate,
+                           &pm->id_pi,
+                           &pm->iq_pi,
+                           id_ref,
+                           iq_ref,
+                           pm->foc.i_d,
+                           pm->foc.i_q,
+                           &pm->foc.v_d,
+                           &pm->foc.v_q);
+    pm->period.cur_pid_cnt = rate.count;
+}
+
+/**
+ * @brief 执行现有速度环，并把 q 轴电流参考和分频状态写回兼容对象。
+ */
+static _RAM_FUNC void foc_run_spd_loop(pmsm_t *pm,
+                                       float speed_ref,
+                                       float iq_limit)
+{
+    control_rate_t rate = {
+        .count = pm->period.spd_pid_cnt,
+        .divider = pm->period.spd_pid_cnt_val,
+    };
+
+    (void)control_spd_step(&rate,
+                           &pm->spd_pi,
+                           speed_ref,
+                           pm->foc.wr_f,
+                           iq_limit,
+                           &pm->ctrl.iq_lim);
+    pm->period.spd_pid_cnt = rate.count;
+}
+
+/**
+ * @brief 执行现有位置环，并把速度参考和分频状态写回兼容对象。
+ */
+static _RAM_FUNC void foc_run_pos_loop(pmsm_t *pm,
+                                       float position_ref,
+                                       float speed_limit)
+{
+    control_rate_t rate = {
+        .count = pm->period.pos_pid_cnt,
+        .divider = pm->period.pos_pid_cnt_val,
+    };
+
+    (void)control_pos_step(&rate,
+                           &pm->pos_pi,
+                           position_ref,
+                           pm->foc.mp_r,
+                           speed_limit,
+                           &pm->ctrl.wr_lim);
+    pm->period.pos_pid_cnt = rate.count;
+}
+
+/**
 ***********************************************************************
 * @brief:      foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
 * @param[in]:  pm 指向 PMSM 参数结构体的指针
@@ -475,13 +541,7 @@ _RAM_FUNC bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
     pm->foc.mode = foc_curr_mode;
     foc_prepare_frame(pm, pos, &frame);
 
-    if (++pm->period.cur_pid_cnt >= pm->period.cur_pid_cnt_val)
-    {
-        control_pid_parallel_step(&pm->id_pi, id_set, pm->foc.i_d);
-        pm->foc.v_d = pm->id_pi.out_value;
-        control_pid_parallel_step(&pm->iq_pi, iq_set, pm->foc.i_q);
-        pm->foc.v_q = pm->iq_pi.out_value;
-    }
+    foc_run_cur_loop(pm, id_set, iq_set);
 
     return foc_finish_frame(pm, &frame);
 }
@@ -503,25 +563,8 @@ _RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
     pm->foc.mode = foc_vel_mode;
     foc_prepare_frame(pm, pos, &frame);
 
-    if (++pm->period.spd_pid_cnt >= pm->period.spd_pid_cnt_val)
-    {
-        pm->period.spd_pid_cnt = 0;
-        control_pid_pdff_step(&pm->spd_pi, vel_set, pm->foc.wr_f);
-        pm->ctrl.iq_lim = pm->spd_pi.out_value;
-
-        if (ABS(iq_set) > 0)
-        {
-            pm->ctrl.iq_lim = control_limit(pm->ctrl.iq_lim, ABS(iq_set), -ABS(iq_set));
-        }
-    }
-
-    if (++pm->period.cur_pid_cnt >= pm->period.cur_pid_cnt_val)
-    {
-        control_pid_parallel_step(&pm->id_pi, pm->ctrl.id_set, pm->foc.i_d);
-        pm->foc.v_d = pm->id_pi.out_value;
-        control_pid_parallel_step(&pm->iq_pi, pm->ctrl.iq_lim, pm->foc.i_q);
-        pm->foc.v_q = pm->iq_pi.out_value;
-    }
+    foc_run_spd_loop(pm, vel_set, iq_set);
+    foc_run_cur_loop(pm, pm->ctrl.id_set, pm->ctrl.iq_lim);
 
     return foc_finish_frame(pm, &frame);
 }
@@ -545,37 +588,9 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
     pm->foc.mode = foc_pos_mode;
     foc_prepare_frame(pm, pos, &frame);
 
-    if (++pm->period.pos_pid_cnt >= pm->period.pos_pid_cnt_val)
-    {
-        pm->period.pos_pid_cnt = 0;
-        control_pid_parallel_step(&pm->pos_pi, pos_set, pm->foc.mp_r);
-        pm->ctrl.wr_lim = pm->pos_pi.out_value;
-
-        if (ABS(vel_set) > 0)
-        {
-            pm->ctrl.wr_lim = control_limit(pm->ctrl.wr_lim, ABS(vel_set), -ABS(vel_set));
-        }
-    }
-
-    if (++pm->period.spd_pid_cnt >= pm->period.spd_pid_cnt_val)
-    {
-        pm->period.spd_pid_cnt = 0;
-        control_pid_pdff_step(&pm->spd_pi, pm->ctrl.wr_lim, pm->foc.wr_f);
-        pm->ctrl.iq_lim = pm->spd_pi.out_value;
-
-        if (ABS(iq_set) > 0)
-        {
-            pm->ctrl.iq_lim = control_limit(pm->ctrl.iq_lim, ABS(iq_set), -ABS(iq_set));
-        }
-    }
-
-    if (++pm->period.cur_pid_cnt >= pm->period.cur_pid_cnt_val)
-    {
-        control_pid_parallel_step(&pm->id_pi, pm->ctrl.id_set, pm->foc.i_d);
-        pm->foc.v_d = pm->id_pi.out_value;
-        control_pid_parallel_step(&pm->iq_pi, pm->ctrl.iq_lim, pm->foc.i_q);
-        pm->foc.v_q = pm->iq_pi.out_value;
-    }
+    foc_run_pos_loop(pm, pos_set, vel_set);
+    foc_run_spd_loop(pm, pm->ctrl.wr_lim, iq_set);
+    foc_run_cur_loop(pm, pm->ctrl.id_set, pm->ctrl.iq_lim);
 
     return foc_finish_frame(pm, &frame);
 }

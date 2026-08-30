@@ -11,6 +11,7 @@
 #include <stdbool.h>
 
 #include "common.h"
+#include "control_cascade.h"
 #include "foc_core.h"
 
 void foc_calc(pmsm_foc_t *foc);
@@ -44,5 +45,27 @@ void legacy_foc_core_prepare(const foc_sample_t *sample, foc_frame_t *frame);
 bool legacy_foc_core_modulate(const foc_frame_t *frame,
                               const foc_voltage_t *voltage,
                               foc_duty_t *duty);
+
+bool legacy_control_cur_step(control_rate_t *rate,
+                             pid_para_t *d_pid,
+                             pid_para_t *q_pid,
+                             float id_ref,
+                             float iq_ref,
+                             float id_feedback,
+                             float iq_feedback,
+                             float *v_d,
+                             float *v_q);
+bool legacy_control_spd_step(control_rate_t *rate,
+                             pid_para_t *speed_pid,
+                             float speed_ref,
+                             float speed_feedback,
+                             float iq_limit_abs,
+                             float *iq_ref);
+bool legacy_control_pos_step(control_rate_t *rate,
+                             pid_para_t *position_pid,
+                             float position_ref,
+                             float position_feedback,
+                             float speed_limit_abs,
+                             float *speed_ref);
 
 #endif /* TESTS_LEGACY_CONTROL_H */
