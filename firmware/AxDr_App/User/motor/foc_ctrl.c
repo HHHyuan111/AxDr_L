@@ -2,23 +2,55 @@
 #include "modlue.h"
 
 /**
- * @brief 运行一次 PMSM 生命周期状态机。
+ * @brief 执行本周期控制请求对应的动作。
  *
  * @param[in,out] pm 电机控制对象。
+ * @param[in] ctrl_req 本周期入口接收到的控制请求。
  *
- * 本函数在快速控制回调中运行。它根据 ctrl_bit 执行启动、复位或正常运行，
- * 可能启停 PWM、清空控制器，或进入当前选定的控制模式。
+ * 本函数只执行启动、复位或运行动作，不判断动作完成后的状态。启动和复位路径中的
+ * PWM 启停、50% 占空比和控制器清零顺序保持不变。
  */
-_RAM_FUNC void pmsm_run_state_machine(pmsm_t *pm)
+static _RAM_FUNC void pmsm_exec_action(pmsm_t *pm, pm_ctrl_bit_e ctrl_req)
 {
-    switch (pm->ctrl_bit)
+    switch (ctrl_req)
     {
         case start:
             /* 保留原启动顺序：先启动 PWM，再写入中点占空比，最后清空控制器。 */
             foc_pwm_start();
             foc_pwm_duty_set(pm);
             pmsm_reset(pm);
+            break;
 
+        case reset:
+            /* 复位请求先关闭 PWM，再清空各级控制器。 */
+            foc_pwm_stop();
+            pmsm_reset(pm);
+            break;
+
+        case opera:
+            /* 运行请求先执行当前模式，故障状态在模式执行完成后统一判断。 */
+            pmsm_run_selected_mode(pm);
+            break;
+
+        default:
+            /* 保留原行为：未知控制请求不执行动作。 */
+            break;
+    }
+}
+
+/**
+ * @brief 根据本周期控制请求和故障结果更新运行状态。
+ *
+ * @param[in,out] pm 电机控制对象。
+ * @param[in] ctrl_req 本周期入口接收到的控制请求。
+ *
+ * 本函数只更新 state_bit，不启停 PWM，也不运行控制算法。
+ */
+static _RAM_FUNC void pmsm_eval_state(pmsm_t *pm, pm_ctrl_bit_e ctrl_req)
+{
+    switch (ctrl_req)
+    {
+        case start:
             if (pm->fault.all > 0)
             {
                 pm->state_bit = fault;
@@ -30,10 +62,6 @@ _RAM_FUNC void pmsm_run_state_machine(pmsm_t *pm)
             break;
 
         case reset:
-            /* 复位请求先关闭 PWM，再清空各级控制器。 */
-            foc_pwm_stop();
-            pmsm_reset(pm);
-
             if (pm->fault.all > 0)
             {
                 pm->state_bit = fault;
@@ -45,9 +73,6 @@ _RAM_FUNC void pmsm_run_state_machine(pmsm_t *pm)
             break;
 
         case opera:
-            /* 运行请求进入当前选定模式，本周期仍保持原有的“先控制、后判故障”顺序。 */
-            pmsm_run_selected_mode(pm);
-
             if (pm->fault.all > 0)
             {
                 pm->state_bit = fault;
@@ -59,9 +84,26 @@ _RAM_FUNC void pmsm_run_state_machine(pmsm_t *pm)
             break;
 
         default:
-            /* 保留原行为：未知控制请求不执行动作。 */
+            /* 未知请求保持原状态。 */
             break;
     }
+}
+
+/**
+ * @brief 运行一次 PMSM 生命周期状态机。
+ *
+ * @param[in,out] pm 电机控制对象。
+ *
+ * 本函数在快速控制回调中运行。它根据 ctrl_bit 执行启动、复位或正常运行，
+ * 可能启停 PWM、清空控制器，或进入当前选定的控制模式。
+ */
+_RAM_FUNC void pmsm_run_state_machine(pmsm_t *pm)
+{
+    const pm_ctrl_bit_e ctrl_req = pm->ctrl_bit;
+
+    /* 某些模式会修改下一周期请求，本周期结果仍按入口时接收的请求判断。 */
+    pmsm_exec_action(pm, ctrl_req);
+    pmsm_eval_state(pm, ctrl_req);
 
     /* 故障具有最终优先级，并把下一控制周期切换为复位请求。 */
     if (pm->fault.all > 0)
