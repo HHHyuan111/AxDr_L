@@ -15,6 +15,7 @@
 #include "control_filter.h"
 #include "control_limit.h"
 #include "control_speed.h"
+#include "foc_core.h"
 #include "foc_svm.h"
 #include "foc_transform.h"
 #include "legacy_control.h"
@@ -246,6 +247,58 @@ static int test_pure_transform_interface(void)
            expect_close("纯 Park i_q", i_q, -0.40358984f) &&
            expect_close("纯逆 Park v_alpha", v_alpha, 0.44f) &&
            expect_close("纯逆 Park v_beta", v_beta, 0.08f);
+}
+
+static int test_foc_core_migration_equivalence(void)
+{
+    static const foc_sample_t samples[] = {
+        {1.25f, -0.25f, -1.0f, 0.0f},
+        {-2.0f, 0.75f, 1.25f, -0.2f},
+        {3.0f, -1.0f, -2.0f, 6.5f},
+        {0.0f, -0.0f, 0.0f, 6.28318530716f}
+    };
+    static const foc_voltage_t voltages[] = {
+        {0.4f, -0.2f, 0.04f},
+        {-1.5f, 2.0f, 0.03f},
+        {20.0f, 20.0f, 0.10f},
+        {0.0f, -0.0f, 0.05f}
+    };
+    size_t index;
+
+    for (index = 0U; index < sizeof(samples) / sizeof(samples[0]); index++)
+    {
+        foc_frame_t legacy_frame;
+        foc_frame_t control_frame;
+        foc_duty_t legacy_duty;
+        foc_duty_t control_duty;
+        bool legacy_valid;
+        bool control_valid;
+
+        legacy_foc_core_prepare(&samples[index], &legacy_frame);
+        foc_core_prepare(&samples[index], &control_frame);
+
+        if (memcmp(&control_frame, &legacy_frame, sizeof(control_frame)) != 0)
+        {
+            fprintf(stderr, "FOC 输入阶段等价用例 %zu 失败。\n", index);
+            return 0;
+        }
+
+        legacy_valid = legacy_foc_core_modulate(&legacy_frame,
+                                                &voltages[index],
+                                                &legacy_duty);
+        control_valid = foc_core_modulate(&control_frame,
+                                          &voltages[index],
+                                          &control_duty);
+
+        if ((control_valid != legacy_valid) ||
+            (memcmp(&control_duty, &legacy_duty, sizeof(control_duty)) != 0))
+        {
+            fprintf(stderr, "FOC 输出阶段等价用例 %zu 失败。\n", index);
+            return 0;
+        }
+    }
+
+    return 1;
 }
 
 static int test_sin_cos_migration_equivalence(void)
@@ -489,6 +542,8 @@ int main(void)
     _Static_assert(sizeof(uint32_t) == 4U, "uint32_t 必须为 32 位");
     _Static_assert(sizeof(float) == sizeof(uint32_t), "测试要求 float 为 32 位");
     _Static_assert(sizeof(lpf_t) == (6U * sizeof(float)), "lpf_t 布局发生了变化");
+    _Static_assert(sizeof(foc_frame_t) == (7U * sizeof(float)), "foc_frame_t 布局发生了变化");
+    _Static_assert(sizeof(foc_duty_t) == (5U * sizeof(float)), "foc_duty_t 布局发生了变化");
 
     if (!test_limit_migration_equivalence()) {
         return 1;
@@ -506,32 +561,36 @@ int main(void)
         return 4;
     }
 
-    if (!test_pure_transform_interface()) {
+    if (!test_foc_core_migration_equivalence()) {
         return 5;
     }
 
-    if (!test_sin_cos_migration_equivalence()) {
+    if (!test_pure_transform_interface()) {
         return 6;
     }
 
-    if (!test_transform_migration_equivalence()) {
+    if (!test_sin_cos_migration_equivalence()) {
         return 7;
     }
 
-    if (!test_coordinate_transforms()) {
+    if (!test_transform_migration_equivalence()) {
         return 8;
     }
 
-    if (!test_svm_migration_equivalence()) {
+    if (!test_coordinate_transforms()) {
         return 9;
     }
 
-    if (!test_svm_vectors()) {
+    if (!test_svm_migration_equivalence()) {
         return 10;
     }
 
-    if (!test_foc_zero_angle_pipeline()) {
+    if (!test_svm_vectors()) {
         return 11;
+    }
+
+    if (!test_foc_zero_angle_pipeline()) {
+        return 12;
     }
 
     return 0;

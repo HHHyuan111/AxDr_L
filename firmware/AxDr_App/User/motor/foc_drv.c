@@ -1,8 +1,7 @@
 #include "common.h"
 #include "control_filter.h"
 #include "control_limit.h"
-#include "foc_svm.h"
-#include "foc_transform.h"
+#include "foc_core.h"
 #include "target_adc.h"
 #include "target_pwm.h"
 
@@ -387,6 +386,54 @@ _RAM_FUNC void foc_spd_pi_calc(pmsm_t* pm)
 
 
 /**
+ * @brief 把现有电机对象中的三相反馈送入纯 FOC 核心。
+ */
+static _RAM_FUNC void foc_prepare_frame(pmsm_t *pm,
+                                        float theta,
+                                        foc_frame_t *frame)
+{
+    const foc_sample_t sample = {
+        .i_a = pm->foc.i_a,
+        .i_b = pm->foc.i_b,
+        .i_c = pm->foc.i_c,
+        .theta = theta,
+    };
+
+    foc_core_prepare(&sample, frame);
+
+    pm->foc.theta = frame->theta;
+    pm->foc.sin_val = frame->sin_theta;
+    pm->foc.cos_val = frame->cos_theta;
+    pm->foc.i_alph = frame->i_alpha;
+    pm->foc.i_beta = frame->i_beta;
+    pm->foc.i_d = frame->i_d;
+    pm->foc.i_q = frame->i_q;
+}
+
+/**
+ * @brief 把当前 d-q 电压送入纯 FOC 核心，并保存占空比候选值。
+ */
+static _RAM_FUNC bool foc_finish_frame(pmsm_t *pm,
+                                       const foc_frame_t *frame)
+{
+    const foc_voltage_t voltage = {
+        .v_d = pm->foc.v_d,
+        .v_q = pm->foc.v_q,
+        .inv_vbus = pm->foc.inv_vbus,
+    };
+    foc_duty_t duty;
+    const bool duty_valid = foc_core_modulate(frame, &voltage, &duty);
+
+    pm->foc.v_alph = duty.v_alpha;
+    pm->foc.v_beta = duty.v_beta;
+    pm->foc.dtc_a = duty.duty_a;
+    pm->foc.dtc_b = duty.duty_b;
+    pm->foc.dtc_c = duty.duty_c;
+
+    return duty_valid;
+}
+
+/**
 ***********************************************************************
 * @brief:      foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
 * @param[in]:  pm 指向 PMSM 参数结构体的指针
@@ -399,35 +446,14 @@ _RAM_FUNC void foc_spd_pi_calc(pmsm_t* pm)
 **/
 _RAM_FUNC bool foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
 {
-	pm->foc.mode = foc_volt_mode;
-    foc_clarke(pm->foc.i_a,
-               pm->foc.i_b,
-               pm->foc.i_c,
-               &pm->foc.i_alph,
-               &pm->foc.i_beta);
-    pm->foc.theta = pos;
-    wrap_0_2pi(pm->foc.theta);
-    foc_sin_cos(pm->foc.theta, &pm->foc.sin_val, &pm->foc.cos_val);
-    foc_park(pm->foc.i_alph,
-             pm->foc.i_beta,
-             pm->foc.sin_val,
-             pm->foc.cos_val,
-             &pm->foc.i_d,
-             &pm->foc.i_q);
+    foc_frame_t frame;
+
+    pm->foc.mode = foc_volt_mode;
+    foc_prepare_frame(pm, pos, &frame);
     pm->foc.v_d = vd_ref;
     pm->foc.v_q = vq_ref;
-    foc_inv_park(pm->foc.v_d,
-                 pm->foc.v_q,
-                 pm->foc.sin_val,
-                 pm->foc.cos_val,
-                 &pm->foc.v_alph,
-                 &pm->foc.v_beta);
 
-    return foc_svm(pm->foc.v_alph * pm->foc.inv_vbus,
-                   pm->foc.v_beta * pm->foc.inv_vbus,
-                   &pm->foc.dtc_a,
-                   &pm->foc.dtc_b,
-                   &pm->foc.dtc_c) == 0;
+    return foc_finish_frame(pm, &frame);
 }
 
 
@@ -444,22 +470,10 @@ _RAM_FUNC bool foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
 **/
 _RAM_FUNC bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
 {
-	pm->foc.mode = foc_curr_mode;
-    foc_clarke(pm->foc.i_a,
-               pm->foc.i_b,
-               pm->foc.i_c,
-               &pm->foc.i_alph,
-               &pm->foc.i_beta);
-    pm->foc.theta = pos;
-    wrap_0_2pi(pm->foc.theta);
-    foc_sin_cos(pm->foc.theta, &pm->foc.sin_val, &pm->foc.cos_val);
+    foc_frame_t frame;
 
-    foc_park(pm->foc.i_alph,
-             pm->foc.i_beta,
-             pm->foc.sin_val,
-             pm->foc.cos_val,
-             &pm->foc.i_d,
-             &pm->foc.i_q);
+    pm->foc.mode = foc_curr_mode;
+    foc_prepare_frame(pm, pos, &frame);
 
     if (++pm->period.cur_pid_cnt >= pm->period.cur_pid_cnt_val)
     {
@@ -469,18 +483,7 @@ _RAM_FUNC bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
         pm->foc.v_q = pm->iq_pi.out_value;
     }
 
-    foc_inv_park(pm->foc.v_d,
-                 pm->foc.v_q,
-                 pm->foc.sin_val,
-                 pm->foc.cos_val,
-                 &pm->foc.v_alph,
-                 &pm->foc.v_beta);
-
-    return foc_svm(pm->foc.v_alph * pm->foc.inv_vbus,
-                   pm->foc.v_beta * pm->foc.inv_vbus,
-                   &pm->foc.dtc_a,
-                   &pm->foc.dtc_b,
-                   &pm->foc.dtc_c) == 0;
+    return foc_finish_frame(pm, &frame);
 }
 /**
 ***********************************************************************
@@ -495,21 +498,10 @@ _RAM_FUNC bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
 **/
 _RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
 {
-	pm->foc.mode = foc_vel_mode;
-    foc_clarke(pm->foc.i_a,
-               pm->foc.i_b,
-               pm->foc.i_c,
-               &pm->foc.i_alph,
-               &pm->foc.i_beta);
-    pm->foc.theta = pos;
-    wrap_0_2pi(pm->foc.theta);
-    foc_sin_cos(pm->foc.theta, &pm->foc.sin_val, &pm->foc.cos_val);
-    foc_park(pm->foc.i_alph,
-             pm->foc.i_beta,
-             pm->foc.sin_val,
-             pm->foc.cos_val,
-             &pm->foc.i_d,
-             &pm->foc.i_q);
+    foc_frame_t frame;
+
+    pm->foc.mode = foc_vel_mode;
+    foc_prepare_frame(pm, pos, &frame);
 
     if (++pm->period.spd_pid_cnt >= pm->period.spd_pid_cnt_val)
     {
@@ -531,18 +523,7 @@ _RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
         pm->foc.v_q = pm->iq_pi.out_value;
     }
 
-    foc_inv_park(pm->foc.v_d,
-                 pm->foc.v_q,
-                 pm->foc.sin_val,
-                 pm->foc.cos_val,
-                 &pm->foc.v_alph,
-                 &pm->foc.v_beta);
-
-    return foc_svm(pm->foc.v_alph * pm->foc.inv_vbus,
-                   pm->foc.v_beta * pm->foc.inv_vbus,
-                   &pm->foc.dtc_a,
-                   &pm->foc.dtc_b,
-                   &pm->foc.dtc_c) == 0;
+    return foc_finish_frame(pm, &frame);
 }
 
 /**
@@ -559,21 +540,10 @@ _RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
 **/
 _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos)
 {
-	pm->foc.mode = foc_pos_mode;
-    foc_clarke(pm->foc.i_a,
-               pm->foc.i_b,
-               pm->foc.i_c,
-               &pm->foc.i_alph,
-               &pm->foc.i_beta);
-    pm->foc.theta = pos;
-    wrap_0_2pi(pm->foc.theta);
-    foc_sin_cos(pm->foc.theta, &pm->foc.sin_val, &pm->foc.cos_val);
-    foc_park(pm->foc.i_alph,
-             pm->foc.i_beta,
-             pm->foc.sin_val,
-             pm->foc.cos_val,
-             &pm->foc.i_d,
-             &pm->foc.i_q);
+    foc_frame_t frame;
+
+    pm->foc.mode = foc_pos_mode;
+    foc_prepare_frame(pm, pos, &frame);
 
     if (++pm->period.pos_pid_cnt >= pm->period.pos_pid_cnt_val)
     {
@@ -607,18 +577,7 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
         pm->foc.v_q = pm->iq_pi.out_value;
     }
 
-    foc_inv_park(pm->foc.v_d,
-                 pm->foc.v_q,
-                 pm->foc.sin_val,
-                 pm->foc.cos_val,
-                 &pm->foc.v_alph,
-                 &pm->foc.v_beta);
-
-    return foc_svm(pm->foc.v_alph * pm->foc.inv_vbus,
-                   pm->foc.v_beta * pm->foc.inv_vbus,
-                   &pm->foc.dtc_a,
-                   &pm->foc.dtc_b,
-                   &pm->foc.dtc_c) == 0;
+    return foc_finish_frame(pm, &frame);
 }
 
 /**

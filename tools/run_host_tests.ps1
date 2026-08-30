@@ -18,9 +18,11 @@ $pidTestSource = Join-Path $testDir "test_control_pid.c"
 $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
 $legacyFocSource = Join-Path $legacyDir "legacy_foc.c"
+$legacyFocCoreSource = Join-Path $legacyDir "legacy_foc_core.c"
 $legacyPidSource = Join-Path $legacyDir "legacy_pid.c"
 $legacyUtilSource = Join-Path $legacyDir "legacy_util.c"
 $filterSource = Join-Path $controlDir "control_filter.c"
+$focCoreSource = Join-Path $controlDir "foc_core.c"
 $limitSource = Join-Path $controlDir "control_limit.c"
 $svmSource = Join-Path $controlDir "foc_svm.c"
 $transformSource = Join-Path $controlDir "foc_transform.c"
@@ -44,8 +46,8 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" "-I$legacyDir" `
-        $focTestSource $legacyFocSource $legacyUtilSource `
-        $filterSource $limitSource $speedSource `
+        $focTestSource $legacyFocSource $legacyFocCoreSource $legacyUtilSource `
+        $filterSource $limitSource $speedSource $focCoreSource `
         $svmSource $transformSource $utilSource `
         -o $focExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }

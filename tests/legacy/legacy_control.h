@@ -8,7 +8,10 @@
 #ifndef TESTS_LEGACY_CONTROL_H
 #define TESTS_LEGACY_CONTROL_H
 
+#include <stdbool.h>
+
 #include "common.h"
+#include "foc_core.h"
 
 void foc_calc(pmsm_foc_t *foc);
 void sin_cos_val(pmsm_foc_t *foc);
@@ -36,5 +39,10 @@ float sat1_datf(float val, float up, float low);
 void low_pf_init(lpf_t *filter);
 float low_pf(lpf_t *filter, float value);
 float angle_speed_calc(float angle_rad, float sample_frequency_hz);
+
+void legacy_foc_core_prepare(const foc_sample_t *sample, foc_frame_t *frame);
+bool legacy_foc_core_modulate(const foc_frame_t *frame,
+                              const foc_voltage_t *voltage,
+                              foc_duty_t *duty);
 
 #endif /* TESTS_LEGACY_CONTROL_H */

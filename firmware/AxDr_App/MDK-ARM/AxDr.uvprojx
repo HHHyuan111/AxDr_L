@@ -430,6 +430,11 @@
               <FilePath>..\User\control\control_speed.c</FilePath>
             </File>
             <File>
+              <FileName>foc_core.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\control\foc_core.c</FilePath>
+            </File>
+            <File>
               <FileName>foc_svm.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\control\foc_svm.c</FilePath>

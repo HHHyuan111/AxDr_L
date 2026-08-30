@@ -52,6 +52,7 @@ set(AXDR_USER_SOURCES
     User/control/control_limit.c
     User/control/control_pid.c
     User/control/control_speed.c
+    User/control/foc_core.c
     User/control/foc_svm.c
     User/control/foc_transform.c
     User/drive/drive.c
