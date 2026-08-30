@@ -13,6 +13,7 @@ $driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
 $focTestSource = Join-Path $testDir "test_foc_math.c"
 $driveTestSource = Join-Path $testDir "test_drive_state.c"
 $focSource = Join-Path $motorDir "foc_calc.c"
+$svmSource = Join-Path $controlDir "foc_svm.c"
 $transformSource = Join-Path $controlDir "foc_transform.c"
 $utilSource = Join-Path $motorDir "util.c"
 $driveSource = Join-Path $driveDir "drive.c"
@@ -30,7 +31,7 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" `
-        $focTestSource $focSource $transformSource $utilSource `
+        $focTestSource $focSource $svmSource $transformSource $utilSource `
         -o $focExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )

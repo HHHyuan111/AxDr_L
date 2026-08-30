@@ -1,4 +1,5 @@
 #include "common.h"
+#include "foc_svm.h"
 #include "foc_transform.h"
 #include "target_adc.h"
 #include "target_pwm.h"
@@ -420,11 +421,11 @@ _RAM_FUNC bool foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
                  &pm->foc.v_alph,
                  &pm->foc.v_beta);
 
-    return svm(pm->foc.v_alph * pm->foc.inv_vbus,
-               pm->foc.v_beta * pm->foc.inv_vbus,
-               &pm->foc.dtc_a,
-               &pm->foc.dtc_b,
-               &pm->foc.dtc_c) == 0;
+    return foc_svm(pm->foc.v_alph * pm->foc.inv_vbus,
+                   pm->foc.v_beta * pm->foc.inv_vbus,
+                   &pm->foc.dtc_a,
+                   &pm->foc.dtc_b,
+                   &pm->foc.dtc_c) == 0;
 }
 
 
@@ -473,11 +474,11 @@ _RAM_FUNC bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
                  &pm->foc.v_alph,
                  &pm->foc.v_beta);
 
-    return svm(pm->foc.v_alph * pm->foc.inv_vbus,
-               pm->foc.v_beta * pm->foc.inv_vbus,
-               &pm->foc.dtc_a,
-               &pm->foc.dtc_b,
-               &pm->foc.dtc_c) == 0;
+    return foc_svm(pm->foc.v_alph * pm->foc.inv_vbus,
+                   pm->foc.v_beta * pm->foc.inv_vbus,
+                   &pm->foc.dtc_a,
+                   &pm->foc.dtc_b,
+                   &pm->foc.dtc_c) == 0;
 }
 /**
 ***********************************************************************
@@ -533,11 +534,11 @@ _RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
                  &pm->foc.v_alph,
                  &pm->foc.v_beta);
 
-    return svm(pm->foc.v_alph * pm->foc.inv_vbus,
-               pm->foc.v_beta * pm->foc.inv_vbus,
-               &pm->foc.dtc_a,
-               &pm->foc.dtc_b,
-               &pm->foc.dtc_c) == 0;
+    return foc_svm(pm->foc.v_alph * pm->foc.inv_vbus,
+                   pm->foc.v_beta * pm->foc.inv_vbus,
+                   &pm->foc.dtc_a,
+                   &pm->foc.dtc_b,
+                   &pm->foc.dtc_c) == 0;
 }
 
 /**
@@ -605,11 +606,11 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
                  &pm->foc.v_alph,
                  &pm->foc.v_beta);
 
-    return svm(pm->foc.v_alph * pm->foc.inv_vbus,
-               pm->foc.v_beta * pm->foc.inv_vbus,
-               &pm->foc.dtc_a,
-               &pm->foc.dtc_b,
-               &pm->foc.dtc_c) == 0;
+    return foc_svm(pm->foc.v_alph * pm->foc.inv_vbus,
+                   pm->foc.v_beta * pm->foc.inv_vbus,
+                   &pm->foc.dtc_a,
+                   &pm->foc.dtc_b,
+                   &pm->foc.dtc_c) == 0;
 }
 
 /**

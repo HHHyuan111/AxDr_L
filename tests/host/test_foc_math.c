@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "foc_svm.h"
 #include "foc_transform.h"
 
 #if !defined(__STDC_VERSION__) || (__STDC_VERSION__ < 201112L)
@@ -174,13 +175,60 @@ static int test_coordinate_transforms(void)
            expect_close("逆 Clarke v_c", foc.v_c, 0.30801270f);
 }
 
+static int test_svm_migration_equivalence(void)
+{
+    static const struct {
+        float alpha;
+        float beta;
+    } cases[] = {
+        {0.0f, 0.0f},
+        {0.2f, 0.1f},
+        {0.05f, 0.2f},
+        {-0.2f, 0.1f},
+        {-0.2f, -0.1f},
+        {-0.05f, -0.2f},
+        {0.2f, -0.1f},
+        {2.0f, 2.0f}
+    };
+    size_t index;
+
+    for (index = 0U; index < sizeof(cases) / sizeof(cases[0]); index++) {
+        float legacy_a = 0.0f;
+        float legacy_b = 0.0f;
+        float legacy_c = 0.0f;
+        float duty_a = 0.0f;
+        float duty_b = 0.0f;
+        float duty_c = 0.0f;
+        const int legacy_result = svm(cases[index].alpha,
+                                      cases[index].beta,
+                                      &legacy_a,
+                                      &legacy_b,
+                                      &legacy_c);
+        const int result = foc_svm(cases[index].alpha,
+                                   cases[index].beta,
+                                   &duty_a,
+                                   &duty_b,
+                                   &duty_c);
+
+        if ((result != legacy_result) ||
+            !expect_same_float_bits("SVM duty_a", duty_a, legacy_a) ||
+            !expect_same_float_bits("SVM duty_b", duty_b, legacy_b) ||
+            !expect_same_float_bits("SVM duty_c", duty_c, legacy_c)) {
+            fprintf(stderr, "SVM 等价用例 %zu 失败。\n", index);
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 static int test_svm_vectors(void)
 {
     float duty_a = 0.0f;
     float duty_b = 0.0f;
     float duty_c = 0.0f;
 
-    if (svm(0.0f, 0.0f, &duty_a, &duty_b, &duty_c) != 0) {
+    if (foc_svm(0.0f, 0.0f, &duty_a, &duty_b, &duty_c) != 0) {
         fprintf(stderr, "SVM 零矢量被错误判定为无效。\n");
         return 0;
     }
@@ -191,7 +239,7 @@ static int test_svm_vectors(void)
         return 0;
     }
 
-    if (svm(0.2f, 0.1f, &duty_a, &duty_b, &duty_c) != 0) {
+    if (foc_svm(0.2f, 0.1f, &duty_a, &duty_b, &duty_c) != 0) {
         fprintf(stderr, "SVM 非零测试矢量被错误判定为无效。\n");
         return 0;
     }
@@ -238,12 +286,16 @@ int main(void)
         return 3;
     }
 
-    if (!test_svm_vectors()) {
+    if (!test_svm_migration_equivalence()) {
         return 4;
     }
 
-    if (!test_foc_zero_angle_pipeline()) {
+    if (!test_svm_vectors()) {
         return 5;
+    }
+
+    if (!test_foc_zero_angle_pipeline()) {
+        return 6;
     }
 
     return 0;
