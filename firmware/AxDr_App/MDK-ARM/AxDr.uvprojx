@@ -405,6 +405,11 @@
               <FilePath>..\User\drive\drive.c</FilePath>
             </File>
             <File>
+              <FileName>drive_mode.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\drive\drive_mode.c</FilePath>
+            </File>
+            <File>
               <FileName>drive_pwm.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\drive\drive_pwm.c</FilePath>
