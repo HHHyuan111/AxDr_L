@@ -2,6 +2,7 @@
 // Created by disnox on 2025/6/12.
 //
 #include "common.h"
+#include "drive_pwm.h"
 
 
 void iden_init(void)
@@ -70,7 +71,7 @@ _RAM_FUNC void iden_pmsm_first(idpm_t *x)
     switch (x->id_state) {
         case id_Rs:
             if (foc_volt(&pm, x->vd_ref, x->vq_ref, 0.0f)) {
-                foc_pwm_commit(&pm);
+                drive_pwm_commit(&pm);
             }
             iden_Rs(x);
             if (x->id_Rs_state == id_Rs_end) {
@@ -82,7 +83,7 @@ _RAM_FUNC void iden_pmsm_first(idpm_t *x)
 
         case id_Ls:
             if (foc_volt(&pm, x->vd_ref, x->vq_ref, 0.0f)) {
-                foc_pwm_commit(&pm);
+                drive_pwm_commit(&pm);
             }
             iden_Ls(x);
             if (x->id_Ls_state == id_Ls_end) {
@@ -98,7 +99,7 @@ _RAM_FUNC void iden_pmsm_first(idpm_t *x)
 
         case id_Fs:
             if (foc_curr(&pm, 0.0f, x->fiq_ref, x->p_e)) {
-                foc_pwm_commit(&pm);
+                drive_pwm_commit(&pm);
             }
             iden_Fs(x);
             if (x->id_Fs_state == id_Fs_end){
@@ -110,7 +111,7 @@ _RAM_FUNC void iden_pmsm_first(idpm_t *x)
 
         case id_Js:
             if (foc_curr(&pm, 0.0f, x->Jiq_ref, pm.foc.p_e)) {
-                foc_pwm_commit(&pm);
+                drive_pwm_commit(&pm);
             }
             iden_Js(x);
             if (x->id_Js_state == id_Js_end) {

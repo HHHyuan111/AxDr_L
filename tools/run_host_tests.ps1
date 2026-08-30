@@ -9,11 +9,13 @@ $testDir = Join-Path $repoRoot "tests/host"
 $legacyDir = Join-Path $repoRoot "tests/legacy"
 $focFakeIncludeDir = Join-Path $testDir "fakes"
 $appDir = Join-Path $repoRoot "firmware/AxDr_App/User/app"
+$bspIncludeDir = Join-Path $repoRoot "firmware/AxDr_App/User/bsp/inc"
 $controlDir = Join-Path $repoRoot "firmware/AxDr_App/User/control"
 $motorDir = Join-Path $repoRoot "firmware/AxDr_App/User/motor"
 $driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
 $focTestSource = Join-Path $testDir "test_foc_math.c"
 $driveTestSource = Join-Path $testDir "test_drive_state.c"
+$drivePwmTestSource = Join-Path $testDir "test_drive_pwm.c"
 $pidTestSource = Join-Path $testDir "test_control_pid.c"
 $cascadeTestSource = Join-Path $testDir "test_control_cascade.c"
 $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
@@ -33,9 +35,11 @@ $controlPidSource = Join-Path $controlDir "control_pid.c"
 $speedSource = Join-Path $controlDir "control_speed.c"
 $utilSource = Join-Path $motorDir "util.c"
 $driveSource = Join-Path $driveDir "drive.c"
+$drivePwmSource = Join-Path $driveDir "drive_pwm.c"
 $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
 $focExecutablePath = Join-Path $outputDir "test_foc_math.exe"
 $driveExecutablePath = Join-Path $outputDir "test_drive_state.exe"
+$drivePwmExecutablePath = Join-Path $outputDir "test_drive_pwm.exe"
 $pidExecutablePath = Join-Path $outputDir "test_control_pid.exe"
 $cascadeExecutablePath = Join-Path $outputDir "test_control_cascade.exe"
 $debugSnapshotExecutablePath = Join-Path $outputDir "test_debug_snapshot.exe"
@@ -139,6 +143,28 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/只读调试快照测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$bspIncludeDir" "-I$controlDir" `
+        "-I$motorDir" "-I$driveDir" `
+        $drivePwmTestSource $drivePwmSource `
+        -o $drivePwmExecutablePath 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host Drive PWM 边界测试编译失败，退出码：$compileExitCode"
+}
+
+& $drivePwmExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host Drive PWM 边界测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/Drive PWM 与 Fake Target 边界测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `

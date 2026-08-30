@@ -4,6 +4,7 @@
  */
 
 #include "drive.h"
+#include "drive_pwm.h"
 
 /**
  * @brief 执行当前选定的 PMSM 控制模式。
@@ -114,7 +115,7 @@ static _RAM_FUNC void drive_run_selected_mode(pmsm_t *pm)
                                  pm->ctrl.vq_set,
                                  pm->foc.p_e))
                     {
-                        foc_pwm_commit(pm);
+                        drive_pwm_commit(pm);
                     }
                     break;
 
@@ -128,7 +129,7 @@ static _RAM_FUNC void drive_run_selected_mode(pmsm_t *pm)
                                  pm->ctrl.iq_set,
                                  pm->foc.p_e))
                     {
-                        foc_pwm_commit(pm);
+                        drive_pwm_commit(pm);
                     }
                     break;
 
@@ -138,7 +139,7 @@ static _RAM_FUNC void drive_run_selected_mode(pmsm_t *pm)
                                 pm->ctrl.iq_set,
                                 pm->foc.p_e))
                     {
-                        foc_pwm_commit(pm);
+                        drive_pwm_commit(pm);
                     }
                     break;
 
@@ -149,7 +150,7 @@ static _RAM_FUNC void drive_run_selected_mode(pmsm_t *pm)
                                 pm->ctrl.iq_set,
                                 pm->foc.p_e))
                     {
-                        foc_pwm_commit(pm);
+                        drive_pwm_commit(pm);
                     }
                     break;
 
@@ -187,8 +188,8 @@ static _RAM_FUNC void drive_start_pwm(pmsm_t *pm)
         return;
     }
 
-    foc_pwm_start();
-    foc_pwm_duty_set(pm);
+    drive_pwm_start();
+    drive_pwm_set_neutral(pm);
     pmsm_reset(pm);
     pm->pwm_active = true;
 }
@@ -207,7 +208,7 @@ static _RAM_FUNC void drive_stop_pwm(pmsm_t *pm)
         return;
     }
 
-    foc_pwm_stop();
+    drive_pwm_stop();
     pmsm_reset(pm);
     pm->pwm_active = false;
 }

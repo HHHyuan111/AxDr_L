@@ -57,6 +57,7 @@ set(AXDR_USER_SOURCES
     User/control/foc_svm.c
     User/control/foc_transform.c
     User/drive/drive.c
+    User/drive/drive_pwm.c
     User/moldue/display.c
     User/moldue/lcd.c
     User/moldue/vofa.c

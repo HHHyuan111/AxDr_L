@@ -3,7 +3,6 @@
 #include "control_filter.h"
 #include "foc_core.h"
 #include "target_adc.h"
-#include "target_pwm.h"
 
 /* 快速控制和电角度差分当前都按 20 kHz 执行。 */
 #define FOC_FS_HZ (20000.0f)
@@ -734,30 +733,6 @@ void temp_calc(void)
 }
 
 /**
- * @brief 启动三相 PWM 的主输出和互补输出。
- *
- * 当前仅由 Drive 的 START 过程调用。FOC 层不直接操作 TIM1，
- * 而是调用 target_pwm_start_phase_outputs()，让板级适配层完成硬件启动。
- * 本函数只把启动请求交给板级适配层，不修改占空比，也不处理故障状态。
- */
-_RAM_FUNC void foc_pwm_start(void)
-{
-    target_pwm_start_phase_outputs();
-}
-
-/**
- * @brief 停止三相 PWM 的主输出和互补输出。
- *
- * 当前由电机状态机在离开运行流程时调用。FOC 层只发出停止请求，
- * 具体关闭 TIM1 主输出和互补输出的操作由板级适配层完成。
- * 本函数只把停止请求交给板级适配层，不等同于完整的 Gate 或故障保护流程。
- */
-_RAM_FUNC void foc_pwm_stop(void)
-{
-    target_pwm_stop_phase_outputs();
-}
-
-/**
  * @brief 读取本控制周期的原始 ADC 数据并换算三相电流。
  *
  * @param[in,out] pm 电机控制对象，用于保存原始 ADC 值和换算后的三相电流。
@@ -810,79 +785,4 @@ _RAM_FUNC void foc_adc_sample(pmsm_t* pm)
     pm->foc.i_a = ((float) pm->adc.ia - pm->adc.ia_off) * pm->board.i_ratio;
     pm->foc.i_b = ((float) pm->adc.ib - pm->adc.ib_off) * pm->board.i_ratio;
     pm->foc.i_c = ((float) pm->adc.ic - pm->adc.ic_off) * pm->board.i_ratio;
-}
-
-/**
- * @brief 将 FOC 算出的三相占空比映射到物理 PWM 通道。
- *
- * @param[in] pm 电机控制对象，使用其中的相序和 A、B、C 三相占空比。
- *
- * FOC 计算函数把结果保存到 dtc_a、dtc_b、dtc_c，并返回占空比是否有效。
- * 调用者确认有效后立即调用本函数；本函数根据接线顺序排列三相占空比，再交给
- * 板级适配层写入 TIM1。
- */
-_RAM_FUNC void foc_pwm_commit(pmsm_t* pm)
-{
-    pm->pwm_cmd = (drive_pwm_cmd_t){
-        .seq = pm->fast_seq,
-        .valid = true,
-        .duty_a = pm->foc.dtc_a,
-        .duty_b = pm->foc.dtc_b,
-        .duty_c = pm->foc.dtc_c
-    };
-
-    switch (pm->para.phase_order) {
-    case ABC_PHASE:
-        /* ABC 接线：TIM1 通道顺序为 A、B、C。 */
-        target_pwm_set_duty_ratios(pm->foc.dtc_a,
-                                   pm->foc.dtc_b,
-                                   pm->foc.dtc_c);
-        break;
-    case ACB_PHASE:
-        /* ACB 接线：交换 B、C 两相后写入物理通道。 */
-        target_pwm_set_duty_ratios(pm->foc.dtc_a,
-                                   pm->foc.dtc_c,
-                                   pm->foc.dtc_b);
-        break;
-    default:
-        /* 保留原有行为：相序无效时不更新本周期占空比。 */
-        return;
-    }
-
-    pm->pwm_commit = (drive_pwm_commit_t){
-        .seq = pm->fast_seq,
-        .valid = true,
-        .duty_a = pm->foc.dtc_a,
-        .duty_b = pm->foc.dtc_b,
-        .duty_c = pm->foc.dtc_c
-    };
-}
-
-/**
- * @brief 将三路 PWM 固定设置为 50% 占空比。
- *
- * @param[in] pm 为兼容现有接口保留，本函数不使用该参数。
- *
- * Drive 的 START 过程调用本函数后进入 STARTING；此处只保留原有的 50% 设置。
- */
-_RAM_FUNC void foc_pwm_duty_set(pmsm_t* pm)
-{
-    pm->pwm_cmd = (drive_pwm_cmd_t){
-        .seq = pm->fast_seq,
-        .valid = true,
-        .duty_a = 0.5f,
-        .duty_b = 0.5f,
-        .duty_c = 0.5f
-    };
-
-    /* 三个物理通道都设置为 0.5，即 PWM 周期的一半。 */
-    target_pwm_set_duty_ratios(0.5f, 0.5f, 0.5f);
-
-    pm->pwm_commit = (drive_pwm_commit_t){
-        .seq = pm->fast_seq,
-        .valid = true,
-        .duty_a = 0.5f,
-        .duty_b = 0.5f,
-        .duty_c = 0.5f
-    };
 }

@@ -404,6 +404,11 @@
               <FileType>1</FileType>
               <FilePath>..\User\drive\drive.c</FilePath>
             </File>
+            <File>
+              <FileName>drive_pwm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\drive\drive_pwm.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

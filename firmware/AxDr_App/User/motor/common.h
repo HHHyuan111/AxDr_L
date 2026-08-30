@@ -1390,11 +1390,7 @@ void pmsm_peroid_init(void);
 void pmsm_protect_init(void);
 void pmsm_lpf_init(void);
 void foc_feedback_update(pmsm_t *pm);
-void foc_pwm_start(void);
-void foc_pwm_stop(void);
 void foc_clear(pmsm_t* pm);
-void foc_pwm_commit(pmsm_t* pm);
-void foc_pwm_duty_set(pmsm_t* pm);
 void foc_adc_sample(pmsm_t* pm);
 void foc_get_curr_off(void);
 

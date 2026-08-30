@@ -1,5 +1,6 @@
 #include "common.h"
 #include "control_limit.h"
+#include "drive_pwm.h"
 #include "modlue.h"
 
 /**
@@ -22,7 +23,7 @@ _RAM_FUNC void force_volt_mode(pmsm_t* pm)
     wrap_0_2pi(pm->ctrl.drag_pe);
     // Apply voltage control
     if (foc_volt(pm, pm->ctrl.vd_set, pm->ctrl.vq_set, pm->ctrl.drag_pe)) {
-        foc_pwm_commit(pm);
+        drive_pwm_commit(pm);
     }
 }
 /**
@@ -40,7 +41,7 @@ _RAM_FUNC void force_curr_mode(pmsm_t* pm)
     pm->ctrl.drag_pe += pm->ctrl.pos_acc;
     wrap_0_2pi(pm->ctrl.drag_pe);
     if (foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->ctrl.drag_pe)) {
-        foc_pwm_commit(pm);
+        drive_pwm_commit(pm);
     }
 }
 
@@ -62,7 +63,7 @@ _RAM_FUNC void pm_mit_mode(pmsm_t* pm)
     pm->ctrl.iq_set = pm->ctrl.tor_set * pm->para.div_Kt;
 
     if (foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e)) {
-        foc_pwm_commit(pm);
+        drive_pwm_commit(pm);
     }
 }
 
@@ -91,7 +92,7 @@ _RAM_FUNC void pt_tor_mode(pmsm_t* pm)
     pm->ctrl.iq_set = pm->ctrl.tor_set * pm->para.div_Kt;
 
     if (foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e)) {
-        foc_pwm_commit(pm);
+        drive_pwm_commit(pm);
     }
 }
 /**
@@ -130,7 +131,7 @@ _RAM_FUNC void pv_vel_mode(pmsm_t* pm)
     pm->ctrl.tor_set = pm->ctrl.torm_set * pm->para.div_Gr;
     pm->ctrl.iq_set = pm->ctrl.tor_set * pm->para.div_Kt;
     if (foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e)) {
-        foc_pwm_commit(pm);
+        drive_pwm_commit(pm);
     }
 }
 /**
@@ -228,7 +229,7 @@ _RAM_FUNC void pp_pos_mode(pmsm_t* pm)
                     pm->ctrl.wr_set,
                     pm->ctrl.iq_set,
                     pm->foc.p_e)) {
-            foc_pwm_commit(pm);
+            drive_pwm_commit(pm);
         }
     }
     // 🔑 更新暂停状态记录
@@ -251,7 +252,7 @@ _RAM_FUNC void cst_tor_mode(pmsm_t* pm)
     pm->ctrl.tor_set = pm->ctrl.torm_set * pm->para.div_Gr;
     pm->ctrl.iq_set = pm->ctrl.tor_set * pm->para.div_Kt;
     if (foc_curr(pm, pm->ctrl.id_set, pm->ctrl.iq_set, pm->foc.p_e)) {
-        foc_pwm_commit(pm);
+        drive_pwm_commit(pm);
     }
 }
 
@@ -262,7 +263,7 @@ _RAM_FUNC void csv_vel_mode(pmsm_t* pm)
     pm->ctrl.tor_set = pm->ctrl.torm_set * pm->para.div_Gr;
     pm->ctrl.iq_set = pm->ctrl.tor_set * pm->para.div_Kt;
     if (foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e)) {
-        foc_pwm_commit(pm);
+        drive_pwm_commit(pm);
     }
 }
 
@@ -278,7 +279,7 @@ _RAM_FUNC void csp_pos_mode(pmsm_t* pm)
                 pm->ctrl.wr_set,
                 pm->ctrl.iq_set,
                 pm->foc.p_e)) {
-        foc_pwm_commit(pm);
+        drive_pwm_commit(pm);
     }
 }
 
@@ -322,7 +323,7 @@ _RAM_FUNC void pmsm_slow_down(pmsm_t* pm, float dec)
             pm->ctrl.wr_set = 0.0f;
     }
     if (foc_vel(pm, pm->ctrl.wr_set, pm->ctrl.iq_set, pm->foc.p_e)) {
-        foc_pwm_commit(pm);
+        drive_pwm_commit(pm);
     }
 }
 

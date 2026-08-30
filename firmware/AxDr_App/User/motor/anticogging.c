@@ -3,6 +3,7 @@
 //
 
 #include "main.h"
+#include "drive_pwm.h"
 
 void anticog_init(void)
 {
@@ -28,7 +29,7 @@ _RAM_FUNC void anticogging_calibration(pmsm_t *pm)
                 pm->ctrl.wr_set,
                 pm->ctrl.iq_set,
                 pm->foc.p_e)) {
-        foc_pwm_commit(pm);
+        drive_pwm_commit(pm);
     }
 
     if (++x->count < 700) {

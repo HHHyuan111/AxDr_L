@@ -86,17 +86,17 @@ static bool test_expect_events(const test_event_e *expected, size_t expected_cou
     return true;
 }
 
-void foc_pwm_start(void)
+void drive_pwm_start(void)
 {
     test_log_event(TEST_EVENT_PWM_START);
 }
 
-void foc_pwm_stop(void)
+void drive_pwm_stop(void)
 {
     test_log_event(TEST_EVENT_PWM_STOP);
 }
 
-void foc_pwm_duty_set(pmsm_t *pm)
+void drive_pwm_set_neutral(pmsm_t *pm)
 {
     (void)pm;
     test_log_event(TEST_EVENT_DUTY_NEUTRAL);
@@ -235,7 +235,7 @@ bool foc_pos(pmsm_t *pm,
     return false;
 }
 
-void foc_pwm_commit(pmsm_t *pm)
+void drive_pwm_commit(pmsm_t *pm)
 {
     (void)pm;
 }
