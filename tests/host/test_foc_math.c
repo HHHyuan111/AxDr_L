@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "control_limit.h"
 #include "foc_svm.h"
 #include "foc_transform.h"
 
@@ -43,6 +44,55 @@ static int expect_same_float_bits(const char *name, float actual, float expected
             (double)actual,
             (double)expected);
     return 0;
+}
+
+static float float_from_bits(uint32_t bits)
+{
+    float value;
+
+    memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+static int test_limit_migration_equivalence(void)
+{
+    const float quiet_nan = float_from_bits(UINT32_C(0x7fc12345));
+    static const float finite_cases[] = {
+        -1.5f,
+        -1.0f,
+        -0.0f,
+        0.0f,
+        0.75f,
+        2.0f,
+        2.5f
+    };
+    size_t index;
+
+    for (index = 0U; index < sizeof(finite_cases) / sizeof(finite_cases[0]); index++)
+    {
+        const float legacy = sat1_datf(finite_cases[index], 2.0f, -1.0f);
+        const float control = control_limit(finite_cases[index], 2.0f, -1.0f);
+
+        if (!expect_same_float_bits("有限值限幅", control, legacy))
+        {
+            return 0;
+        }
+    }
+
+    if (!expect_same_float_bits("负无穷限幅",
+                                control_limit(-INFINITY, 2.0f, -1.0f),
+                                sat1_datf(-INFINITY, 2.0f, -1.0f)) ||
+        !expect_same_float_bits("正无穷限幅",
+                                control_limit(INFINITY, 2.0f, -1.0f),
+                                sat1_datf(INFINITY, 2.0f, -1.0f)) ||
+        !expect_same_float_bits("NaN 限幅",
+                                control_limit(quiet_nan, 2.0f, -1.0f),
+                                sat1_datf(quiet_nan, 2.0f, -1.0f)))
+    {
+        return 0;
+    }
+
+    return 1;
 }
 
 static int test_pure_transform_interface(void)
@@ -273,29 +323,34 @@ static int test_foc_zero_angle_pipeline(void)
 int main(void)
 {
     _Static_assert(sizeof(uint32_t) == 4U, "uint32_t 必须为 32 位");
+    _Static_assert(sizeof(float) == sizeof(uint32_t), "测试要求 float 为 32 位");
 
-    if (!test_pure_transform_interface()) {
+    if (!test_limit_migration_equivalence()) {
         return 1;
     }
 
-    if (!test_transform_migration_equivalence()) {
+    if (!test_pure_transform_interface()) {
         return 2;
     }
 
-    if (!test_coordinate_transforms()) {
+    if (!test_transform_migration_equivalence()) {
         return 3;
     }
 
-    if (!test_svm_migration_equivalence()) {
+    if (!test_coordinate_transforms()) {
         return 4;
     }
 
-    if (!test_svm_vectors()) {
+    if (!test_svm_migration_equivalence()) {
         return 5;
     }
 
-    if (!test_foc_zero_angle_pipeline()) {
+    if (!test_svm_vectors()) {
         return 6;
+    }
+
+    if (!test_foc_zero_angle_pipeline()) {
+        return 7;
     }
 
     return 0;

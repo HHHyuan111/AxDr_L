@@ -1,4 +1,5 @@
 #include "common.h"
+#include "control_limit.h"
 #include "modlue.h"
 
 /**
@@ -336,17 +337,29 @@ _RAM_FUNC void pmsm_reset(pmsm_t* pm)
 
 _RAM_FUNC void pmsm_ctrl_set(pmsm_t* pm)
 {
-    if(pm->app_ctrl.polarity == motor_polarity_p)
+    if (pm->app_ctrl.polarity == motor_polarity_p)
     {
-        pm->ctrl.torm_set = sat1_datf(pm->cmd.torm_set, pm->app_ctrl.pmax_torm, pm->app_ctrl.nmax_torm);
-        pm->ctrl.wm_set   = sat1_datf(pm->cmd.wm_set,   pm->app_ctrl.pmax_velm, pm->app_ctrl.nmax_velm);
-        pm->ctrl.posm_set = sat1_datf(pm->cmd.posm_set, pm->app_ctrl.pmax_posm, pm->app_ctrl.nmax_posm);
+        pm->ctrl.torm_set = control_limit(pm->cmd.torm_set,
+                                          pm->app_ctrl.pmax_torm,
+                                          pm->app_ctrl.nmax_torm);
+        pm->ctrl.wm_set = control_limit(pm->cmd.wm_set,
+                                        pm->app_ctrl.pmax_velm,
+                                        pm->app_ctrl.nmax_velm);
+        pm->ctrl.posm_set = control_limit(pm->cmd.posm_set,
+                                          pm->app_ctrl.pmax_posm,
+                                          pm->app_ctrl.nmax_posm);
     }
     else if (pm->app_ctrl.polarity == motor_polarity_n)
     {
-        pm->ctrl.torm_set = -1.0f*sat1_datf(pm->cmd.torm_set, pm->app_ctrl.pmax_torm, pm->app_ctrl.nmax_torm);
-        pm->ctrl.wm_set   = -1.0f*sat1_datf(pm->cmd.wm_set,   pm->app_ctrl.pmax_velm, pm->app_ctrl.nmax_velm);
-        pm->ctrl.posm_set = -1.0f*sat1_datf(pm->cmd.posm_set, pm->app_ctrl.pmax_posm, pm->app_ctrl.nmax_posm);
+        pm->ctrl.torm_set = -1.0f * control_limit(pm->cmd.torm_set,
+                                                  pm->app_ctrl.pmax_torm,
+                                                  pm->app_ctrl.nmax_torm);
+        pm->ctrl.wm_set = -1.0f * control_limit(pm->cmd.wm_set,
+                                                pm->app_ctrl.pmax_velm,
+                                                pm->app_ctrl.nmax_velm);
+        pm->ctrl.posm_set = -1.0f * control_limit(pm->cmd.posm_set,
+                                                  pm->app_ctrl.pmax_posm,
+                                                  pm->app_ctrl.nmax_posm);
     }
 
     pm->ctrl.pmax_tor =  pm->app_ctrl.pmax_torm*pm->para.div_Gr;

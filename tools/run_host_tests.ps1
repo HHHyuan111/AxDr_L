@@ -15,6 +15,7 @@ $driveTestSource = Join-Path $testDir "test_drive_state.c"
 $pidTestSource = Join-Path $testDir "test_control_pid.c"
 $focSource = Join-Path $motorDir "foc_calc.c"
 $legacyPidSource = Join-Path $motorDir "pid.c"
+$limitSource = Join-Path $controlDir "control_limit.c"
 $svmSource = Join-Path $controlDir "foc_svm.c"
 $transformSource = Join-Path $controlDir "foc_transform.c"
 $controlPidSource = Join-Path $controlDir "control_pid.c"
@@ -35,7 +36,7 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$controlDir" "-I$motorDir" `
-        $focTestSource $focSource $svmSource $transformSource $utilSource `
+        $focTestSource $focSource $limitSource $svmSource $transformSource $utilSource `
         -o $focExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )

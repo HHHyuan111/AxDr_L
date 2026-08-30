@@ -405,6 +405,11 @@
           <GroupName>User/control</GroupName>
           <Files>
             <File>
+              <FileName>control_limit.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\control\control_limit.c</FilePath>
+            </File>
+            <File>
               <FileName>control_pid.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\control\control_pid.c</FilePath>

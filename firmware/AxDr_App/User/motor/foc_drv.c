@@ -1,4 +1,5 @@
 #include "common.h"
+#include "control_limit.h"
 #include "foc_svm.h"
 #include "foc_transform.h"
 #include "target_adc.h"
@@ -516,7 +517,9 @@ _RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
         pm->ctrl.iq_lim = pm->spd_pi.out_value;
 
         if (ABS(iq_set) > 0)
-            pm->ctrl.iq_lim = sat1_datf(pm->ctrl.iq_lim, ABS(iq_set), -ABS(iq_set));
+        {
+            pm->ctrl.iq_lim = control_limit(pm->ctrl.iq_lim, ABS(iq_set), -ABS(iq_set));
+        }
     }
 
     if (++pm->period.cur_pid_cnt >= pm->period.cur_pid_cnt_val)
@@ -578,7 +581,9 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
         pm->ctrl.wr_lim = pm->pos_pi.out_value;
 
         if (ABS(vel_set) > 0)
-            pm->ctrl.wr_lim = sat1_datf(pm->ctrl.wr_lim, ABS(vel_set), -ABS(vel_set));
+        {
+            pm->ctrl.wr_lim = control_limit(pm->ctrl.wr_lim, ABS(vel_set), -ABS(vel_set));
+        }
     }
 
     if (++pm->period.spd_pid_cnt >= pm->period.spd_pid_cnt_val)
@@ -588,7 +593,9 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
         pm->ctrl.iq_lim = pm->spd_pi.out_value;
 
         if (ABS(iq_set) > 0)
-            pm->ctrl.iq_lim = sat1_datf(pm->ctrl.iq_lim, ABS(iq_set), -ABS(iq_set));
+        {
+            pm->ctrl.iq_lim = control_limit(pm->ctrl.iq_lim, ABS(iq_set), -ABS(iq_set));
+        }
     }
 
     if (++pm->period.cur_pid_cnt >= pm->period.cur_pid_cnt_val)

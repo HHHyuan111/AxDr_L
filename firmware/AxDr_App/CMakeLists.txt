@@ -47,6 +47,7 @@ set(AXDR_USER_SOURCES
     User/bsp/target_adc.c
     User/bsp/target_encoder.c
     User/bsp/target_pwm.c
+    User/control/control_limit.c
     User/control/control_pid.c
     User/control/foc_svm.c
     User/control/foc_transform.c
