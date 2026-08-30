@@ -389,6 +389,11 @@
               <FileType>1</FileType>
               <FilePath>..\User\app\axdr_app.c</FilePath>
             </File>
+            <File>
+              <FileName>debug_snapshot.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\app\debug_snapshot.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

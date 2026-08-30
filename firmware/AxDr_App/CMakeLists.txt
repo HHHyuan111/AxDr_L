@@ -39,6 +39,7 @@ include_directories(
 
 set(AXDR_USER_SOURCES
     User/app/axdr_app.c
+    User/app/debug_snapshot.c
     User/bsp/bsp_cpu.c
     User/bsp/bsp_fdcan.c
     User/bsp/bsp_flash.c

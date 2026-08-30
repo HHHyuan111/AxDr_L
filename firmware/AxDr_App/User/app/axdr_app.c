@@ -2,7 +2,7 @@
  * @file axdr_app.c
  * @brief AxDr 固件应用层快速控制入口。
  *
- * 数据流：ADC 周期中断 -> 编码器与 ADC 采样 -> 反馈更新 -> 电机状态机。
+ * 数据流：ADC 周期中断 -> 编码器与 ADC 采样 -> 反馈更新 -> Drive -> 调试快照。
  * 本文件只负责安排调用顺序，暂时继续使用现有 pmsm_t 控制对象和原有控制函数。
  */
 
@@ -11,6 +11,7 @@
 #include <stdbool.h>
 
 #include "common.h"
+#include "debug_snapshot.h"
 #include "drive.h"
 #include "modlue.h"
 
@@ -48,6 +49,9 @@ _RAM_FUNC void axdr_app_fast_step(void)
 
     /* 第 4 步：运行状态机和当前选定的控制模式。 */
     drive_fast_step(&pm);
+
+    /* 第 5 步：复制本周期最终结果，仅供调试器观察，不参与控制。 */
+    debug_snapshot_publish(&pm);
 }
 
 /**
