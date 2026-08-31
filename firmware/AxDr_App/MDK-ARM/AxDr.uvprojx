@@ -385,9 +385,9 @@
           <GroupName>User/app</GroupName>
           <Files>
             <File>
-              <FileName>axdr_app.c</FileName>
+              <FileName>fast_loop.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\app\axdr_app.c</FilePath>
+              <FilePath>..\User\app\fast_loop.c</FilePath>
             </File>
             <File>
               <FileName>debug_snapshot.c</FileName>

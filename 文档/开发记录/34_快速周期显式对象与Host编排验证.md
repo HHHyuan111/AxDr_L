@@ -2,18 +2,18 @@
 
 ## 1. 本节点解决什么
 
-原 `axdr_app_fast_step()` 在函数内部直接使用全局 `pm`。这样虽然能运行，但电脑端回放或仿真很难给它换一份独立的电机对象。
+原快速周期函数在内部直接使用全局 `pm`。这样虽然能运行，但电脑端回放或仿真很难给它换一份独立的电机对象。
 
 现在接口改为：
 
 ```c
-void axdr_app_fast_step(pmsm_t *motor);
+void fast_loop_step(pmsm_t *motor);
 ```
 
 快速周期内部只使用调用者传入的 `motor`。STM32 ADC 回调仍然调用：
 
 ```c
-axdr_app_fast_step(&pm);
+fast_loop_step(&pm);
 ```
 
 因此，全局对象只在硬件中断边界被选中，应用编排本身可以在 Host 上使用普通测试对象。
@@ -34,7 +34,7 @@ fast_seq 加 1
 
 ## 3. Host 验证内容
 
-新增 `tests/host/test_fast_loop.c`，使用 Fake 模块直接编译生产 `axdr_app.c`，验证：
+新增 `tests/host/test_fast_loop.c`，使用 Fake 模块直接编译生产 `fast_loop.c`，验证：
 
 - 初始化未放行时，不访问电机对象，也不增加周期编号；
 - 放行后六个步骤严格按当前顺序各执行一次；

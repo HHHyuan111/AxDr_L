@@ -11,7 +11,7 @@
 ```text
 ADC1 注入转换完成中断
     ↓
-App：axdr_app_fast_step()
+App：fast_loop_step()
     ├─ 编码器采样与角度更新
     ├─ Target 读取 ADC，换算三相电流
     ├─ 更新母线、转矩和速度反馈
@@ -33,7 +33,7 @@ App：axdr_app_fast_step()
 
 | 层 | 当前文件 | 负责 | 不负责 |
 |---|---|---|---|
-| App | `User/app/axdr_app.c` | 固定快速周期调用顺序 | 不展开控制公式，不直接写寄存器 |
+| App | `User/app/fast_loop.c` | 固定快速周期调用顺序 | 不展开控制公式，不直接写寄存器 |
 | Target | `User/bsp/target_*.c` | ADC/编码器原始读取、PWM 启停与比较值提交 | 不决定状态和模式 |
 | Drive | `User/drive/drive.c` | STOP/START/RUN/FAULT、PWM 软件所有权、模式分派 | 不读取寄存器，不计算 FOC 数学 |
 | Control | `User/control/*.c` | 正余弦、坐标变换、PID/PDFF、限幅、LPF、角度差分测速、SVPWM | 不包含 HAL、Target、`pmsm_t` 或寄存器 |

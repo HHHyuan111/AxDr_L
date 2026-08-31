@@ -22,7 +22,7 @@ $cascadeTestSource = Join-Path $testDir "test_control_cascade.c"
 $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
 $fastLoopTestSource = Join-Path $testDir "test_fast_loop.c"
 $publicHeadersTestSource = Join-Path $testDir "test_public_headers.c"
-$appSource = Join-Path $appDir "axdr_app.c"
+$fastLoopSource = Join-Path $appDir "fast_loop.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
 $legacyFocSource = Join-Path $legacyDir "legacy_foc.c"
 $legacyFocCoreSource = Join-Path $legacyDir "legacy_foc_core.c"
@@ -156,7 +156,7 @@ $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$appDir" "-I$controlDir" `
         "-I$motorDir" "-I$driveDir" `
-        $fastLoopTestSource $appSource `
+        $fastLoopTestSource $fastLoopSource `
         -o $fastLoopExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
 )

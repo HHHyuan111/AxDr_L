@@ -9,7 +9,7 @@
 #define __I volatile const
 #endif
 
-/* axdr_app.c 的 HAL 回调在 Host 测试中只需要该句柄的不完整类型。 */
+/* fast_loop.c 的 HAL 回调在 Host 测试中只需要该句柄的不完整类型。 */
 typedef struct ADC_HandleTypeDef ADC_HandleTypeDef;
 
 #endif

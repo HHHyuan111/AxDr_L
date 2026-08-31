@@ -3,7 +3,7 @@
  * @brief 验证 App 与 Drive 对外头文件不依赖完整 pmsm_t 定义。
  */
 
-#include "axdr_app.h"
+#include "fast_loop.h"
 #include "debug_snapshot.h"
 #include "drive.h"
 #include "drive_io.h"

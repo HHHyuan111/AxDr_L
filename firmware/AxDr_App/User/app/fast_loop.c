@@ -1,12 +1,12 @@
 /**
- * @file axdr_app.c
- * @brief AxDr 固件应用层快速控制入口。
+ * @file fast_loop.c
+ * @brief 电机快速控制周期编排。
  *
  * 数据流：ADC 周期中断 -> 编码器与 ADC 采样 -> 反馈更新 -> Drive -> 调试快照。
  * 本文件只负责安排调用顺序，暂时继续使用现有 pmsm_t 控制对象和原有控制函数。
  */
 
-#include "axdr_app.h"
+#include "fast_loop.h"
 
 #include <stdbool.h>
 
@@ -18,20 +18,20 @@
  * 主初始化流程只把本标志从 false 写为 true 一次，ADC 中断只读取它。
  * volatile 保证中断每次都读取最新值；它不承担通用的多线程同步功能。
  */
-static volatile bool fast_control_ready = false;
+static volatile bool fast_loop_enabled = false;
 
-void axdr_app_start_fast_control(void)
+void fast_loop_enable(void)
 {
-    fast_control_ready = true;
+    fast_loop_enabled = true;
 }
 
-_RAM_FUNC void axdr_app_fast_step(pmsm_t *motor)
+_RAM_FUNC void fast_loop_step(pmsm_t *motor)
 {
     /*
      * ADC 和 TIM1 通道 4 必须先运行，电流零偏校准才能取得持续更新的采样值；
      * 但 pmsm_init() 完成以前，不能让中断访问正在初始化的电机对象。
      */
-    if (!fast_control_ready)
+    if (!fast_loop_enabled)
     {
         return;
     }
@@ -65,5 +65,5 @@ _RAM_FUNC void axdr_app_fast_step(pmsm_t *motor)
 _RAM_FUNC void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
     (void)hadc;
-    axdr_app_fast_step(&pm);
+    fast_loop_step(&pm);
 }

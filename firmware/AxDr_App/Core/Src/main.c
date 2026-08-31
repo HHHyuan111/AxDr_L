@@ -29,7 +29,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "axdr_app.h"
+#include "fast_loop.h"
 #include "common.h"
 #include "modlue.h"
 #include "lcd.h"
@@ -125,7 +125,7 @@ int main(void)
   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 3900);
 
   pmsm_init();
-  axdr_app_start_fast_control();
+  fast_loop_enable();
   
   
   LCD_Init();

@@ -8,7 +8,7 @@
 #include <stdio.h>
 
 #include "common.h"
-#include "axdr_app.h"
+#include "fast_loop.h"
 
 typedef enum
 {
@@ -114,7 +114,7 @@ static bool test_not_ready_does_nothing(pmsm_t *motor)
     motor->fast_seq = 7U;
     event_count = 0U;
 
-    axdr_app_fast_step(motor);
+    fast_loop_step(motor);
 
     return expect_true(event_count == 0U,
                        "快速控制未放行时不应调用任何模块。") &&
@@ -124,12 +124,12 @@ static bool test_not_ready_does_nothing(pmsm_t *motor)
 
 static bool test_explicit_motor_cycle(pmsm_t *motor)
 {
-    axdr_app_start_fast_control();
+    fast_loop_enable();
     event_count = 0U;
     last_motor = NULL;
     last_pos_box = NULL;
 
-    axdr_app_fast_step(motor);
+    fast_loop_step(motor);
 
     if (!expect_true(event_count == EVENT_COUNT_PER_CYCLE,
                      "一次快速周期应依次调用六个步骤。") ||
@@ -144,7 +144,7 @@ static bool test_explicit_motor_cycle(pmsm_t *motor)
         return false;
     }
 
-    axdr_app_fast_step(motor);
+    fast_loop_step(motor);
 
     return expect_true(event_count == (2U * EVENT_COUNT_PER_CYCLE),
                        "两次快速周期应各执行一遍完整步骤。") &&

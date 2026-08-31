@@ -96,7 +96,7 @@ foc_pwm_stop()
 ```text
 ADC1 注入转换完成回调
     ↓
-axdr_app_fast_step()
+fast_loop_step()
     ├─ 读取编码器原始值
     ├─ 更新机械角和电角度
     ├─ 读取并换算 ADC
