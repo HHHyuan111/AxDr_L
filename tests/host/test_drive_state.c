@@ -33,6 +33,8 @@ static test_event_e test_events[TEST_EVENT_CAPACITY];
 static size_t test_event_count;
 static bool test_mode_sets_fault;
 static bool test_mode_requests_stop;
+static bool test_mode_valid;
+static bool test_mode_writes_pwm;
 
 static void test_log_event(test_event_e event)
 {
@@ -45,6 +47,8 @@ static void test_reset_fakes(void)
     test_event_count = 0U;
     test_mode_sets_fault = false;
     test_mode_requests_stop = false;
+    test_mode_valid = true;
+    test_mode_writes_pwm = true;
 }
 
 static bool test_expect(bool condition, const char *message)
@@ -109,9 +113,14 @@ void pmsm_reset(pmsm_t *pm)
     test_log_event(TEST_EVENT_RESET);
 }
 
-void drive_mode_step(pmsm_t *pm)
+bool drive_mode_step(pmsm_t *pm)
 {
     test_log_event(TEST_EVENT_RUN_MODE);
+
+    if (test_mode_writes_pwm)
+    {
+        pm->pwm_cmd.valid = true;
+    }
 
     if (test_mode_sets_fault)
     {
@@ -122,6 +131,8 @@ void drive_mode_step(pmsm_t *pm)
     {
         pm->req = DRIVE_REQ_STOP;
     }
+
+    return test_mode_valid;
 }
 
 static bool test_power_on_stays_stopped(void)
@@ -157,8 +168,8 @@ static bool test_power_on_stays_stopped(void)
 static bool test_start_then_run(void)
 {
     static const test_event_e start_events[] = {
-        TEST_EVENT_PWM_START,
         TEST_EVENT_DUTY_NEUTRAL,
+        TEST_EVENT_PWM_START,
         TEST_EVENT_RESET
     };
     static const test_event_e run_events[] = {
@@ -261,33 +272,95 @@ static bool test_fault_stops_same_cycle(void)
                        "故障周期末三相 PWM 应标记为关闭。");
 }
 
-static bool test_existing_fault_keeps_original_order(void)
+static bool test_existing_fault_blocks_start_and_run(void)
 {
-    static const test_event_e fault_start_events[] = {
-        TEST_EVENT_PWM_START,
-        TEST_EVENT_DUTY_NEUTRAL,
-        TEST_EVENT_RESET,
+    static const test_event_e fault_run_events[] = {
         TEST_EVENT_PWM_STOP,
         TEST_EVENT_RESET
     };
-    pmsm_t pm = {
+    pmsm_t start_pm = {
         .req = DRIVE_REQ_START,
         .state = DRIVE_STATE_STOP,
         .fault = {.all = 1U}
     };
+    pmsm_t run_pm = {
+        .req = DRIVE_REQ_RUN,
+        .state = DRIVE_STATE_RUN,
+        .pwm_active = true,
+        .fault = {.all = 1U}
+    };
 
     test_reset_fakes();
-    drive_fast_step(&pm);
+    drive_fast_step(&start_pm);
+
+    if (!test_expect(test_event_count == 0U,
+                     "已有故障时不能执行 START 的任何功率动作。") ||
+        !test_expect(start_pm.req == DRIVE_REQ_STOP,
+                     "已有故障的 START 请求应退回 STOP。") ||
+        !test_expect(start_pm.state == DRIVE_STATE_FAULT,
+                     "已有故障的 START 请求应进入 FAULT。") ||
+        !test_expect(!start_pm.pwm_active,
+                     "已有故障时 PWM 必须保持关闭。"))
+    {
+        return false;
+    }
+
+    test_reset_fakes();
+    drive_fast_step(&run_pm);
 
     return test_expect_events(
-               fault_start_events,
-               sizeof(fault_start_events) / sizeof(fault_start_events[0])) &&
-           test_expect(pm.req == DRIVE_REQ_STOP,
-                       "已有故障的 START 周期应退回 STOP 请求。") &&
-           test_expect(pm.state == DRIVE_STATE_FAULT,
-                       "已有故障的 START 周期应进入 FAULT。") &&
-           test_expect(!pm.pwm_active,
-                       "已有故障的 START 周期末 PWM 应关闭。");
+               fault_run_events,
+               sizeof(fault_run_events) / sizeof(fault_run_events[0])) &&
+           test_expect(run_pm.req == DRIVE_REQ_STOP,
+                       "已有故障的 RUN 请求应退回 STOP。") &&
+           test_expect(run_pm.state == DRIVE_STATE_FAULT,
+                       "已有故障的 RUN 请求应进入 FAULT。") &&
+           test_expect(!run_pm.pwm_active,
+                       "已有故障的 RUN 周期必须关闭 PWM。");
+}
+
+static bool test_invalid_mode_or_missing_pwm_stops(void)
+{
+    static const test_event_e stop_events[] = {
+        TEST_EVENT_RUN_MODE,
+        TEST_EVENT_PWM_STOP,
+        TEST_EVENT_RESET
+    };
+    pmsm_t invalid_mode_pm = {
+        .req = DRIVE_REQ_RUN,
+        .state = DRIVE_STATE_RUN,
+        .pwm_active = true
+    };
+    pmsm_t missing_pwm_pm = invalid_mode_pm;
+
+    test_reset_fakes();
+    test_mode_valid = false;
+    drive_fast_step(&invalid_mode_pm);
+
+    if (!test_expect_events(stop_events,
+                            sizeof(stop_events) / sizeof(stop_events[0])) ||
+        !test_expect(invalid_mode_pm.req == DRIVE_REQ_STOP,
+                     "无效模式应退回 STOP 请求。") ||
+        !test_expect(invalid_mode_pm.state == DRIVE_STATE_STOP,
+                     "无效模式应进入 STOP 状态。") ||
+        !test_expect(!invalid_mode_pm.pwm_active,
+                     "无效模式必须关闭 PWM。"))
+    {
+        return false;
+    }
+
+    test_reset_fakes();
+    test_mode_writes_pwm = false;
+    drive_fast_step(&missing_pwm_pm);
+
+    return test_expect_events(stop_events,
+                              sizeof(stop_events) / sizeof(stop_events[0])) &&
+           test_expect(missing_pwm_pm.req == DRIVE_REQ_STOP,
+                       "本周期没有新 PWM 命令时应退回 STOP。") &&
+           test_expect(missing_pwm_pm.state == DRIVE_STATE_STOP,
+                       "本周期没有新 PWM 命令时应进入 STOP。") &&
+           test_expect(!missing_pwm_pm.pwm_active,
+                       "本周期没有新 PWM 命令时必须关闭输出。");
 }
 
 static bool test_stop_request_during_mode_is_preserved(void)
@@ -393,7 +466,7 @@ int main(void)
         return 4;
     }
 
-    if (!test_existing_fault_keeps_original_order())
+    if (!test_existing_fault_blocks_start_and_run())
     {
         return 5;
     }
@@ -406,6 +479,11 @@ int main(void)
     if (!test_invalid_requests_do_not_run())
     {
         return 7;
+    }
+
+    if (!test_invalid_mode_or_missing_pwm_stops())
+    {
+        return 8;
     }
 
     return 0;

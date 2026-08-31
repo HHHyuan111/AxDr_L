@@ -14,7 +14,8 @@
  *
  * @param[in,out] pm 电机控制对象。
  *
- * 这里保留原硬件顺序：先启动三相输出，再写 50% 占空比，最后清控制器。
+ * 先把三个比较寄存器写成 50%，再打开三相输出，避免启动瞬间沿用旧 CCR。
+ * 最后清空控制器历史状态。
  * pwm_active 记录软件已经发出启动动作，避免每个快速周期重复启动硬件。
  */
 static _RAM_FUNC void drive_start_pwm(pmsm_t *pm)
@@ -24,8 +25,8 @@ static _RAM_FUNC void drive_start_pwm(pmsm_t *pm)
         return;
     }
 
-    drive_pwm_start();
     drive_pwm_set_neutral(pm);
+    drive_pwm_start();
     pmsm_reset(pm);
     pm->pwm_active = true;
 }
@@ -70,7 +71,22 @@ static _RAM_FUNC void drive_exec_action(pmsm_t *pm, drive_req_e req)
         case DRIVE_REQ_RUN:
             if (pm->pwm_active)
             {
-                drive_mode_step(pm);
+                const bool mode_valid = drive_mode_step(pm);
+
+                if (!mode_valid || !pm->pwm_cmd.valid)
+                {
+                    /* 未实现模式或无效计算不得继续沿用上一拍物理占空比。 */
+                    if (pm->pwm_active)
+                    {
+                        drive_stop_pwm(pm);
+                    }
+                    else
+                    {
+                        /* PWM 提交层已经关断硬件时，仍需清空控制器历史。 */
+                        pmsm_reset(pm);
+                    }
+                    pm->req = DRIVE_REQ_STOP;
+                }
             }
             break;
 
@@ -133,7 +149,15 @@ _RAM_FUNC void drive_fast_step(pmsm_t *pm)
     pm->pwm_cmd.seq = pm->fast_seq;
     pm->pwm_cmd.valid = false;
 
-    /* 保持原快速链先执行本周期动作、再汇总故障的先后关系。 */
+    /* 已锁存故障时，当前周期禁止执行 START 或 RUN。 */
+    if (pm->fault.all > 0U)
+    {
+        drive_stop_pwm(pm);
+        pm->state = DRIVE_STATE_FAULT;
+        pm->req = DRIVE_REQ_STOP;
+        return;
+    }
+
     drive_exec_action(pm, req);
 
     if (pm->fault.all > 0U)

@@ -189,10 +189,11 @@ bool foc_pos(pmsm_t *pm,
     return foc_result_valid;
 }
 
-void drive_pwm_commit(pmsm_t *pm)
+bool drive_pwm_commit(pmsm_t *pm)
 {
     (void)pm;
     commit_count++;
+    return true;
 }
 
 static bool expect_true(bool condition, const char *message)
@@ -210,10 +211,13 @@ static bool expect_dispatch(pmsm_t *pm,
                             mode_event_e expected_event,
                             bool expected_commit)
 {
-    reset_fakes();
-    drive_mode_step(pm);
+    bool mode_valid;
 
-    return expect_true(event_count == 1U, "模式应且只应调用一个实现。") &&
+    reset_fakes();
+    mode_valid = drive_mode_step(pm);
+
+    return expect_true(mode_valid, "已实现模式应返回有效。") &&
+           expect_true(event_count == 1U, "模式应且只应调用一个实现。") &&
            expect_true(last_event == expected_event, "模式分派到错误的实现。") &&
            expect_true(commit_count == (expected_commit ? 1U : 0U),
                        "模式的 PWM 提交次数不正确。") &&
@@ -303,9 +307,10 @@ static bool test_debug_modes(pmsm_t *pm)
     reset_fakes();
     foc_result_valid = false;
     pm->mode.debug = volt_op;
-    drive_mode_step(pm);
+    const bool mode_valid = drive_mode_step(pm);
 
-    return expect_true(event_count == 1U, "无效 FOC 结果仍应完成本模式计算。") &&
+    return expect_true(!mode_valid, "无效 FOC 结果应报告本周期模式失败。") &&
+           expect_true(event_count == 1U, "无效 FOC 结果仍应完成本模式计算。") &&
            expect_true(commit_count == 0U, "无效 FOC 结果不能提交 PWM。");
 }
 
@@ -329,9 +334,11 @@ static bool test_unimplemented_modes_do_nothing(pmsm_t *pm)
     {
         reset_fakes();
         pm->mode.calibrat = calibration_modes[index];
-        drive_mode_step(pm);
-        if (!expect_true(event_count == 0U,
-                         "未实现的标定模式应保持空操作。"))
+        const bool mode_valid = drive_mode_step(pm);
+        if (!expect_true(!mode_valid,
+                         "未实现的标定模式必须明确返回失败。") ||
+            !expect_true(event_count == 0U,
+                         "未实现的标定模式不应调用其他实现。"))
         {
             return false;
         }
@@ -342,15 +349,28 @@ static bool test_unimplemented_modes_do_nothing(pmsm_t *pm)
     {
         reset_fakes();
         pm->mode.debug = debug_modes[index];
-        drive_mode_step(pm);
-        if (!expect_true(event_count == 0U,
-                         "未实现的调试模式应保持空操作。"))
+        const bool mode_valid = drive_mode_step(pm);
+        if (!expect_true(!mode_valid,
+                         "未实现的调试模式必须明确返回失败。") ||
+            !expect_true(event_count == 0U,
+                         "未实现的调试模式不应调用其他实现。"))
         {
             return false;
         }
     }
 
     return true;
+}
+
+static bool test_unknown_system_mode_returns_failure(pmsm_t *pm)
+{
+    reset_fakes();
+    pm->mode.sys = (sys_mode_e)99;
+
+    return expect_true(!drive_mode_step(pm),
+                       "未知系统模式必须明确返回失败。") &&
+           expect_true(event_count == 0U,
+                       "未知系统模式不应调用任何实现。");
 }
 
 int main(void)
@@ -388,6 +408,11 @@ int main(void)
     if (!test_unimplemented_modes_do_nothing(&pm))
     {
         return 5;
+    }
+
+    if (!test_unknown_system_mode_returns_failure(&pm))
+    {
+        return 6;
     }
 
     return 0;

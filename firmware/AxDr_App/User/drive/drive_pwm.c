@@ -7,8 +7,15 @@
 
 #include "drive_pwm.h"
 
+#include <math.h>
+
 #include "common.h"
 #include "target_pwm.h"
+
+static _RAM_FUNC bool drive_pwm_duty_is_valid(float duty)
+{
+    return isfinite(duty) && (duty >= 0.0f) && (duty <= 1.0f);
+}
 
 _RAM_FUNC void drive_pwm_start(void)
 {
@@ -41,15 +48,24 @@ _RAM_FUNC void drive_pwm_set_neutral(pmsm_t *pm)
     };
 }
 
-_RAM_FUNC void drive_pwm_commit(pmsm_t *pm)
+_RAM_FUNC bool drive_pwm_commit(pmsm_t *pm)
 {
     pm->pwm_cmd = (drive_pwm_cmd_t){
         .seq = pm->fast_seq,
-        .valid = true,
+        .valid = false,
         .duty_a = pm->foc.dtc_a,
         .duty_b = pm->foc.dtc_b,
         .duty_c = pm->foc.dtc_c
     };
+
+    if (!drive_pwm_duty_is_valid(pm->foc.dtc_a) ||
+        !drive_pwm_duty_is_valid(pm->foc.dtc_b) ||
+        !drive_pwm_duty_is_valid(pm->foc.dtc_c))
+    {
+        target_pwm_stop_phase_outputs();
+        pm->pwm_active = false;
+        return false;
+    }
 
     switch (pm->para.phase_order)
     {
@@ -66,9 +82,13 @@ _RAM_FUNC void drive_pwm_commit(pmsm_t *pm)
             break;
 
         default:
-            /* 相序无效时不写物理通道，也不伪造提交记录。 */
-            return;
+            /* 无法确定物理相序时立即撤销功率输出，不能继续沿用上一拍占空比。 */
+            target_pwm_stop_phase_outputs();
+            pm->pwm_active = false;
+            return false;
     }
+
+    pm->pwm_cmd.valid = true;
 
     pm->pwm_commit = (drive_pwm_commit_t){
         .seq = pm->fast_seq,
@@ -77,4 +97,6 @@ _RAM_FUNC void drive_pwm_commit(pmsm_t *pm)
         .duty_b = pm->foc.dtc_b,
         .duty_c = pm->foc.dtc_c
     };
+
+    return true;
 }
