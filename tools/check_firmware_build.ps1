@@ -7,8 +7,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $firmwareDir = Join-Path $repoRoot "firmware/AxDr_App"
 $warningBaseline = [ordered]@{
-    Debug = 104
-    Release = 104
+    Debug = 10
+    Release = 10
 }
 
 $cmake = Get-Command $CMakeCommand -ErrorAction SilentlyContinue
