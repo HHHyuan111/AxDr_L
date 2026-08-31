@@ -341,10 +341,13 @@ _RAM_FUNC void pmsm_slow_down(pmsm_t* pm, float dec)
 
 _RAM_FUNC void pmsm_reset(pmsm_t* pm)
 {
+    const float speed_angle_rad = isfinite(pm->foc.p_e) ? pm->foc.p_e : 0.0f;
+
     control_pid_clear(&pm->id_pi);
     control_pid_clear(&pm->iq_pi);
     control_pid_clear(&pm->spd_pi);
     control_pid_clear(&pm->pos_pi);
+    control_angle_speed_reset(&pm->elec_speed_diff, speed_angle_rad);
     foc_clear(pm);
 }
 
@@ -386,109 +389,6 @@ _RAM_FUNC void pmsm_ctrl_set(pmsm_t* pm)
     pm->ctrl.nmax_vel =  pm->app_ctrl.nmax_velm*pm->para.Gr;
     pm->ctrl.pmax_pos =  pm->app_ctrl.pmax_posm*pm->para.Gr;
     pm->ctrl.nmax_pos =  pm->app_ctrl.nmax_posm*pm->para.Gr;
-}
-
-/**
-***********************************************************************
-* @brief:      pmsm_fault_check(pmsm_t* pm)
-* @param[in]:  pm  指向永磁同步电机（PMSM）控制结构体的指针
-* @retval:     void
-* @details:    故障检测函数，包括通信超时、线圈温度、MOS温度等多项保护
-***********************************************************************
-**/
-_RAM_FUNC void pmsm_fault_check(pmsm_t* pm)
-{
-    // Communication timeout protection
-    if (pm->protect.link_out_cnt > pm->protect.time_value && pm->protect.time_value > 0)
-    {
-        pm->protect.link_out_cnt = pm->protect.time_value;
-        pm->fault.bit.off_link = 1; // Communication lost
-        pm->protect.rst = 1;
-    }
-
-    // Communication timeout protection
-    if (pm->protect.ov_speed_cnt > pm->protect.ov_speed_value && pm->protect.ov_speed_value > 0)
-    {
-        pm->protect.ov_speed_cnt = pm->protect.ov_speed_value;
-        pm->fault.bit.ov_speed = 1;
-        pm->protect.rst = 1;
-    }
-
-    // Motor coil temperature protection
-    if (pm->foc.Tcoil > pm->protect.omt_value)
-    {
-        if (++pm->protect.omt_cnt > pm->protect.omt_cnt_value)
-        {
-            pm->fault.bit.ov_tcoi = 1; // Coil over temperature
-            pm->protect.omt_cnt = pm->protect.omt_cnt_value;
-            pm->protect.rst = 1;
-        }
-    }
-    else
-    {
-        if (!pm->protect.rst)
-        {
-            pm->fault.bit.ov_tcoi = 0;
-            pm->protect.omt_cnt = 0;
-        }
-    }
-
-    // MOSFET temperature protection
-    if (pm->foc.Tmos > pm->protect.ot_value)
-    {
-        if (++pm->protect.ot_cnt > pm->protect.ot_cnt_value)
-        {
-            pm->fault.bit.ov_tmos = 1; // MOSFET over temperature
-            pm->protect.ot_cnt = pm->protect.ot_cnt_value;
-            pm->protect.rst = 1;
-        }
-    }
-    else
-    {
-        if (!pm->protect.rst)
-        {
-            pm->fault.bit.ov_tmos = 0;
-            pm->protect.ot_cnt = 0;
-        }
-    }
-
-    // voltage protection
-    if (pm->foc.vbus < pm->protect.uv_value)
-    {
-        if (++pm->protect.uv_cnt > pm->protect.uv_cnt_value)
-        {
-            pm->fault.bit.un_volt = 1;
-            pm->protect.uv_cnt = pm->protect.uv_cnt_value;
-            pm->protect.rst = 1;
-        }
-    }
-    else
-    {
-        if (!pm->protect.rst)
-        {
-            pm->fault.bit.un_volt = 0;
-            pm->protect.uv_cnt = 0;
-        }
-    }
-    if (pm->foc.vbus > pm->protect.ov_value)
-    {
-        if (++pm->protect.ov_cnt > pm->protect.ov_cnt_value)
-        {
-            pm->fault.bit.ov_volt = 1;
-            pm->protect.ov_cnt = pm->protect.ov_cnt_value;
-            pm->protect.rst = 1;
-        }
-    }
-    else
-    {
-        if (!pm->protect.rst)
-        {
-            pm->fault.bit.ov_volt = 0;
-            pm->protect.ov_cnt = 0;
-        }
-    }
-
-    // ... (similar protection logic for current, voltage, etc.)
 }
 
 _RAM_FUNC void pmsm_anticog_comp(pmsm_t* pm)

@@ -415,6 +415,11 @@
               <FilePath>..\User\drive\drive_mode.c</FilePath>
             </File>
             <File>
+              <FileName>drive_protection.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\drive\drive_protection.c</FilePath>
+            </File>
+            <File>
               <FileName>drive_pwm.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\drive\drive_pwm.c</FilePath>

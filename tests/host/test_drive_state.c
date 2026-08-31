@@ -7,6 +7,7 @@
  */
 
 #include <stdbool.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -363,6 +364,87 @@ static bool test_invalid_mode_or_missing_pwm_stops(void)
                        "本周期没有新 PWM 命令时必须关闭输出。");
 }
 
+static bool test_protection_blocks_power_actions(void)
+{
+    static const test_event_e stop_events[] = {
+        TEST_EVENT_PWM_STOP,
+        TEST_EVENT_RESET
+    };
+    pmsm_t under_voltage_pm = {
+        .req = DRIVE_REQ_START,
+        .foc = {.vbus = 12.0f},
+        .prot_cfg = {
+            .under_voltage_v = 15.0f,
+            .under_voltage_samples = 1U
+        }
+    };
+    pmsm_t over_current_pm = {
+        .req = DRIVE_REQ_RUN,
+        .state = DRIVE_STATE_RUN,
+        .pwm_active = true,
+        .foc = {.i_a = 81.0f, .vbus = 24.0f},
+        .prot_cfg = {
+            .over_current_a = 80.0f,
+            .over_current_samples = 1U
+        }
+    };
+
+    test_reset_fakes();
+    drive_fast_step(&under_voltage_pm);
+
+    if (!test_expect(test_event_count == 0U,
+                     "母线欠压时不能执行 START 动作。") ||
+        !test_expect(under_voltage_pm.fault.bit.un_volt == 1U,
+                     "母线欠压应写入对应故障位。") ||
+        !test_expect(under_voltage_pm.state == DRIVE_STATE_FAULT,
+                     "母线欠压应进入 FAULT。"))
+    {
+        return false;
+    }
+
+    test_reset_fakes();
+    drive_fast_step(&over_current_pm);
+
+    return test_expect_events(stop_events,
+                              sizeof(stop_events) / sizeof(stop_events[0])) &&
+           test_expect(over_current_pm.fault.bit.ov_curr == 1U,
+                       "三相过流应写入对应故障位。") &&
+           test_expect(over_current_pm.state == DRIVE_STATE_FAULT,
+                       "三相过流应进入 FAULT。") &&
+           test_expect(!over_current_pm.pwm_active,
+                       "三相过流必须在本周期关闭 PWM。");
+}
+
+static bool test_invalid_feedback_blocks_start(void)
+{
+    pmsm_t invalid_current_pm = {
+        .req = DRIVE_REQ_START,
+        .foc = {.i_a = NAN, .vbus = 24.0f}
+    };
+    pmsm_t invalid_position_pm = {
+        .req = DRIVE_REQ_START,
+        .foc = {.vbus = 24.0f, .p_e = NAN}
+    };
+
+    test_reset_fakes();
+    drive_fast_step(&invalid_current_pm);
+    if (!test_expect(test_event_count == 0U,
+                     "电流反馈非法时不能执行 START。") ||
+        !test_expect(invalid_current_pm.fault.bit.ioff_err == 1U,
+                     "非法电流反馈应锁存采样故障。"))
+    {
+        return false;
+    }
+
+    test_reset_fakes();
+    drive_fast_step(&invalid_position_pm);
+
+    return test_expect(test_event_count == 0U,
+                       "位置反馈非法时不能执行 START。") &&
+           test_expect(invalid_position_pm.fault.bit.enc_err == 1U,
+                       "非法位置反馈应锁存编码器故障。");
+}
+
 static bool test_stop_request_during_mode_is_preserved(void)
 {
     static const test_event_e run_events[] = {
@@ -484,6 +566,16 @@ int main(void)
     if (!test_invalid_mode_or_missing_pwm_stops())
     {
         return 8;
+    }
+
+    if (!test_protection_blocks_power_actions())
+    {
+        return 9;
+    }
+
+    if (!test_invalid_feedback_blocks_start())
+    {
+        return 10;
     }
 
     return 0;

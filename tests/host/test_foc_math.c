@@ -150,6 +150,16 @@ static int test_angle_speed_explicit_state(void)
     control_angle_speed_state_t first = {0};
     control_angle_speed_state_t second = {0};
 
+    control_angle_speed_reset(&first, 1.0f);
+    if (!expect_close("测速复位首拍",
+                      control_angle_speed_step(&first, 1.0f, 1000.0f),
+                      0.0f))
+    {
+        return 0;
+    }
+
+    control_angle_speed_reset(&first, 0.0f);
+
     if (!expect_close("测速实例 A 首拍",
                       control_angle_speed_step(&first, 0.1f, 1000.0f),
                       100.0f) ||

@@ -14,6 +14,7 @@
 #include "control_pid.h"
 #include "control_speed.h"
 #include "drive_io.h"
+#include "drive_protection.h"
 #include "main.h"
 #include "bsp.h"
 #include "motor_fwd.h"
@@ -651,45 +652,6 @@ typedef union
     uint32_t all;
 } pmsm_flag_t;
 
-// Protection parameter structure
-typedef struct
-{
-    uint8_t rst;
-    float uv_value;
-    float ov_value;
-    float oc_value;
-    float ot_value;
-    float omt_value;
-    float lt_value;
-    float time_value;
-    float ov_speed_value;
-
-    uint32_t uv_cnt;
-    uint32_t ov_cnt;
-    uint32_t oc_cnt;
-    uint32_t ot_cnt;
-    uint32_t omt_cnt;
-    uint32_t link_out_cnt;
-    uint32_t ov_speed_cnt;
-
-    uint32_t uv_cnt_value;
-    uint32_t ov_cnt_value;
-    uint32_t oc_cnt_value;
-    uint32_t ot_cnt_value;
-    uint32_t omt_cnt_value;
-    uint32_t link_out_cnt_value;
-    uint32_t ov_speed_cnt_value;
-
-    float uv_time;
-    float ov_time;
-    float oc_time;
-    float ot_time;
-    float omt_time;
-    float link_out_time;
-    float ov_speed_time;
-} protect_t;
-
-
 // Encoder parameter structure
 typedef struct
 {
@@ -1319,7 +1281,8 @@ struct pmsm
     period_t period;
     pmsm_fault_t fault;
     pmsm_flag_t flag;
-    protect_t protect;
+    drive_protection_config_t prot_cfg;
+    drive_protection_state_t prot_state;
 
     pos_box_t pos_box;
 
@@ -1407,7 +1370,6 @@ bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos);
 /* FOC control functions */
 void pmsm_observe(pmsm_t* pm);
 void pmsm_ctrl_set(pmsm_t* pm);
-void pmsm_fault_check(pmsm_t* pm);
 void pmsm_slow_down(pmsm_t* pm, float dec);
 void pmsm_reset(pmsm_t* pm);
 void pmsm_quick_stop_mode(pmsm_t* pm);

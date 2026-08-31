@@ -16,6 +16,15 @@ typedef struct
 } control_angle_speed_state_t;
 
 /**
+ * @brief 清除角度差分并把当前角度作为下一拍基准。
+ *
+ * @param[out] state 要复位的测速状态。
+ * @param[in] angle_rad 当前有效角度，单位 rad。
+ */
+void control_angle_speed_reset(control_angle_speed_state_t *state,
+                               float angle_rad);
+
+/**
  * @brief 根据相邻两个采样周期的角度差计算角速度。
  *
  * @param[in,out] state 当前测速实例独占的历史状态。

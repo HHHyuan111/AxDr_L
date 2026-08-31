@@ -10,6 +10,14 @@
 static const float control_speed_pi = 3.14159265358f;
 static const float control_speed_two_pi = 6.28318530716f;
 
+PLATFORM_FAST_CODE void control_angle_speed_reset(
+    control_angle_speed_state_t *state,
+    float angle_rad)
+{
+    state->delta_angle_rad = 0.0f;
+    state->previous_angle_rad = angle_rad;
+}
+
 PLATFORM_FAST_CODE float control_angle_speed_step(
     control_angle_speed_state_t *state,
     float angle_rad,

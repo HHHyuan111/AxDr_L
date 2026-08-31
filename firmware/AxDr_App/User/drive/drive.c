@@ -9,6 +9,78 @@
 #include "drive_mode.h"
 #include "drive_pwm.h"
 
+static _RAM_FUNC void drive_update_protection(pmsm_t *pm)
+{
+    const bool power_requested = pm->pwm_active ||
+                                 (pm->req == DRIVE_REQ_START) ||
+                                 (pm->req == DRIVE_REQ_RUN);
+    const bool currents_valid = isfinite(pm->foc.i_a) &&
+                                isfinite(pm->foc.i_b) &&
+                                isfinite(pm->foc.i_c);
+    const bool bus_voltage_valid = isfinite(pm->foc.vbus) &&
+                                   (pm->foc.vbus >= 0.0f);
+    const bool position_valid = isfinite(pm->foc.p_e) &&
+                                isfinite(pm->foc.mp_r) &&
+                                isfinite(pm->foc.mp_m);
+    const drive_protection_sample_t sample = {
+        .current_a_a = pm->foc.i_a,
+        .current_b_a = pm->foc.i_b,
+        .current_c_a = pm->foc.i_c,
+        .bus_voltage_v = pm->foc.vbus,
+        .mos_temperature_c = pm->foc.Tmos,
+        .coil_temperature_c = pm->foc.Tcoil,
+        .rotor_speed_rad_s = pm->foc.wr_f,
+        .currents_valid = currents_valid,
+        .bus_voltage_valid = bus_voltage_valid,
+        /* 当前板级采样链尚未接入两个温度 ADC，不宣称温度数据有效。 */
+        .mos_temperature_valid = false,
+        .coil_temperature_valid = false,
+        .rotor_speed_valid = position_valid,
+        .power_stage_active = power_requested,
+    };
+    const uint32_t faults = drive_protection_step(&pm->prot_state,
+                                                  &pm->prot_cfg,
+                                                  &sample);
+
+    if (power_requested && !currents_valid)
+    {
+        pm->fault.bit.ioff_err = 1U;
+    }
+    if (power_requested && !bus_voltage_valid)
+    {
+        pm->fault.bit.un_volt = 1U;
+    }
+    if (power_requested && !position_valid)
+    {
+        pm->fault.bit.enc_err = 1U;
+    }
+
+    if ((faults & DRIVE_PROTECTION_FAULT_OVER_CURRENT) != 0U)
+    {
+        pm->fault.bit.ov_curr = 1U;
+    }
+    if ((faults & DRIVE_PROTECTION_FAULT_UNDER_VOLTAGE) != 0U)
+    {
+        pm->fault.bit.un_volt = 1U;
+    }
+    if ((faults & DRIVE_PROTECTION_FAULT_OVER_VOLTAGE) != 0U)
+    {
+        pm->fault.bit.ov_volt = 1U;
+    }
+    if ((faults & DRIVE_PROTECTION_FAULT_MOS_OVER_TEMPERATURE) != 0U)
+    {
+        pm->fault.bit.ov_tmos = 1U;
+    }
+    if ((faults & DRIVE_PROTECTION_FAULT_COIL_OVER_TEMPERATURE) != 0U)
+    {
+        pm->fault.bit.ov_tcoi = 1U;
+    }
+    if ((faults & DRIVE_PROTECTION_FAULT_OVER_SPEED) != 0U)
+    {
+        pm->fault.bit.ov_speed = 1U;
+    }
+}
+
 /**
  * @brief 启动三相 PWM，并把控制器置于已知初始状态。
  *
@@ -148,6 +220,8 @@ _RAM_FUNC void drive_fast_step(pmsm_t *pm)
     /* 每周期从空命令开始；只有实际执行的启动或控制路径可以重新生成命令。 */
     pm->pwm_cmd.seq = pm->fast_seq;
     pm->pwm_cmd.valid = false;
+
+    drive_update_protection(pm);
 
     /* 已锁存故障时，当前周期禁止执行 START 或 RUN。 */
     if (pm->fault.all > 0U)

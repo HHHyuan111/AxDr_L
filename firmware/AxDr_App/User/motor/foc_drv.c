@@ -58,26 +58,24 @@ void pmsm_board_init(void)
 **/
 void pmsm_protect_init(void)
 {
-    pm.protect.oc_value = 80.0f; // A
-    pm.protect.ov_value = 60.0f; // V
-    pm.protect.uv_value = 15.0f; // V
-    pm.protect.ot_value = 100.0f; //
-    pm.protect.omt_value = 100.0f; //
-    pm.protect.time_value = 0; // 50us
+    const uint32_t delayed_trip_samples = (uint32_t)(0.1f * pm.period.foc_fs);
 
-    pm.protect.oc_time = 0.1f; // s
-    pm.protect.ov_time = 0.1f; // s
-    pm.protect.uv_time = 0.1f; // s
-    pm.protect.ot_time = 0.1f; // s
-    pm.protect.omt_time = 0.1f; // s
-    pm.protect.link_out_time = 0.1f; // s
+    pm.prot_cfg = (drive_protection_config_t){
+        .under_voltage_v = 15.0f,
+        .over_voltage_v = 60.0f,
+        .over_current_a = 80.0f,
+        .mos_over_temperature_c = 100.0f,
+        .coil_over_temperature_c = 100.0f,
+        .over_speed_rad_s = pm.para.peak_speed * pm.para.Gr,
+        .under_voltage_samples = 1U,
+        .over_voltage_samples = 1U,
+        .over_current_samples = 1U,
+        .mos_over_temperature_samples = delayed_trip_samples,
+        .coil_over_temperature_samples = delayed_trip_samples,
+        .over_speed_samples = delayed_trip_samples,
+    };
 
-    pm.protect.oc_cnt_value = pm.protect.oc_time * pm.period.foc_fs;
-    pm.protect.ov_cnt_value = pm.protect.ov_time * pm.period.foc_fs;
-    pm.protect.uv_cnt_value = pm.protect.uv_time * pm.period.foc_fs;
-    pm.protect.ot_cnt_value = pm.protect.ot_time * pm.period.foc_fs;
-    pm.protect.omt_cnt_value = pm.protect.omt_time * pm.period.foc_fs;
-    pm.protect.link_out_cnt_value = pm.protect.link_out_time * pm.period.foc_fs;
+    drive_protection_reset(&pm.prot_state);
 }
 
 /**

@@ -16,6 +16,7 @@ $motorDir = Join-Path $repoRoot "firmware/AxDr_App/User/motor"
 $driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
 $focTestSource = Join-Path $testDir "test_foc_math.c"
 $driveModeTestSource = Join-Path $testDir "test_drive_mode.c"
+$driveProtectionTestSource = Join-Path $testDir "test_drive_protection.c"
 $driveTestSource = Join-Path $testDir "test_drive_state.c"
 $drivePwmTestSource = Join-Path $testDir "test_drive_pwm.c"
 $pidTestSource = Join-Path $testDir "test_control_pid.c"
@@ -47,10 +48,12 @@ $speedSource = Join-Path $controlDir "control_speed.c"
 $utilSource = Join-Path $motorDir "util.c"
 $driveSource = Join-Path $driveDir "drive.c"
 $driveModeSource = Join-Path $driveDir "drive_mode.c"
+$driveProtectionSource = Join-Path $driveDir "drive_protection.c"
 $drivePwmSource = Join-Path $driveDir "drive_pwm.c"
 $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
 $focExecutablePath = Join-Path $outputDir "test_foc_math.exe"
 $driveModeExecutablePath = Join-Path $outputDir "test_drive_mode.exe"
+$driveProtectionExecutablePath = Join-Path $outputDir "test_drive_protection.exe"
 $driveExecutablePath = Join-Path $outputDir "test_drive_state.exe"
 $drivePwmExecutablePath = Join-Path $outputDir "test_drive_pwm.exe"
 $pidExecutablePath = Join-Path $outputDir "test_control_pid.exe"
@@ -298,9 +301,30 @@ Write-Host "Host C11/Drive 模式分派测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$commonDir" "-I$driveDir" `
+        $driveProtectionTestSource $driveProtectionSource `
+        -o $driveProtectionExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host Drive 保护测试编译失败，退出码：$compileExitCode"
+}
+
+& $driveProtectionExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host Drive 保护测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/Drive 保护与故障锁存测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$motorDir" "-I$driveDir" `
-        $driveTestSource $driveSource `
-        -o $driveExecutablePath 2>&1 |
+        $driveTestSource $driveSource $driveProtectionSource `
+        -o $driveExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )
 $compileExitCode = $LASTEXITCODE
