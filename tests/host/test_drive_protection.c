@@ -35,6 +35,9 @@ static drive_protection_config_t test_config(void)
         .mos_over_temperature_samples = 2U,
         .coil_over_temperature_samples = 2U,
         .over_speed_samples = 2U,
+        .invalid_current_samples = 2U,
+        .invalid_bus_voltage_samples = 2U,
+        .invalid_position_samples = 2U,
     };
 }
 
@@ -53,6 +56,7 @@ static drive_protection_sample_t safe_sample(void)
         .mos_temperature_valid = true,
         .coil_temperature_valid = true,
         .rotor_speed_valid = true,
+        .position_valid = true,
         .power_stage_active = true,
     };
 }
@@ -157,12 +161,29 @@ static bool test_other_limits_and_invalid_samples(void)
     sample.mos_temperature_c = NAN;
     sample.coil_temperature_c = NAN;
     sample.rotor_speed_rad_s = NAN;
+    sample.position_valid = false;
     (void)drive_protection_step(&state, &config, &sample);
     if (!expect_true(state.latched_faults == 0U,
                      "非有限样本应交给输入有效性故障处理，不能误判物理超限。"))
     {
         return false;
     }
+
+    const uint32_t invalid_faults = drive_protection_step(&state, &config, &sample);
+    if (!expect_true(
+            (invalid_faults & DRIVE_PROTECTION_FAULT_CURRENT_FEEDBACK) != 0U,
+            "连续无效电流样本应锁存电流反馈故障。") ||
+        !expect_true(
+            (invalid_faults & DRIVE_PROTECTION_FAULT_BUS_FEEDBACK) != 0U,
+            "连续无效母线样本应锁存母线反馈故障。") ||
+        !expect_true(
+            (invalid_faults & DRIVE_PROTECTION_FAULT_POSITION_FEEDBACK) != 0U,
+            "连续无效位置样本应锁存位置反馈故障。"))
+    {
+        return false;
+    }
+
+    drive_protection_reset(&state);
 
     sample = safe_sample();
     sample.bus_voltage_v = 51.0f;

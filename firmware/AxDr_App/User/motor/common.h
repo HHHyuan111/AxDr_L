@@ -1268,6 +1268,7 @@ struct pmsm
     drive_req_e req;
     drive_state_e state;
     bool pwm_active;
+    drive_feedback_status_t fb_status;
     drive_pwm_cmd_t pwm_cmd;
     drive_pwm_commit_t pwm_commit;
 
@@ -1356,7 +1357,7 @@ void pmsm_protect_init(void);
 void pmsm_lpf_init(void);
 void foc_feedback_update(pmsm_t *pm, float bus_voltage_v);
 void foc_clear(pmsm_t* pm);
-void foc_adc_sample(pmsm_t* pm);
+bool foc_adc_sample(pmsm_t* pm);
 void foc_get_curr_off(void);
 
 void foc_cur_pi_calc(pmsm_t* pm);
@@ -1394,13 +1395,13 @@ void csp_pos_mode(pmsm_t* pm);
 /* Encoder functions */
 void encoder_init(pos_box_t *pos_box);
 uint32_t read_mt6825_raw(void);
-void read_mt6816_raw(enc_para_t *enc);
+bool read_mt6816_raw(enc_para_t *enc);
 uint32_t read_ma732_raw(void);
 uint32_t read_dm485enc_raw(void);
 uint32_t send_mod_dm485enc(void);
 
-void position_update(pmsm_t *pm);
-void encoder_sample(pos_box_t *pos_box);
+bool position_update(pmsm_t *pm);
+bool encoder_sample(pos_box_t *pos_box);
 void encoder_update_angle(enc_para_t *enc);
 void position_update_single_encoder(pmsm_t *pm);
 void sensory2_pos_calc(pmsm_t* pm);

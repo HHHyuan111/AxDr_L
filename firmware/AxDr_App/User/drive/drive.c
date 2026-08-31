@@ -14,12 +14,15 @@ static _RAM_FUNC void drive_update_protection(pmsm_t *pm)
     const bool power_requested = pm->pwm_active ||
                                  (pm->req == DRIVE_REQ_START) ||
                                  (pm->req == DRIVE_REQ_RUN);
-    const bool currents_valid = isfinite(pm->foc.i_a) &&
+    const bool currents_valid = pm->fb_status.i_valid &&
+                                isfinite(pm->foc.i_a) &&
                                 isfinite(pm->foc.i_b) &&
                                 isfinite(pm->foc.i_c);
-    const bool bus_voltage_valid = isfinite(pm->foc.vbus) &&
+    const bool bus_voltage_valid = pm->fb_status.vbus_valid &&
+                                   isfinite(pm->foc.vbus) &&
                                    (pm->foc.vbus >= 0.0f);
-    const bool position_valid = isfinite(pm->foc.p_e) &&
+    const bool position_valid = pm->fb_status.pos_valid &&
+                                isfinite(pm->foc.p_e) &&
                                 isfinite(pm->foc.mp_r) &&
                                 isfinite(pm->foc.mp_m);
     const drive_protection_sample_t sample = {
@@ -36,24 +39,12 @@ static _RAM_FUNC void drive_update_protection(pmsm_t *pm)
         .mos_temperature_valid = false,
         .coil_temperature_valid = false,
         .rotor_speed_valid = position_valid,
+        .position_valid = position_valid,
         .power_stage_active = power_requested,
     };
     const uint32_t faults = drive_protection_step(&pm->prot_state,
                                                   &pm->prot_cfg,
                                                   &sample);
-
-    if (power_requested && !currents_valid)
-    {
-        pm->fault.bit.ioff_err = 1U;
-    }
-    if (power_requested && !bus_voltage_valid)
-    {
-        pm->fault.bit.un_volt = 1U;
-    }
-    if (power_requested && !position_valid)
-    {
-        pm->fault.bit.enc_err = 1U;
-    }
 
     if ((faults & DRIVE_PROTECTION_FAULT_OVER_CURRENT) != 0U)
     {
@@ -78,6 +69,18 @@ static _RAM_FUNC void drive_update_protection(pmsm_t *pm)
     if ((faults & DRIVE_PROTECTION_FAULT_OVER_SPEED) != 0U)
     {
         pm->fault.bit.ov_speed = 1U;
+    }
+    if ((faults & DRIVE_PROTECTION_FAULT_CURRENT_FEEDBACK) != 0U)
+    {
+        pm->fault.bit.ioff_err = 1U;
+    }
+    if ((faults & DRIVE_PROTECTION_FAULT_BUS_FEEDBACK) != 0U)
+    {
+        pm->fault.bit.un_volt = 1U;
+    }
+    if ((faults & DRIVE_PROTECTION_FAULT_POSITION_FEEDBACK) != 0U)
+    {
+        pm->fault.bit.enc_err = 1U;
     }
 }
 

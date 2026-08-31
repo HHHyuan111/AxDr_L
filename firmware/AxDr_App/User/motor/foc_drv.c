@@ -73,6 +73,9 @@ void pmsm_protect_init(void)
         .mos_over_temperature_samples = delayed_trip_samples,
         .coil_over_temperature_samples = delayed_trip_samples,
         .over_speed_samples = delayed_trip_samples,
+        .invalid_current_samples = 1U,
+        .invalid_bus_voltage_samples = 1U,
+        .invalid_position_samples = 3U,
     };
 
     drive_protection_reset(&pm.prot_state);
@@ -697,8 +700,10 @@ void temp_calc(void)
  *
  * 函数依次完成三件事：从板级适配层取得原始计数值；根据 ABC/ACB 接线关系
  * 映射到 A、B、C 相；扣除零偏并乘以电流换算系数。采样触发和 DMA 不在这里处理。
+ *
+ * @return 相序有效并完成电流换算返回 true，否则返回 false。
  */
-_RAM_FUNC void foc_adc_sample(pmsm_t* pm)
+_RAM_FUNC bool foc_adc_sample(pmsm_t* pm)
 {
     target_adc_raw_t adc_raw;
 
@@ -726,8 +731,7 @@ _RAM_FUNC void foc_adc_sample(pmsm_t* pm)
         pm->adc.vb = adc_raw.v.c;
         break;
     default:
-        /* 保留原有行为：相序无效时不更新三相电流和相电压原始值。 */
-        break;
+        return false;
     }
 
     /* 母线电压不参与相序交换，每个控制周期都直接更新。 */
@@ -743,4 +747,6 @@ _RAM_FUNC void foc_adc_sample(pmsm_t* pm)
     pm->foc.i_a = ((float) pm->adc.ia - pm->adc.ia_off) * pm->board.i_ratio;
     pm->foc.i_b = ((float) pm->adc.ib - pm->adc.ib_off) * pm->board.i_ratio;
     pm->foc.i_c = ((float) pm->adc.ic - pm->adc.ic_off) * pm->board.i_ratio;
+
+    return true;
 }

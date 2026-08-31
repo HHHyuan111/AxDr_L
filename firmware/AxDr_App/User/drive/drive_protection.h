@@ -16,6 +16,9 @@ typedef enum
     DRIVE_PROTECTION_FAULT_OVER_VOLTAGE = (1UL << 2U),
     DRIVE_PROTECTION_FAULT_MOS_OVER_TEMPERATURE = (1UL << 3U),
     DRIVE_PROTECTION_FAULT_COIL_OVER_TEMPERATURE = (1UL << 4U),
+    DRIVE_PROTECTION_FAULT_POSITION_FEEDBACK = (1UL << 5U),
+    DRIVE_PROTECTION_FAULT_CURRENT_FEEDBACK = (1UL << 6U),
+    DRIVE_PROTECTION_FAULT_BUS_FEEDBACK = (1UL << 7U),
     DRIVE_PROTECTION_FAULT_OVER_SPEED = (1UL << 8U)
 } drive_protection_fault_e;
 
@@ -33,6 +36,9 @@ typedef struct
     uint32_t mos_over_temperature_samples;
     uint32_t coil_over_temperature_samples;
     uint32_t over_speed_samples;
+    uint32_t invalid_current_samples;
+    uint32_t invalid_bus_voltage_samples;
+    uint32_t invalid_position_samples;
 } drive_protection_config_t;
 
 typedef struct
@@ -49,6 +55,7 @@ typedef struct
     bool mos_temperature_valid;
     bool coil_temperature_valid;
     bool rotor_speed_valid;
+    bool position_valid;
     bool power_stage_active;
 } drive_protection_sample_t;
 
@@ -60,6 +67,9 @@ typedef struct
     uint32_t mos_over_temperature_count;
     uint32_t coil_over_temperature_count;
     uint32_t over_speed_count;
+    uint32_t invalid_current_count;
+    uint32_t invalid_bus_voltage_count;
+    uint32_t invalid_position_count;
     uint32_t latched_faults;
 } drive_protection_state_t;
 

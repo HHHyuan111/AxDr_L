@@ -63,6 +63,33 @@ PLATFORM_FAST_CODE uint32_t drive_protection_step(
                                                   fabsf(sample->current_c_a)));
 
     drive_protection_update_counter(
+        &state->invalid_current_count,
+        config->invalid_current_samples,
+        sample->power_stage_active &&
+            (config->invalid_current_samples > 0U) &&
+            !currents_valid,
+        DRIVE_PROTECTION_FAULT_CURRENT_FEEDBACK,
+        &state->latched_faults);
+
+    drive_protection_update_counter(
+        &state->invalid_bus_voltage_count,
+        config->invalid_bus_voltage_samples,
+        sample->power_stage_active &&
+            (config->invalid_bus_voltage_samples > 0U) &&
+            !bus_voltage_valid,
+        DRIVE_PROTECTION_FAULT_BUS_FEEDBACK,
+        &state->latched_faults);
+
+    drive_protection_update_counter(
+        &state->invalid_position_count,
+        config->invalid_position_samples,
+        sample->power_stage_active &&
+            (config->invalid_position_samples > 0U) &&
+            !sample->position_valid,
+        DRIVE_PROTECTION_FAULT_POSITION_FEEDBACK,
+        &state->latched_faults);
+
+    drive_protection_update_counter(
         &state->over_current_count,
         config->over_current_samples,
         currents_valid && drive_protection_limit_enabled(

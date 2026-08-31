@@ -16,6 +16,9 @@ PLATFORM_FAST_CODE void control_cycle_step(
 {
     /* 将硬件采样或回放数据写入现有控制器上下文。 */
     motor->fast_seq = input->seq;
+    motor->fb_status.i_valid = input->i_valid;
+    motor->fb_status.vbus_valid = input->vbus_valid;
+    motor->fb_status.pos_valid = input->pos_valid;
     motor->foc.i_a = input->current_a_a;
     motor->foc.i_b = input->current_b_a;
     motor->foc.i_c = input->current_c_a;

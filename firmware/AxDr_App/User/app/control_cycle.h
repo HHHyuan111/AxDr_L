@@ -20,6 +20,9 @@
 typedef struct
 {
     uint32_t seq;
+    bool i_valid;
+    bool vbus_valid;
+    bool pos_valid;
     float current_a_a;
     float current_b_a;
     float current_c_a;

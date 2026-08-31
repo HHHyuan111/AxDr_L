@@ -19,6 +19,9 @@ void foc_feedback_update(pmsm_t *motor, float bus_voltage_v)
     feedback_called = true;
     received_bus_voltage_v = bus_voltage_v;
     input_visible = (motor->fast_seq == 42U) &&
+                    motor->fb_status.i_valid &&
+                    motor->fb_status.vbus_valid &&
+                    motor->fb_status.pos_valid &&
                     (motor->foc.i_a == 1.0f) &&
                     (motor->foc.i_b == -2.0f) &&
                     (motor->foc.i_c == 3.0f) &&
@@ -59,6 +62,9 @@ int main(void)
     pmsm_t motor = {0};
     const control_cycle_input_t input = {
         .seq = 42U,
+        .i_valid = true,
+        .vbus_valid = true,
+        .pos_valid = true,
         .current_a_a = 1.0f,
         .current_b_a = -2.0f,
         .current_c_a = 3.0f,

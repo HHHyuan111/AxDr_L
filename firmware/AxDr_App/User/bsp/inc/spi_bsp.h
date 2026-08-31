@@ -1,88 +1,86 @@
-#ifndef __SPI_BSP_H__
-#define __SPI_BSP_H__
+/**
+ * @file spi_bsp.h
+ * @brief 快速周期使用的有界同步 SPI 单字传输接口。
+ */
+
+#ifndef SPI_BSP_H
+#define SPI_BSP_H
+
+#include <stdint.h>
 
 #include "main.h"
 
-static inline uint32_t LL_SPI_IsActiveFlag_TXE(SPI_TypeDef *SPIx)
+static inline uint32_t spi_bsp_tx_ready(const SPI_TypeDef *spi)
 {
-return ((READ_BIT(SPIx->SR, SPI_SR_TXE) == (SPI_SR_TXE)) ? 1UL : 0UL);
+    return (READ_BIT(spi->SR, SPI_SR_TXE) == SPI_SR_TXE) ? 1UL : 0UL;
 }
 
-
-static inline void LL_SPI_TransmitData16(SPI_TypeDef *SPIx, uint16_t TxData)
+static inline uint32_t spi_bsp_busy(const SPI_TypeDef *spi)
 {
-
-    SPIx->DR = TxData;
-
+    return (READ_BIT(spi->SR, SPI_SR_BSY) == SPI_SR_BSY) ? 1UL : 0UL;
 }
 
-static inline uint32_t LL_SPI_IsActiveFlag_BSY(SPI_TypeDef *SPIx)
+static inline uint32_t spi_bsp_rx_ready(const SPI_TypeDef *spi)
 {
-    return ((READ_BIT(SPIx->SR, SPI_SR_BSY) == (SPI_SR_BSY)) ? 1UL : 0UL);
+    return (READ_BIT(spi->SR, SPI_SR_RXNE) == SPI_SR_RXNE) ? 1UL : 0UL;
 }
 
-static inline uint32_t LL_SPI_IsActiveFlag_RXNE(SPI_TypeDef *SPIx)
+/**
+ * @brief 在限定轮询次数内完成一次 16 位 SPI 收发。
+ *
+ * @param[in,out] hspi SPI 外设句柄。
+ * @param[in] tx_word 本次发送的 16 位数据。
+ * @param[out] rx_word 成功时写入收到的 16 位数据。
+ * @param[in] timeout_count 每个等待阶段允许的最大轮询次数。
+ * @return 成功返回 0；等待超时返回 -1。
+ *
+ * 这是 ADC 快速周期里的同步接口，因此超时参数表示轮询次数，不表示毫秒。
+ * 任一阶段超时后立即退出，不再继续发送或读取无效数据。
+ */
+static inline int8_t spi_transmit_receive_sync(
+    SPI_HandleTypeDef *hspi,
+    uint16_t tx_word,
+    uint16_t *rx_word,
+    uint32_t timeout_count)
 {
-    return ((READ_BIT(SPIx->SR, SPI_SR_RXNE) == (SPI_SR_RXNE)) ? 1UL : 0UL);
-}
+    uint32_t count = 0U;
 
-static inline uint16_t LL_SPI_ReceiveData16(SPI_TypeDef *SPIx)
-{
-    return (uint16_t)(READ_REG(SPIx->DR));
-}
-
-static inline int8_t spi_transmit_receive_sync(SPI_HandleTypeDef *hspi,uint16_t data_in, uint16_t *data_out, uint32_t timeout_ms) {
-    int8_t state = 0;
-    *data_out = 0;
-    uint32_t timeout_cnt;
-    const uint32_t timeout_cnt_num = timeout_ms;
-
-    /* Check if the SPI is already enabled */
     if ((hspi->Instance->CR1 & SPI_CR1_SPE) != SPI_CR1_SPE)
     {
-        /* Enable SPI peripheral */
         __HAL_SPI_ENABLE(hspi);
     }
 
-    /* Wait until TXE flag is set to send data */
-    timeout_cnt = 0;
-    while(!LL_SPI_IsActiveFlag_TXE(hspi->Instance)){
-        timeout_cnt ++;
-        if(timeout_cnt > timeout_cnt_num){
-            state = -1;
-            break;
+    while (spi_bsp_tx_ready(hspi->Instance) == 0U)
+    {
+        if (++count > timeout_count)
+        {
+            return -1;
         }
     }
 
-    /* Transmit data in 16 Bit mode */
-    LL_SPI_TransmitData16(hspi->Instance, data_in);
+    hspi->Instance->DR = tx_word;
 
-    /* Check BSY flag */
-    timeout_cnt = 0;
-    while(LL_SPI_IsActiveFlag_BSY(hspi->Instance)){
-        timeout_cnt ++;
-        if(timeout_cnt > timeout_cnt_num){
-            state = -1;
-            break;
+    count = 0U;
+    while (spi_bsp_rx_ready(hspi->Instance) == 0U)
+    {
+        if (++count > timeout_count)
+        {
+            return -1;
         }
     }
 
-    /* Check RXNE flag */
-    timeout_cnt = 0;
-    while(!LL_SPI_IsActiveFlag_RXNE(hspi->Instance)){
-        timeout_cnt ++;
-        if(timeout_cnt > timeout_cnt_num){
-            state = -1;
-            break;
+    *rx_word = (uint16_t)READ_REG(hspi->Instance->DR);
+
+    count = 0U;
+    while (spi_bsp_busy(hspi->Instance) != 0U)
+    {
+        if (++count > timeout_count)
+        {
+            return -1;
         }
     }
 
-    // Read 16-Bits in the data register
-    *data_out = LL_SPI_ReceiveData16(hspi->Instance);
-
-    return state;
+    return 0;
 }
 
-#endif
-
-
+#endif /* SPI_BSP_H */

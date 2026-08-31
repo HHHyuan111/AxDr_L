@@ -29,6 +29,8 @@ static fast_event_e events[EVENT_CAPACITY];
 static size_t event_count;
 static const pmsm_t *last_motor;
 static pos_box_t *last_pos_box;
+static bool encoder_valid = true;
+static bool current_valid = true;
 
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc);
 
@@ -38,22 +40,25 @@ static void log_event(fast_event_e event)
     event_count++;
 }
 
-void encoder_sample(pos_box_t *pos_box)
+bool encoder_sample(pos_box_t *pos_box)
 {
     last_pos_box = pos_box;
     log_event(EVENT_ENCODER_SAMPLE);
+    return encoder_valid;
 }
 
-void position_update(pmsm_t *motor)
+bool position_update(pmsm_t *motor)
 {
     last_motor = motor;
     log_event(EVENT_POSITION_UPDATE);
+    return true;
 }
 
-void foc_adc_sample(pmsm_t *motor)
+bool foc_adc_sample(pmsm_t *motor)
 {
     last_motor = motor;
     log_event(EVENT_ADC_SAMPLE);
+    return current_valid;
 }
 
 void foc_feedback_update(pmsm_t *motor, float bus_voltage_v)
@@ -125,6 +130,8 @@ static bool test_not_ready_does_nothing(pmsm_t *motor)
 
 static bool test_explicit_motor_cycle(pmsm_t *motor)
 {
+    encoder_valid = true;
+    current_valid = true;
     fast_loop_enable();
     event_count = 0U;
     last_motor = NULL;
@@ -154,8 +161,28 @@ static bool test_explicit_motor_cycle(pmsm_t *motor)
                        "第二次快速周期应继续增加周期编号。");
 }
 
+static bool test_sample_validity_is_forwarded(pmsm_t *motor)
+{
+    encoder_valid = false;
+    current_valid = false;
+    event_count = 0U;
+
+    fast_loop_step(motor);
+
+    return expect_true(event_count == (EVENT_COUNT_PER_CYCLE - 1U),
+                       "编码器采样失败后不应继续换算位置。") &&
+           expect_true(!motor->fb_status.i_valid,
+                       "ADC 采样失败必须传到控制周期。") &&
+           expect_true(motor->fb_status.vbus_valid,
+                       "现有母线 ADC 直读结果应保持有效。") &&
+           expect_true(!motor->fb_status.pos_valid,
+                       "编码器采样失败必须传到控制周期。");
+}
+
 static bool test_hal_callback_uses_firmware_motor(void)
 {
+    encoder_valid = true;
+    current_valid = true;
     pm.fast_seq = 20U;
     event_count = 0U;
     last_motor = NULL;
@@ -188,9 +215,14 @@ int main(void)
         return 2;
     }
 
-    if (!test_hal_callback_uses_firmware_motor())
+    if (!test_sample_validity_is_forwarded(&motor))
     {
         return 3;
+    }
+
+    if (!test_hal_callback_uses_firmware_motor())
+    {
+        return 4;
     }
 
     return 0;

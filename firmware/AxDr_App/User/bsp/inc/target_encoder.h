@@ -9,16 +9,18 @@
 #ifndef TARGET_ENCODER_H
 #define TARGET_ENCODER_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 /**
  * @brief 读取 MT6816 的 14 位单圈位置原始值。
  *
- * @return 编码器原始计数，范围为 0～16383，单位为 count，不是弧度。
+ * @param[out] raw_count 成功时写入 0～16383 范围内的原始计数。
+ * @return 两次 SPI 传输均成功返回 true，否则返回 false。
  *
  * 函数依次读取 MT6816 的 0x03 和 0x04 寄存器，并按照当前固件原有格式
  * 拼成 14 位位置值。SPI 外设和片选引脚只在板级适配层中出现。
  */
-uint16_t target_encoder_read_mt6816_raw(void);
+bool target_encoder_read_mt6816_raw(uint16_t *raw_count);
 
 #endif /* TARGET_ENCODER_H */

@@ -27,6 +27,9 @@ void fast_loop_enable(void)
 
 _RAM_FUNC void fast_loop_step(pmsm_t *motor)
 {
+    bool current_valid;
+    bool encoder_valid;
+    bool position_valid;
     control_cycle_input_t input;
     control_cycle_output_t output;
 
@@ -43,15 +46,18 @@ _RAM_FUNC void fast_loop_step(pmsm_t *motor)
     motor->fast_seq++;
 
     /* 第 1 步：读取编码器，并更新机械角、电角度和多圈位置。 */
-    encoder_sample(&motor->pos_box);
-    position_update(motor);
+    encoder_valid = encoder_sample(&motor->pos_box);
+    position_valid = encoder_valid && position_update(motor);
 
     /* 第 2 步：读取 ADC 原始值，并换算本周期三相电流。 */
-    foc_adc_sample(motor);
+    current_valid = foc_adc_sample(motor);
 
     /* 第 3 步：把本周期物理反馈整理为硬件无关的控制输入。 */
     input = (control_cycle_input_t){
         .seq = motor->fast_seq,
+        .i_valid = current_valid,
+        .vbus_valid = true,
+        .pos_valid = position_valid,
         .current_a_a = motor->foc.i_a,
         .current_b_a = motor->foc.i_b,
         .current_c_a = motor->foc.i_c,

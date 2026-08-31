@@ -25,30 +25,39 @@
  * 当前保留原工程行为：底层传输状态暂不向位置算法层传播。
  */
 static PLATFORM_FAST_CODE
-void target_encoder_transfer_word(uint16_t tx_word, uint16_t *rx_word)
+bool target_encoder_transfer_word(uint16_t tx_word, uint16_t *rx_word)
 {
+    int8_t transfer_status;
+
     HAL_GPIO_WritePin(SPI1_CSN_GPIO_Port, SPI1_CSN_Pin, GPIO_PIN_RESET);
-    (void)spi_transmit_receive_sync(
+    transfer_status = spi_transmit_receive_sync(
         &hspi1,
         tx_word,
         rx_word,
         MT6816_SPI_TIMEOUT_COUNT);
     HAL_GPIO_WritePin(SPI1_CSN_GPIO_Port, SPI1_CSN_Pin, GPIO_PIN_SET);
+
+    return transfer_status == 0;
 }
 
 PLATFORM_FAST_CODE
-uint16_t target_encoder_read_mt6816_raw(void)
+bool target_encoder_read_mt6816_raw(uint16_t *raw_count)
 {
     uint16_t reg_03_response = 0U;
     uint16_t reg_04_response = 0U;
 
     /* 第 1 步：分别读取保存位置高位和低位的两个寄存器。 */
-    target_encoder_transfer_word(MT6816_READ_REG_03_COMMAND, &reg_03_response);
-    target_encoder_transfer_word(MT6816_READ_REG_04_COMMAND, &reg_04_response);
+    if (!target_encoder_transfer_word(MT6816_READ_REG_03_COMMAND, &reg_03_response)
+        || !target_encoder_transfer_word(MT6816_READ_REG_04_COMMAND, &reg_04_response))
+    {
+        return false;
+    }
 
     /* 第 2 步：取两帧响应的低 8 位，拼接后右移 2 位，得到 14 位位置值。 */
-    return (uint16_t)((
+    *raw_count = (uint16_t)((
         ((uint32_t)(reg_03_response & 0x00FFU) << 8U)
         | (uint32_t)(reg_04_response & 0x00FFU))
         >> 2U);
+
+    return true;
 }

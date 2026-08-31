@@ -90,12 +90,19 @@ _RAM_FUNC uint32_t read_ma732_raw(void)
  * 硬件通信由 target_encoder 完成；本函数只把结果交给上层已有的数据结构。
  * 显式传入 enc，避免函数暗中修改全局电机对象。
  */
-_RAM_FUNC void read_mt6816_raw(enc_para_t *enc)
+_RAM_FUNC bool read_mt6816_raw(enc_para_t *enc)
 {
-    uint16_t raw_count = target_encoder_read_mt6816_raw();
+    uint16_t raw_count;
+
+    if (!target_encoder_read_mt6816_raw(&raw_count))
+    {
+        enc->rev_flag = 0;
+        return false;
+    }
 
     enc->rev_flag = 1;
     enc->raw = raw_count;
+    return true;
 }
 
 _RAM_FUNC uint32_t read_dm485enc_raw(void)

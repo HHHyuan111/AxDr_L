@@ -10,6 +10,16 @@
 #include <stdint.h>
 
 /**
+ * @brief 本控制周期反馈数据的有效状态。
+ */
+typedef struct
+{
+    bool i_valid;
+    bool vbus_valid;
+    bool pos_valid;
+} drive_feedback_status_t;
+
+/**
  * @brief Drive 在一个快速周期内生成的逻辑 A、B、C 相 PWM 命令。
  *
  * cmd 是 command 的常用缩写，表示算法希望 Target 写入的占空比。
