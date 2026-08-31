@@ -8,6 +8,7 @@
 
 #include "target_pwm.h"
 
+#include "compiler.h"
 #include "tim.h"
 
 void target_pwm_start_phase_outputs(void)
@@ -44,7 +45,7 @@ void target_pwm_stop_phase_outputs(void)
  * .RamFunc 告诉链接器把本函数放到 RAM 中运行。快速控制环会频繁更新占空比，
  * 这里继续保留原工程的 RAM 执行方式，不改变实时链路的位置。
  */
-__attribute__((section(".RamFunc")))
+PLATFORM_FAST_CODE
 void target_pwm_set_duty_ratios(float channel_1_duty_ratio,
                                 float channel_2_duty_ratio,
                                 float channel_3_duty_ratio)

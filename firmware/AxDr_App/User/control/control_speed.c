@@ -5,12 +5,12 @@
 
 #include "control_speed.h"
 
-#define CONTROL_SPEED_RAM_FUNC __attribute__((section(".RamFunc")))
+#include "compiler.h"
 
 static const float control_speed_pi = 3.14159265358f;
 static const float control_speed_two_pi = 6.28318530716f;
 
-CONTROL_SPEED_RAM_FUNC float control_angle_speed_step(
+PLATFORM_FAST_CODE float control_angle_speed_step(
     control_angle_speed_state_t *state,
     float angle_rad,
     float sample_frequency_hz)

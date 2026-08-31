@@ -5,7 +5,7 @@
 
 #include "control_filter.h"
 
-#define CONTROL_FILTER_RAM_FUNC __attribute__((section(".RamFunc")))
+#include "compiler.h"
 
 static const float control_filter_two_pi = 6.28318530716f;
 
@@ -19,7 +19,7 @@ void control_lpf_init(lpf_t *filter)
     filter->val_f = 0.0f;
 }
 
-CONTROL_FILTER_RAM_FUNC float control_lpf_step(lpf_t *filter, float value)
+PLATFORM_FAST_CODE float control_lpf_step(lpf_t *filter, float value)
 {
     filter->val = value;
     filter->val_f = filter->filt_b * filter->val +

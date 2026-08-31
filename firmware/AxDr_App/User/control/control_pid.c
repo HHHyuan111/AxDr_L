@@ -5,7 +5,8 @@
 
 #include "control_pid.h"
 
-#define CONTROL_PID_RAM_FUNC __attribute__((section(".RamFunc")))
+#include "compiler.h"
+
 #define CONTROL_PID_MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define CONTROL_PID_MAX(a, b) (((a) > (b)) ? (a) : (b))
 
@@ -33,7 +34,7 @@ void control_pid_clear(pid_para_t *pid)
     pid->out_value = 0.0f;
 }
 
-CONTROL_PID_RAM_FUNC float control_pid_parallel_step(pid_para_t *pid,
+PLATFORM_FAST_CODE float control_pid_parallel_step(pid_para_t *pid,
                                                       float ref_value,
                                                       float feedback_value)
 {
@@ -72,7 +73,7 @@ CONTROL_PID_RAM_FUNC float control_pid_parallel_step(pid_para_t *pid,
     return pid->out_value;
 }
 
-CONTROL_PID_RAM_FUNC float control_pid_serial_step(pid_para_t *pid,
+PLATFORM_FAST_CODE float control_pid_serial_step(pid_para_t *pid,
                                                     float ref_value,
                                                     float feedback_value)
 {
@@ -106,7 +107,7 @@ CONTROL_PID_RAM_FUNC float control_pid_serial_step(pid_para_t *pid,
     return pid->out_value;
 }
 
-CONTROL_PID_RAM_FUNC float control_pid_pdff_step(pid_para_t *pid,
+PLATFORM_FAST_CODE float control_pid_pdff_step(pid_para_t *pid,
                                                   float ref_value,
                                                   float feedback_value)
 {

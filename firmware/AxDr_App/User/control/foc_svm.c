@@ -5,12 +5,12 @@
 
 #include "foc_svm.h"
 
-#define FOC_SVM_RAM_FUNC __attribute__((section(".RamFunc")))
+#include "compiler.h"
 
 static const float foc_one_by_sqrt3 = 0.57735026919f;
 static const float foc_two_by_sqrt3 = 1.15470053838f;
 
-FOC_SVM_RAM_FUNC int foc_svm(float v_alpha_norm,
+PLATFORM_FAST_CODE int foc_svm(float v_alpha_norm,
                              float v_beta_norm,
                              float *duty_a,
                              float *duty_b,

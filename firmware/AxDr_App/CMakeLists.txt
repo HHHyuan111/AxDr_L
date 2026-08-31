@@ -31,6 +31,7 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 include_directories(
     "User/app"
     "User/bsp/inc"
+    "User/common"
     "User/control"
     "User/drive"
     "User/motor"

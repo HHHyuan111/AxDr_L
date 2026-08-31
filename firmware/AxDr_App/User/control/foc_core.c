@@ -5,14 +5,13 @@
 
 #include "foc_core.h"
 
+#include "compiler.h"
 #include "foc_svm.h"
 #include "foc_transform.h"
 
-#define FOC_CORE_RAM_FUNC __attribute__((section(".RamFunc")))
-
 static const float foc_core_two_pi = 6.28318530716f;
 
-static FOC_CORE_RAM_FUNC float foc_core_wrap_0_2pi(float theta)
+static PLATFORM_FAST_CODE float foc_core_wrap_0_2pi(float theta)
 {
     theta = (theta > foc_core_two_pi) ? theta - foc_core_two_pi : theta;
     theta = (theta < 0.0f) ? theta + foc_core_two_pi : theta;
@@ -20,7 +19,7 @@ static FOC_CORE_RAM_FUNC float foc_core_wrap_0_2pi(float theta)
     return theta;
 }
 
-FOC_CORE_RAM_FUNC void foc_core_prepare(const foc_sample_t *sample,
+PLATFORM_FAST_CODE void foc_core_prepare(const foc_sample_t *sample,
                                         foc_frame_t *frame)
 {
     foc_clarke(sample->i_a,
@@ -39,7 +38,7 @@ FOC_CORE_RAM_FUNC void foc_core_prepare(const foc_sample_t *sample,
              &frame->i_q);
 }
 
-FOC_CORE_RAM_FUNC bool foc_core_modulate(const foc_frame_t *frame,
+PLATFORM_FAST_CODE bool foc_core_modulate(const foc_frame_t *frame,
                                          const foc_voltage_t *voltage,
                                          foc_duty_t *duty)
 {

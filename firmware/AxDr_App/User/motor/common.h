@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "compiler.h"
 #include "control_filter.h"
 #include "control_pid.h"
 #include "control_speed.h"
@@ -17,8 +18,8 @@
 #include "bsp.h"
 #include "motor_fwd.h"
 
-#define _RAM_FUNC   __attribute__((section(".RamFunc")))
-#define _RAM_DATA   __attribute__((section(".data")))
+#define _RAM_FUNC PLATFORM_FAST_CODE
+#define _RAM_DATA PLATFORM_FAST_DATA
 
 
 // Type definitions for various data types

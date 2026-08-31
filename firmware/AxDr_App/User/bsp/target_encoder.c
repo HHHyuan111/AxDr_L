@@ -8,6 +8,7 @@
 
 #include "target_encoder.h"
 
+#include "compiler.h"
 #include "spi.h"
 #include "spi_bsp.h"
 
@@ -23,7 +24,7 @@
  *
  * 当前保留原工程行为：底层传输状态暂不向位置算法层传播。
  */
-static __attribute__((section(".RamFunc")))
+static PLATFORM_FAST_CODE
 void target_encoder_transfer_word(uint16_t tx_word, uint16_t *rx_word)
 {
     HAL_GPIO_WritePin(SPI1_CSN_GPIO_Port, SPI1_CSN_Pin, GPIO_PIN_RESET);
@@ -35,7 +36,7 @@ void target_encoder_transfer_word(uint16_t tx_word, uint16_t *rx_word)
     HAL_GPIO_WritePin(SPI1_CSN_GPIO_Port, SPI1_CSN_Pin, GPIO_PIN_SET);
 }
 
-__attribute__((section(".RamFunc")))
+PLATFORM_FAST_CODE
 uint16_t target_encoder_read_mt6816_raw(void)
 {
     uint16_t reg_03_response = 0U;

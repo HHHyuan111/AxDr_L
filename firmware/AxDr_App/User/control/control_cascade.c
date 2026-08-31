@@ -5,16 +5,15 @@
 
 #include "control_cascade.h"
 
+#include "compiler.h"
 #include "control_limit.h"
 
-#define CONTROL_CASCADE_RAM_FUNC __attribute__((section(".RamFunc")))
-
-static CONTROL_CASCADE_RAM_FUNC float control_abs(float value)
+static PLATFORM_FAST_CODE float control_abs(float value)
 {
     return (value > 0.0f) ? value : -value;
 }
 
-CONTROL_CASCADE_RAM_FUNC bool control_cur_step(control_rate_t *rate,
+PLATFORM_FAST_CODE bool control_cur_step(control_rate_t *rate,
                                                pid_para_t *d_pid,
                                                pid_para_t *q_pid,
                                                float id_ref,
@@ -37,7 +36,7 @@ CONTROL_CASCADE_RAM_FUNC bool control_cur_step(control_rate_t *rate,
     return true;
 }
 
-CONTROL_CASCADE_RAM_FUNC bool control_spd_step(control_rate_t *rate,
+PLATFORM_FAST_CODE bool control_spd_step(control_rate_t *rate,
                                                pid_para_t *speed_pid,
                                                float speed_ref,
                                                float speed_feedback,
@@ -64,7 +63,7 @@ CONTROL_CASCADE_RAM_FUNC bool control_spd_step(control_rate_t *rate,
     return true;
 }
 
-CONTROL_CASCADE_RAM_FUNC bool control_pos_step(control_rate_t *rate,
+PLATFORM_FAST_CODE bool control_pos_step(control_rate_t *rate,
                                                pid_para_t *position_pid,
                                                float position_ref,
                                                float position_feedback,

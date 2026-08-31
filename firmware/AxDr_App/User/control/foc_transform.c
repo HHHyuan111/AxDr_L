@@ -7,11 +7,11 @@
 
 #include <math.h>
 
-#define FOC_TRANSFORM_RAM_FUNC __attribute__((section(".RamFunc")))
+#include "compiler.h"
 
 static const float foc_one_by_sqrt3 = 0.57735026919f;
 
-FOC_TRANSFORM_RAM_FUNC void foc_sin_cos(float theta_e_rad,
+PLATFORM_FAST_CODE void foc_sin_cos(float theta_e_rad,
                                         float *sin_theta,
                                         float *cos_theta)
 {
@@ -19,7 +19,7 @@ FOC_TRANSFORM_RAM_FUNC void foc_sin_cos(float theta_e_rad,
     *cos_theta = cosf(theta_e_rad);
 }
 
-FOC_TRANSFORM_RAM_FUNC void foc_clarke(float i_a,
+PLATFORM_FAST_CODE void foc_clarke(float i_a,
                                        float i_b,
                                        float i_c,
                                        float *i_alpha,
@@ -29,7 +29,7 @@ FOC_TRANSFORM_RAM_FUNC void foc_clarke(float i_a,
     *i_beta = (i_b - i_c) * foc_one_by_sqrt3;
 }
 
-FOC_TRANSFORM_RAM_FUNC void foc_park(float i_alpha,
+PLATFORM_FAST_CODE void foc_park(float i_alpha,
                                      float i_beta,
                                      float sin_theta,
                                      float cos_theta,
@@ -40,7 +40,7 @@ FOC_TRANSFORM_RAM_FUNC void foc_park(float i_alpha,
     *i_q = i_beta * cos_theta - i_alpha * sin_theta;
 }
 
-FOC_TRANSFORM_RAM_FUNC void foc_inv_park(float v_d,
+PLATFORM_FAST_CODE void foc_inv_park(float v_d,
                                          float v_q,
                                          float sin_theta,
                                          float cos_theta,
