@@ -42,11 +42,6 @@ set(AXDR_USER_SOURCES
     User/app/control_cycle.c
     User/app/fast_loop.c
     User/app/debug_snapshot.c
-    User/bsp/bsp_cpu.c
-    User/bsp/bsp_fdcan.c
-    User/bsp/bsp_flash.c
-    User/bsp/bsp_gpio.c
-    User/bsp/bsp_uart.c
     User/bsp/target_adc.c
     User/bsp/target_encoder.c
     User/bsp/target_pwm.c
@@ -54,7 +49,6 @@ set(AXDR_USER_SOURCES
     User/control/control_filter.c
     User/control/control_limit.c
     User/control/control_loop.c
-    User/control/control_mit.c
     User/control/control_pid.c
     User/control/control_speed.c
     User/control/foc_core.c
@@ -68,20 +62,10 @@ set(AXDR_USER_SOURCES
     User/drive/drive_reset.c
     User/moldue/display.c
     User/moldue/lcd.c
-    User/moldue/vofa.c
-    User/motor/alob.c
-    User/motor/anticogging.c
-    User/motor/calibration.c
-    User/motor/encoder.c
-    User/motor/foc_ctrl.c
+    User/motor/encoder_feedback.c
     User/motor/foc_drv.c
-    User/motor/hfsi.c
-    User/motor/idpm.c
-    User/motor/nlob.c
-    User/motor/pll.c
-    User/motor/pos_calc.c
-    User/motor/scvm.c
-    User/motor/trap_traj.c
+    User/motor/motor_modes.c
+    User/motor/position_feedback.c
     User/motor/util.c
 )
 

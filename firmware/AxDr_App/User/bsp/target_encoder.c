@@ -22,7 +22,7 @@
  * @param[in] tx_word 本帧发送的 16 位命令。
  * @param[out] rx_word 接收 MT6816 返回的 16 位数据。
  *
- * 当前保留原工程行为：底层传输状态暂不向位置算法层传播。
+ * @return 传输在限定轮询次数内完成返回 true，否则拉高片选并返回 false。
  */
 static PLATFORM_FAST_CODE
 bool target_encoder_transfer_word(uint16_t tx_word, uint16_t *rx_word)

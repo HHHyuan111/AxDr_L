@@ -460,11 +460,6 @@
               <FilePath>..\User\control\control_loop.c</FilePath>
             </File>
             <File>
-              <FileName>control_mit.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\control\control_mit.c</FilePath>
-            </File>
-            <File>
               <FileName>control_pid.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\control\control_pid.c</FilePath>
@@ -494,31 +489,6 @@
         <Group>
           <GroupName>User/bsp</GroupName>
           <Files>
-            <File>
-              <FileName>bsp_cpu.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\bsp\bsp_cpu.c</FilePath>
-            </File>
-            <File>
-              <FileName>bsp_fdcan.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\bsp\bsp_fdcan.c</FilePath>
-            </File>
-            <File>
-              <FileName>bsp_flash.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\bsp\bsp_flash.c</FilePath>
-            </File>
-            <File>
-              <FileName>bsp_gpio.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\bsp\bsp_gpio.c</FilePath>
-            </File>
-            <File>
-              <FileName>bsp_uart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\bsp\bsp_uart.c</FilePath>
-            </File>
             <File>
               <FileName>target_adc.c</FileName>
               <FileType>1</FileType>
@@ -805,24 +775,9 @@
           <GroupName>User/motor</GroupName>
           <Files>
             <File>
-              <FileName>alob.c</FileName>
+              <FileName>encoder_feedback.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\motor\alob.c</FilePath>
-            </File>
-            <File>
-              <FileName>calibration.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\calibration.c</FilePath>
-            </File>
-            <File>
-              <FileName>encoder.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\encoder.c</FilePath>
-            </File>
-            <File>
-              <FileName>foc_ctrl.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\foc_ctrl.c</FilePath>
+              <FilePath>..\User\motor\encoder_feedback.c</FilePath>
             </File>
             <File>
               <FileName>foc_drv.c</FileName>
@@ -830,49 +785,19 @@
               <FilePath>..\User\motor\foc_drv.c</FilePath>
             </File>
             <File>
-              <FileName>hfsi.c</FileName>
+              <FileName>motor_modes.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\motor\hfsi.c</FilePath>
+              <FilePath>..\User\motor\motor_modes.c</FilePath>
             </File>
             <File>
-              <FileName>idpm.c</FileName>
+              <FileName>position_feedback.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\motor\idpm.c</FilePath>
-            </File>
-            <File>
-              <FileName>nlob.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\nlob.c</FilePath>
-            </File>
-            <File>
-              <FileName>pll.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\pll.c</FilePath>
-            </File>
-            <File>
-              <FileName>pos_calc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\pos_calc.c</FilePath>
-            </File>
-            <File>
-              <FileName>scvm.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\scvm.c</FilePath>
-            </File>
-            <File>
-              <FileName>trap_traj.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\trap_traj.c</FilePath>
+              <FilePath>..\User\motor\position_feedback.c</FilePath>
             </File>
             <File>
               <FileName>util.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\motor\util.c</FilePath>
-            </File>
-            <File>
-              <FileName>anticogging.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\anticogging.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -888,11 +813,6 @@
               <FileName>lcd.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\moldue\lcd.c</FilePath>
-            </File>
-            <File>
-              <FileName>vofa.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\moldue\vofa.c</FilePath>
             </File>
           </Files>
         </Group>
