@@ -319,8 +319,6 @@ void pmsm_init(void)
     cali_init();
     traj_init();
 
-    eh_observer_init();
-
     /* 上电默认保持三相功率输出关闭，等待明确的 START 请求。 */
     pm.req = DRIVE_REQ_STOP;
     pm.state = DRIVE_STATE_STOP;
@@ -600,7 +598,7 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
  * @param[in,out] pm 电机控制对象。
  *
  * 本函数不直接读取硬件，也不执行电流环。它使用前面已经更新的 ADC 和角度结果，
- * 依次计算母线电压、控制器限幅、转矩和速度，最后更新观测器。
+ * 依次计算母线电压、控制器限幅、转矩和速度。
  */
 _RAM_FUNC void foc_feedback_update(pmsm_t *pm)
 {
@@ -637,9 +635,6 @@ _RAM_FUNC void foc_feedback_update(pmsm_t *pm)
     pm->foc.wr_f = control_lpf_step(&pm->wr_lpf, pm->foc.wr);
     pm->foc.wm = pm->foc.wr_f * pm->para.div_Gr; // rad/s
 
-    /* 第 5 步：把本周期速度和转矩送入现有观测器；当前节点不改观测器算法。 */
-    eh_speed_observer(&eh_vobs, pm->foc.wr, pm->foc.tor_r);
-    eh_torque_observer(&eh_tobs, pm->foc.we, pm->foc.tor_r);
 }
 
 /**

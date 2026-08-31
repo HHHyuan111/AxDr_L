@@ -785,11 +785,6 @@
               <FilePath>..\User\motor\calibration.c</FilePath>
             </File>
             <File>
-              <FileName>eh_observer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\eh_observer.c</FilePath>
-            </File>
-            <File>
               <FileName>encoder.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\motor\encoder.c</FilePath>

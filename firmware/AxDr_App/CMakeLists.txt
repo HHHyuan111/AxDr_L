@@ -65,7 +65,6 @@ set(AXDR_USER_SOURCES
     User/motor/alob.c
     User/motor/anticogging.c
     User/motor/calibration.c
-    User/motor/eh_observer.c
     User/motor/encoder.c
     User/motor/foc_ctrl.c
     User/motor/foc_drv.c
