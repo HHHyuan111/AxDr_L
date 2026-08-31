@@ -1,5 +1,6 @@
 #include "common.h"
 #include "control_limit.h"
+#include "control_mit.h"
 #include "drive_pwm.h"
 #include "modlue.h"
 
@@ -55,10 +56,21 @@ _RAM_FUNC void force_curr_mode(pmsm_t* pm)
 **/
 _RAM_FUNC void pm_mit_mode(pmsm_t* pm)
 {
-    float pos_kp = pm->ctrl.kp*(pm->ctrl.posm_set-pm->foc.mp_m);
-    float vel_kp = pm->ctrl.kd*(pm->ctrl.wm_ref  -pm->foc.wm);
-    pm->ctrl.mit_tor_set = pos_kp+vel_kp+pm->ctrl.torm_set;
+    const control_mit_input_t input = {
+        .position_ref_rad = pm->ctrl.posm_set,
+        .position_feedback_rad = pm->foc.mp_m,
+        .speed_ref_rad_s = pm->ctrl.wm_ref,
+        .speed_feedback_rad_s = pm->foc.wm,
+        .torque_feedforward_nm = pm->ctrl.torm_set,
+        .position_gain_nm_per_rad = pm->ctrl.kp,
+        .speed_gain_nm_s_per_rad = pm->ctrl.kd,
+    };
+    control_mit_output_t output;
 
+    control_mit_step(&input, &output);
+    pm->ctrl.mit_tor_set = output.torque_cmd_nm;
+
+    /* 保持现有固件行为：电流参考仍由前馈转矩 torm_set 生成。 */
     pm->ctrl.tor_set = pm->ctrl.torm_set * pm->para.div_Gr;
     pm->ctrl.iq_set = pm->ctrl.tor_set * pm->para.div_Kt;
 

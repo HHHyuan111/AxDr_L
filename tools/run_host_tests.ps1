@@ -20,6 +20,7 @@ $driveTestSource = Join-Path $testDir "test_drive_state.c"
 $drivePwmTestSource = Join-Path $testDir "test_drive_pwm.c"
 $pidTestSource = Join-Path $testDir "test_control_pid.c"
 $cascadeTestSource = Join-Path $testDir "test_control_cascade.c"
+$controlLoopTestSource = Join-Path $testDir "test_control_loop.c"
 $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
 $controlCycleTestSource = Join-Path $testDir "test_control_cycle.c"
 $fastLoopTestSource = Join-Path $testDir "test_fast_loop.c"
@@ -30,10 +31,13 @@ $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
 $legacyFocSource = Join-Path $legacyDir "legacy_foc.c"
 $legacyFocCoreSource = Join-Path $legacyDir "legacy_foc_core.c"
 $legacyCascadeSource = Join-Path $legacyDir "legacy_control_cascade.c"
+$legacyControlLoopSource = Join-Path $legacyDir "legacy_control_loop.c"
 $legacyPidSource = Join-Path $legacyDir "legacy_pid.c"
 $legacyUtilSource = Join-Path $legacyDir "legacy_util.c"
 $filterSource = Join-Path $controlDir "control_filter.c"
 $cascadeSource = Join-Path $controlDir "control_cascade.c"
+$controlLoopSource = Join-Path $controlDir "control_loop.c"
+$controlMitSource = Join-Path $controlDir "control_mit.c"
 $focCoreSource = Join-Path $controlDir "foc_core.c"
 $limitSource = Join-Path $controlDir "control_limit.c"
 $svmSource = Join-Path $controlDir "foc_svm.c"
@@ -51,6 +55,7 @@ $driveExecutablePath = Join-Path $outputDir "test_drive_state.exe"
 $drivePwmExecutablePath = Join-Path $outputDir "test_drive_pwm.exe"
 $pidExecutablePath = Join-Path $outputDir "test_control_pid.exe"
 $cascadeExecutablePath = Join-Path $outputDir "test_control_cascade.exe"
+$controlLoopExecutablePath = Join-Path $outputDir "test_control_loop.exe"
 $debugSnapshotExecutablePath = Join-Path $outputDir "test_debug_snapshot.exe"
 $controlCycleExecutablePath = Join-Path $outputDir "test_control_cycle.exe"
 $fastLoopExecutablePath = Join-Path $outputDir "test_fast_loop.exe"
@@ -133,6 +138,33 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/电流速度位置级联逐拍对照测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        -Wno-misleading-indentation `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" `
+        "-I$driveDir" "-I$motorDir" "-I$legacyDir" `
+        $controlLoopTestSource $controlLoopSource $controlMitSource `
+        $cascadeSource $controlPidSource $limitSource $focCoreSource `
+        $svmSource $transformSource $legacyControlLoopSource `
+        $legacyCascadeSource $legacyPidSource $legacyFocCoreSource `
+        $legacyUtilSource `
+        -o $controlLoopExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host 可移植控制模式主链测试编译失败，退出码：$compileExitCode"
+}
+
+& $controlLoopExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host 可移植控制模式主链测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/电压电流速度位置与 MIT 主链测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `

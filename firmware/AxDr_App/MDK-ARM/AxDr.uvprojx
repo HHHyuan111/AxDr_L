@@ -440,6 +440,16 @@
               <FilePath>..\User\control\control_limit.c</FilePath>
             </File>
             <File>
+              <FileName>control_loop.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\control\control_loop.c</FilePath>
+            </File>
+            <File>
+              <FileName>control_mit.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\control\control_mit.c</FilePath>
+            </File>
+            <File>
               <FileName>control_pid.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\control\control_pid.c</FilePath>
