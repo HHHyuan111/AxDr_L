@@ -4,6 +4,7 @@
  */
 
 #include "fast_loop.h"
+#include "control_cycle.h"
 #include "debug_snapshot.h"
 #include "drive.h"
 #include "drive_io.h"
@@ -13,9 +14,13 @@
 int main(void)
 {
     pmsm_t *motor = (pmsm_t *)0;
+    control_cycle_input_t input = {0};
+    control_cycle_output_t output = {0};
     drive_pwm_cmd_t cmd = {0};
 
     (void)motor;
+    (void)input;
+    (void)output;
     (void)cmd;
     return 0;
 }

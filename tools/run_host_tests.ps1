@@ -21,8 +21,10 @@ $drivePwmTestSource = Join-Path $testDir "test_drive_pwm.c"
 $pidTestSource = Join-Path $testDir "test_control_pid.c"
 $cascadeTestSource = Join-Path $testDir "test_control_cascade.c"
 $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
+$controlCycleTestSource = Join-Path $testDir "test_control_cycle.c"
 $fastLoopTestSource = Join-Path $testDir "test_fast_loop.c"
 $publicHeadersTestSource = Join-Path $testDir "test_public_headers.c"
+$controlCycleSource = Join-Path $appDir "control_cycle.c"
 $fastLoopSource = Join-Path $appDir "fast_loop.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
 $legacyFocSource = Join-Path $legacyDir "legacy_foc.c"
@@ -50,6 +52,7 @@ $drivePwmExecutablePath = Join-Path $outputDir "test_drive_pwm.exe"
 $pidExecutablePath = Join-Path $outputDir "test_control_pid.exe"
 $cascadeExecutablePath = Join-Path $outputDir "test_control_cascade.exe"
 $debugSnapshotExecutablePath = Join-Path $outputDir "test_debug_snapshot.exe"
+$controlCycleExecutablePath = Join-Path $outputDir "test_control_cycle.exe"
 $fastLoopExecutablePath = Join-Path $outputDir "test_fast_loop.exe"
 $publicHeadersExecutablePath = Join-Path $outputDir "test_public_headers.exe"
 
@@ -157,7 +160,29 @@ $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
         "-I$motorDir" "-I$driveDir" `
-        $fastLoopTestSource $fastLoopSource `
+        $controlCycleTestSource $controlCycleSource `
+        -o $controlCycleExecutablePath 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host 控制周期输入输出测试编译失败，退出码：$compileExitCode"
+}
+
+& $controlCycleExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host 控制周期输入输出测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/控制周期显式输入输出测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
+        "-I$motorDir" "-I$driveDir" `
+        $fastLoopTestSource $fastLoopSource $controlCycleSource `
         -o $fastLoopExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
 )

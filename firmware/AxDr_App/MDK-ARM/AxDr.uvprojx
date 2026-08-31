@@ -385,6 +385,11 @@
           <GroupName>User/app</GroupName>
           <Files>
             <File>
+              <FileName>control_cycle.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\app\control_cycle.c</FilePath>
+            </File>
+            <File>
               <FileName>fast_loop.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\app\fast_loop.c</FilePath>

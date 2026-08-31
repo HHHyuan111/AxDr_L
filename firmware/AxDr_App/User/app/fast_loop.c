@@ -11,8 +11,8 @@
 #include <stdbool.h>
 
 #include "common.h"
+#include "control_cycle.h"
 #include "debug_snapshot.h"
-#include "drive.h"
 
 /*
  * 主初始化流程只把本标志从 false 写为 true 一次，ADC 中断只读取它。
@@ -27,6 +27,9 @@ void fast_loop_enable(void)
 
 _RAM_FUNC void fast_loop_step(pmsm_t *motor)
 {
+    control_cycle_input_t input;
+    control_cycle_output_t output;
+
     /*
      * ADC 和 TIM1 通道 4 必须先运行，电流零偏校准才能取得持续更新的采样值；
      * 但 pmsm_init() 完成以前，不能让中断访问正在初始化的电机对象。
@@ -46,11 +49,20 @@ _RAM_FUNC void fast_loop_step(pmsm_t *motor)
     /* 第 2 步：读取 ADC 原始值，并换算本周期三相电流。 */
     foc_adc_sample(motor);
 
-    /* 第 3 步：更新母线电压、控制限幅、转矩和速度反馈。 */
-    foc_feedback_update(motor);
+    /* 第 3 步：把本周期物理反馈整理为硬件无关的控制输入。 */
+    input = (control_cycle_input_t){
+        .seq = motor->fast_seq,
+        .current_a_a = motor->foc.i_a,
+        .current_b_a = motor->foc.i_b,
+        .current_c_a = motor->foc.i_c,
+        .bus_voltage_v = (float)motor->adc.vbus * motor->board.v_ratio,
+        .electrical_angle_rad = motor->foc.p_e,
+        .rotor_position_rad = motor->foc.mp_r,
+        .output_position_rad = motor->foc.mp_m,
+    };
 
-    /* 第 4 步：运行状态机和当前选定的控制模式。 */
-    drive_fast_step(motor);
+    /* 第 4 步：使用显式输入执行反馈更新、状态机和当前控制模式。 */
+    control_cycle_step(motor, &input, &output);
 
     /* 第 5 步：复制本周期最终结果，仅供调试器观察，不参与控制。 */
     debug_snapshot_publish(motor);

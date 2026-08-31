@@ -39,6 +39,7 @@ include_directories(
 )
 
 set(AXDR_USER_SOURCES
+    User/app/control_cycle.c
     User/app/fast_loop.c
     User/app/debug_snapshot.c
     User/bsp/bsp_cpu.c

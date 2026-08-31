@@ -600,12 +600,12 @@ _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, f
  * 本函数不直接读取硬件，也不执行电流环。它使用前面已经更新的 ADC 和角度结果，
  * 依次计算母线电压、控制器限幅、转矩和速度。
  */
-_RAM_FUNC void foc_feedback_update(pmsm_t *pm)
+_RAM_FUNC void foc_feedback_update(pmsm_t *pm, float bus_voltage_v)
 {
-    /* 第 1 步：把母线 ADC 计数换算成电压，并计算调制所需的电压系数和余量。 */
-    pm->foc.vbus = ((float)pm->adc.vbus * pm->board.v_ratio);
+    /* 第 1 步：保存本周期母线电压，并计算调制所需的电压系数和余量。 */
+    pm->foc.vbus = bus_voltage_v;
 
-    if (pm->adc.vbus > 0U)
+    if (pm->foc.vbus > 0.0f)
     {
         pm->foc.inv_vbus = 1.5f / pm->foc.vbus;
     }

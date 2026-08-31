@@ -1391,7 +1391,7 @@ void pmsm_init(void);
 void pmsm_peroid_init(void);
 void pmsm_protect_init(void);
 void pmsm_lpf_init(void);
-void foc_feedback_update(pmsm_t *pm);
+void foc_feedback_update(pmsm_t *pm, float bus_voltage_v);
 void foc_clear(pmsm_t* pm);
 void foc_adc_sample(pmsm_t* pm);
 void foc_get_curr_off(void);

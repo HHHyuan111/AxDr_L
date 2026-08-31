@@ -56,8 +56,9 @@ void foc_adc_sample(pmsm_t *motor)
     log_event(EVENT_ADC_SAMPLE);
 }
 
-void foc_feedback_update(pmsm_t *motor)
+void foc_feedback_update(pmsm_t *motor, float bus_voltage_v)
 {
+    (void)bus_voltage_v;
     last_motor = motor;
     log_event(EVENT_FEEDBACK_UPDATE);
 }
