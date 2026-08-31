@@ -18,6 +18,7 @@ $focTestSource = Join-Path $testDir "test_foc_math.c"
 $driveModeTestSource = Join-Path $testDir "test_drive_mode.c"
 $driveCommandTestSource = Join-Path $testDir "test_drive_command.c"
 $driveProtectionTestSource = Join-Path $testDir "test_drive_protection.c"
+$driveResetTestSource = Join-Path $testDir "test_drive_reset.c"
 $driveTestSource = Join-Path $testDir "test_drive_state.c"
 $drivePwmTestSource = Join-Path $testDir "test_drive_pwm.c"
 $pidTestSource = Join-Path $testDir "test_control_pid.c"
@@ -25,6 +26,7 @@ $cascadeTestSource = Join-Path $testDir "test_control_cascade.c"
 $controlLoopTestSource = Join-Path $testDir "test_control_loop.c"
 $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
 $controlCycleTestSource = Join-Path $testDir "test_control_cycle.c"
+$controlReplayTestSource = Join-Path $testDir "test_control_replay.c"
 $fastLoopTestSource = Join-Path $testDir "test_fast_loop.c"
 $publicHeadersTestSource = Join-Path $testDir "test_public_headers.c"
 $controlCycleSource = Join-Path $appDir "control_cycle.c"
@@ -51,12 +53,14 @@ $driveSource = Join-Path $driveDir "drive.c"
 $driveModeSource = Join-Path $driveDir "drive_mode.c"
 $driveCommandSource = Join-Path $driveDir "drive_command.c"
 $driveProtectionSource = Join-Path $driveDir "drive_protection.c"
+$driveResetSource = Join-Path $driveDir "drive_reset.c"
 $drivePwmSource = Join-Path $driveDir "drive_pwm.c"
 $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
 $focExecutablePath = Join-Path $outputDir "test_foc_math.exe"
 $driveModeExecutablePath = Join-Path $outputDir "test_drive_mode.exe"
 $driveCommandExecutablePath = Join-Path $outputDir "test_drive_command.exe"
 $driveProtectionExecutablePath = Join-Path $outputDir "test_drive_protection.exe"
+$driveResetExecutablePath = Join-Path $outputDir "test_drive_reset.exe"
 $driveExecutablePath = Join-Path $outputDir "test_drive_state.exe"
 $drivePwmExecutablePath = Join-Path $outputDir "test_drive_pwm.exe"
 $pidExecutablePath = Join-Path $outputDir "test_control_pid.exe"
@@ -64,6 +68,7 @@ $cascadeExecutablePath = Join-Path $outputDir "test_control_cascade.exe"
 $controlLoopExecutablePath = Join-Path $outputDir "test_control_loop.exe"
 $debugSnapshotExecutablePath = Join-Path $outputDir "test_debug_snapshot.exe"
 $controlCycleExecutablePath = Join-Path $outputDir "test_control_cycle.exe"
+$controlReplayExecutablePath = Join-Path $outputDir "test_control_replay.exe"
 $fastLoopExecutablePath = Join-Path $outputDir "test_fast_loop.exe"
 $publicHeadersExecutablePath = Join-Path $outputDir "test_public_headers.exe"
 
@@ -218,6 +223,30 @@ Write-Host "Host C11/控制周期显式输入输出测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" `
+        "-I$controlDir" "-I$motorDir" "-I$driveDir" `
+        $controlReplayTestSource $controlCycleSource $driveSource `
+        $driveModeSource $driveCommandSource $driveProtectionSource `
+        $drivePwmSource $limitSource `
+        -o $controlReplayExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host 控制链离线回放测试编译失败，退出码：$compileExitCode"
+}
+
+& $controlReplayExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host 控制链离线回放测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/控制链 STOP-START-RUN-FAULT 离线回放测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
         "-I$motorDir" "-I$driveDir" `
         $fastLoopTestSource $fastLoopSource $controlCycleSource `
@@ -301,6 +330,27 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/Drive 命令校验与限幅测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$motorDir" "-I$driveDir" `
+        $driveResetTestSource $driveResetSource $controlPidSource $speedSource `
+        -o $driveResetExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host Drive 控制复位测试编译失败，退出码：$compileExitCode"
+}
+
+& $driveResetExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host Drive 控制复位测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/Drive 控制运行状态复位测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `

@@ -10,6 +10,7 @@
 #include "drive_io.h"
 #include "drive_mode.h"
 #include "drive_pwm.h"
+#include "drive_reset.h"
 
 int main(void)
 {

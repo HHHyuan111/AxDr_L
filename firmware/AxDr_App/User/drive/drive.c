@@ -8,6 +8,7 @@
 #include "common.h"
 #include "drive_mode.h"
 #include "drive_pwm.h"
+#include "drive_reset.h"
 
 static _RAM_FUNC void drive_update_protection(pmsm_t *pm)
 {
@@ -103,7 +104,7 @@ static _RAM_FUNC void drive_start_pwm(pmsm_t *pm)
     drive_pwm_set_neutral(pm);
     if (drive_pwm_start())
     {
-        pmsm_reset(pm);
+        drive_control_reset(pm);
         pm->pwm_active = true;
     }
     else
@@ -128,7 +129,7 @@ static _RAM_FUNC void drive_stop_pwm(pmsm_t *pm)
 
     const bool stopped = drive_pwm_stop();
 
-    pmsm_reset(pm);
+    drive_control_reset(pm);
     if (stopped)
     {
         pm->pwm_active = false;
@@ -172,7 +173,7 @@ static _RAM_FUNC void drive_exec_action(pmsm_t *pm, drive_req_e req)
                     else
                     {
                         /* PWM 提交层已经关断硬件时，仍需清空控制器历史。 */
-                        pmsm_reset(pm);
+                        drive_control_reset(pm);
                     }
                     pm->req = DRIVE_REQ_STOP;
                 }
@@ -229,6 +230,21 @@ static _RAM_FUNC void drive_update_state(pmsm_t *pm, drive_req_e req)
             pm->req = DRIVE_REQ_STOP;
             break;
     }
+}
+
+bool drive_fault_clear(pmsm_t *pm)
+{
+    if (pm->pwm_active)
+    {
+        return false;
+    }
+
+    pm->fault.all = 0U;
+    drive_protection_reset(&pm->prot_state);
+    drive_control_reset(pm);
+    pm->req = DRIVE_REQ_STOP;
+    pm->state = DRIVE_STATE_STOP;
+    return true;
 }
 
 _RAM_FUNC void drive_fast_step(pmsm_t *pm)

@@ -1372,7 +1372,6 @@ bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos);
 /* FOC control functions */
 void pmsm_observe(pmsm_t* pm);
 void pmsm_slow_down(pmsm_t* pm, float dec);
-void pmsm_reset(pmsm_t* pm);
 void pmsm_quick_stop_mode(pmsm_t* pm);
 void pmsm_fault_stop_mode(pmsm_t* pm);
 

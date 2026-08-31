@@ -65,6 +65,7 @@ set(AXDR_USER_SOURCES
     User/drive/drive_mode.c
     User/drive/drive_protection.c
     User/drive/drive_pwm.c
+    User/drive/drive_reset.c
     User/moldue/display.c
     User/moldue/lcd.c
     User/moldue/vofa.c

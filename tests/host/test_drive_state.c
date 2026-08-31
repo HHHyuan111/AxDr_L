@@ -122,7 +122,7 @@ void drive_pwm_set_neutral(pmsm_t *pm)
     test_log_event(TEST_EVENT_DUTY_NEUTRAL);
 }
 
-void pmsm_reset(pmsm_t *pm)
+void drive_control_reset(pmsm_t *pm)
 {
     (void)pm;
     test_log_event(TEST_EVENT_RESET);
@@ -617,6 +617,50 @@ static bool test_invalid_requests_do_not_run(void)
                        "非法请求不应保持 PWM 输出。");
 }
 
+static bool test_fault_clear_requires_stopped_pwm(void)
+{
+    static const test_event_e reset_events[] = {TEST_EVENT_RESET};
+    pmsm_t active_pm = {
+        .req = DRIVE_REQ_STOP,
+        .state = DRIVE_STATE_FAULT,
+        .pwm_active = true,
+        .fault = {.all = 1U}
+    };
+    pmsm_t stopped_pm = {
+        .req = DRIVE_REQ_STOP,
+        .state = DRIVE_STATE_FAULT,
+        .pwm_active = false,
+        .fault = {.all = 1U},
+        .prot_state = {
+            .invalid_position_count = 2U,
+            .latched_faults = DRIVE_PROTECTION_FAULT_POSITION_FEEDBACK
+        }
+    };
+
+    test_reset_fakes();
+    if (!test_expect(!drive_fault_clear(&active_pm),
+                     "PWM 仍活动时不能清除故障。") ||
+        !test_expect(active_pm.fault.all == 1U,
+                     "拒绝清除时必须保留原故障。") ||
+        !test_expect(test_event_count == 0U,
+                     "拒绝清除时不能修改控制器状态。"))
+    {
+        return false;
+    }
+
+    test_reset_fakes();
+    return test_expect(drive_fault_clear(&stopped_pm),
+                       "PWM 关闭后应允许显式清除故障。") &&
+           test_expect_events(reset_events,
+                              sizeof(reset_events) / sizeof(reset_events[0])) &&
+           test_expect(stopped_pm.fault.all == 0U,
+                       "故障清除后故障位必须归零。") &&
+           test_expect(stopped_pm.prot_state.latched_faults == 0U,
+                       "故障清除后保护锁存必须归零。") &&
+           test_expect(stopped_pm.state == DRIVE_STATE_STOP,
+                       "故障清除后 Drive 必须回到 STOP。");
+}
+
 int main(void)
 {
     if (!test_power_on_stays_stopped())
@@ -677,6 +721,11 @@ int main(void)
     if (!test_invalid_feedback_blocks_start())
     {
         return 12;
+    }
+
+    if (!test_fault_clear_requires_stopped_pwm())
+    {
+        return 13;
     }
 
     return 0;

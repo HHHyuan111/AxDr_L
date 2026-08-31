@@ -429,6 +429,11 @@
               <FileType>1</FileType>
               <FilePath>..\User\drive\drive_pwm.c</FilePath>
             </File>
+            <File>
+              <FileName>drive_reset.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\drive\drive_reset.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

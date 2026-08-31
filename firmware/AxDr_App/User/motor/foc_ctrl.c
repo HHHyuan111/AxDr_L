@@ -338,18 +338,6 @@ _RAM_FUNC void pmsm_slow_down(pmsm_t* pm, float dec)
     }
 }
 
-_RAM_FUNC void pmsm_reset(pmsm_t* pm)
-{
-    const float speed_angle_rad = isfinite(pm->foc.p_e) ? pm->foc.p_e : 0.0f;
-
-    control_pid_clear(&pm->id_pi);
-    control_pid_clear(&pm->iq_pi);
-    control_pid_clear(&pm->spd_pi);
-    control_pid_clear(&pm->pos_pi);
-    control_angle_speed_reset(&pm->elec_speed_diff, speed_angle_rad);
-    foc_clear(pm);
-}
-
 _RAM_FUNC void pmsm_anticog_comp(pmsm_t* pm)
 {
     if (pm->flag.bit.anticog_enable == 1)
