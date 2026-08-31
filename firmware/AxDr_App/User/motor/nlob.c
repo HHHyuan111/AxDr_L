@@ -58,11 +58,9 @@ _RAM_FUNC void nlob_vesc(nlob_t *obj)
 	
 	float R_ia = obj->Rs[0] * obj->i_alph_lst;
 	float L_ia = obj->Ls[0] * obj->i_alph[0];
-	float L_ia_prev = obj->Ls[0] * obj->i_alph_lst;
 	
 	float R_ib = obj->Rs[0] * obj->i_beta_lst;
 	float L_ib = obj->Ls[0] * obj->i_beta[0];
-	float L_ib_prev = obj->Ls[0] * obj->i_beta_lst;
 	
 	float err = obj->flux_sqr - obj->flux_est_s;
 	float x1_dot =  obj->v_alph_lst - R_ia +  obj->gamma * obj->flux_alph * err;
@@ -96,4 +94,3 @@ _RAM_FUNC void nlob_vesc(nlob_t *obj)
     obj->v_alph_lst = obj->v_alph[0];
     obj->v_beta_lst = obj->v_beta[0];
 }
-

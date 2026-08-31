@@ -10,6 +10,7 @@ void bsp_uart_init(void)
 
 void bsp_uart_start(uart_num_e comport)
 {
+    (void)comport;
 
 }
 
@@ -109,10 +110,13 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 
 __weak void uart_tx_callback(uart_num_e comport)
 {
+    (void)comport;
 
 }
 
 __weak void uart_rx_callback(uart_num_e comport, uint16_t len)
 {
+    (void)comport;
+    (void)len;
 
 }

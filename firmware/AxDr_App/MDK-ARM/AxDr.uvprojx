@@ -810,11 +810,6 @@
               <FilePath>..\User\motor\idpm.c</FilePath>
             </File>
             <File>
-              <FileName>ipd_pos.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\ipd_pos.c</FilePath>
-            </File>
-            <File>
               <FileName>nlob.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\motor\nlob.c</FilePath>

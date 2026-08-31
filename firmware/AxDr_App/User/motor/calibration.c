@@ -143,7 +143,7 @@ _RAM_FUNC void cali_mag_encoder(pmsm_t *pm)
         }
         case cali_off_calc:
         {
-            for (int i = 0; i < x->n1; i++)
+            for (uint32_t i = 0U; i < x->n1; i++)
             {
                 //Average the forward and back directions
                 x->p_error_arr[i] = 0.5f * (x->p_error_arr[i] + x->p_error_arr[2 * x->n1 - i - 1]);
@@ -160,16 +160,16 @@ _RAM_FUNC void cali_mag_encoder(pmsm_t *pm)
             float inv_window = 1.0f / (float)x->window;
             int half_window = x->window * 0.5f;
 
-            for (int i = 0; i < x->n1; i++)
+            for (uint32_t i = 0U; i < x->n1; i++)
             {
                 float temp = 0.0f;
-                for (int j = 0; j < x->window; j++)
+                for (uint32_t j = 0U; j < x->window; j++)
                 {
-                    x->ind = -half_window + j + i; // Indexes from -window/2 to + window/2
+                    x->ind = -half_window + (int)j + (int)i; // Indexes from -window/2 to + window/2
                     if (x->ind < 0)
-                        x->ind += x->n1;
-                    else if (x->ind > (x->n1 - 1))
-                        x->ind -= x->n1;
+                        x->ind += (int)x->n1;
+                    else if ((uint32_t)x->ind >= x->n1)
+                        x->ind -= (int)x->n1;
                     temp += x->p_error_arr[x->ind]*inv_window;
                 }
                 if (i % x->pn == 0)
@@ -267,5 +267,4 @@ _RAM_FUNC void cali_reset_state(cali_t *x)
     x->mean = 0.0f;
     x->ind  = 0;
 }
-
 

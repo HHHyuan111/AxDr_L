@@ -70,7 +70,6 @@ set(AXDR_USER_SOURCES
     User/motor/foc_drv.c
     User/motor/hfsi.c
     User/motor/idpm.c
-    User/motor/ipd_pos.c
     User/motor/nlob.c
     User/motor/pll.c
     User/motor/pos_calc.c

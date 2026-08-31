@@ -563,7 +563,6 @@ _RAM_FUNC void iden_Js(idpm_t *x)
 {
 	static uint8_t wait_cnt = 0;
 	static uint8_t samp_cnt = 0;
-	static float tc = 0.0;
 	static float q0 = 0.0;
 	static float q1 = 0.0;
 	static float q1_dot = 0.0;

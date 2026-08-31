@@ -47,9 +47,6 @@ _RAM_FUNC uint8_t encoder_parity(uint16_t v)
 
 _RAM_FUNC uint32_t read_mt6825_raw(void)
 {
-    uint16_t timeOut = 1000;
-
-    uint16_t tx_data[2] = {0x83ff, 0xffff};
     uint16_t rx_data[2] = {0U, 0U};
 
     //cs_down;
