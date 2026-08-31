@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$CMakeCommand = "cmake.exe"
 )
 
@@ -7,8 +7,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $firmwareDir = Join-Path $repoRoot "firmware/AxDr_App"
 $warningBaseline = [ordered]@{
-    Debug = 10
-    Release = 10
+    Debug = 0
+    Release = 0
 }
 
 $cmake = Get-Command $CMakeCommand -ErrorAction SilentlyContinue

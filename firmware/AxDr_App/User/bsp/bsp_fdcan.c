@@ -7,7 +7,7 @@ void bsp_can_init(void)
 	bsp_fdcan_set_baud(fdcan1, CAN_BR_1M, CAN_BR_1M);
 	
 	bsp_can_filter_init(fdcan1, 0x20);
-	HAL_FDCAN_Start(&hfdcan1);                               //¿ªÆôFDCAN
+	HAL_FDCAN_Start(&hfdcan1);                               //å¼€å¯FDCAN
 //	HAL_FDCAN_Start(&hfdcan2);
 //	HAL_FDCAN_Start(&hfdcan3);
 	HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
@@ -47,16 +47,16 @@ int8_t bsp_fdcan_deinit(fdcan_num_e comport)
     return 0;
 }
 
-//CAN(FD)²¨ÌØÂÊÍÆ¼öÉèÖÃ£º
-//1.BRpÓ¦¾¡Á¿Ğ¡ÒÔ±£Ö¤TG¾¡¿ÉÄÜĞ¡£¬¼õÉÙÎó²î£»
-//2.CANFDÍÆ¼öÖÙ²ÃÓòbrp<=Êı¾İÓòbrp£º
-//3.SJWÓ¦¾¡Á¿´ó£¬¾¡Á¿±£³ÖÓëTSEG2Ò»ÖÂ£¬ÒÔÌá¸ßÎ»¿íÈİÈÌ¶È£º
-//4¡¢²ÉÑùµãÍÆ¼ö·¶Î§£º75~87.5%£º
-//²¨ÌØÂÊ>800KbpsÊ±£¬ÍÆ¼ö²ÉÑùµã75%£º
-//²¨ÌØÂÊ>500KbpsÊ±£¬ÍÆ¼ö²ÉÑùµã80%£»
-//²¨ÌØÂÊ<=500KbpsÊ±ÍÆ¼ö²ÉÑùµã87.5%£º
-//5£¬Ó¦¾¡Á¿±£Ö¤×ÜÏßÉÏËùÓĞ½Úµã²ÉÑùµãÒ»ÖÂ£¬¼òÌåÖĞÎÄÖÙ²ÃÓòºÍÊı¾İÓò²ÉÑùµã²»ÒªÇóÒ»ÖÂ
-//6.CANFDÖÙ²ÃÓòÓëÊı¾İÓò²¨ÌØÂÊÖ®±ÈÓ¦´óÓÚ1/8£»
+//CAN(FD)æ³¢ç‰¹ç‡æ¨èè®¾ç½®ï¼š
+//1.BRpåº”å°½é‡å°ä»¥ä¿è¯TGå°½å¯èƒ½å°ï¼Œå‡å°‘è¯¯å·®ï¼›
+//2.CANFDæ¨èä»²è£åŸŸbrp<=æ•°æ®åŸŸbrpï¼š
+//3.SJWåº”å°½é‡å¤§ï¼Œå°½é‡ä¿æŒä¸TSEG2ä¸€è‡´ï¼Œä»¥æé«˜ä½å®½å®¹å¿åº¦ï¼š
+//4ã€é‡‡æ ·ç‚¹æ¨èèŒƒå›´ï¼š75~87.5%ï¼š
+//æ³¢ç‰¹ç‡>800Kbpsæ—¶ï¼Œæ¨èé‡‡æ ·ç‚¹75%ï¼š
+//æ³¢ç‰¹ç‡>500Kbpsæ—¶ï¼Œæ¨èé‡‡æ ·ç‚¹80%ï¼›
+//æ³¢ç‰¹ç‡<=500Kbpsæ—¶æ¨èé‡‡æ ·ç‚¹87.5%ï¼š
+//5ï¼Œåº”å°½é‡ä¿è¯æ€»çº¿ä¸Šæ‰€æœ‰èŠ‚ç‚¹é‡‡æ ·ç‚¹ä¸€è‡´ï¼Œç®€ä½“ä¸­æ–‡ä»²è£åŸŸå’Œæ•°æ®åŸŸé‡‡æ ·ç‚¹ä¸è¦æ±‚ä¸€è‡´
+//6.CANFDä»²è£åŸŸä¸æ•°æ®åŸŸæ³¢ç‰¹ç‡ä¹‹æ¯”åº”å¤§äº1/8ï¼›
 
 int8_t bsp_fdcan_set_baud(fdcan_num_e comport, uint8_t nominal_baud, uint8_t data_baud)
 {
@@ -132,17 +132,17 @@ int8_t bsp_can_filter_init(fdcan_num_e comport, uint16_t filt_id)
 	FDCAN_FilterTypeDef fdcan_filter;
     int8_t ret = -1;
 	
-	fdcan_filter.IdType = FDCAN_STANDARD_ID;                       //±ê×¼ID
-	fdcan_filter.FilterIndex = 0;                                  //ÂË²¨Æ÷Ë÷Òı                   
-	fdcan_filter.FilterType = FDCAN_FILTER_DUAL;                   //Ö»½ÓÊÕÕâÁ½¸öID
-	fdcan_filter.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;           //¹ıÂËÆ÷0¹ØÁªµ½FIFO0  
+	fdcan_filter.IdType = FDCAN_STANDARD_ID;                       //æ ‡å‡†ID
+	fdcan_filter.FilterIndex = 0;                                  //æ»¤æ³¢å™¨ç´¢å¼•
+	fdcan_filter.FilterType = FDCAN_FILTER_DUAL;                   //åªæ¥æ”¶è¿™ä¸¤ä¸ªID
+	fdcan_filter.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;           //è¿‡æ»¤å™¨0å…³è”åˆ°FIFO0
 	fdcan_filter.FilterID1 = filt_id;
 	fdcan_filter.FilterID2 = 0x7FF;
 	
 	if(bsp_fdcan_port_is(comport, &hfdcan)==0)
 	{
-		HAL_FDCAN_ConfigFilter(&hfdcan, &fdcan_filter); 		 				  //½ÓÊÕID2
-		//¾Ü¾ø½ÓÊÕÆ¥Åä²»³É¹¦µÄ±ê×¼IDºÍÀ©Õ¹ID,²»½ÓÊÜÔ¶³ÌÖ¡
+		HAL_FDCAN_ConfigFilter(&hfdcan, &fdcan_filter); 		 				  //æ¥æ”¶ID2
+		//æ‹’ç»æ¥æ”¶åŒ¹é…ä¸æˆåŠŸçš„æ ‡å‡†IDå’Œæ‰©å±•ID,ä¸æ¥å—è¿œç¨‹å¸§
 		ret = HAL_FDCAN_ConfigGlobalFilter(&hfdcan1,FDCAN_REJECT,FDCAN_REJECT,FDCAN_REJECT_REMOTE,FDCAN_REJECT_REMOTE);
 	}
 	return ret;
@@ -231,13 +231,13 @@ __weak void fdcan1_rx_callback(void)
 
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
+    (void)RxFifo0ITs;
+
     if (hfdcan == &hfdcan1)
     {
 		fdcan1_rx_callback();
     }
 }
-
-
 
 
 

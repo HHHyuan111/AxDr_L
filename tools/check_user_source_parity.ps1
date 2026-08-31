@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$FirmwareDir = (Join-Path (Split-Path -Parent $PSScriptRoot) "firmware/AxDr_App")
 )
 

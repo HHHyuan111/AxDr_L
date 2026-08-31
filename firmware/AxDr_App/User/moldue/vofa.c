@@ -11,7 +11,7 @@ uint16_t cnt = 0;
 * @brief:      vofa_start(void)
 * @param:	void
 * @retval:     void
-* @details:    å‘é€
+* @details:    å‘é€è°ƒè¯•æ•°æ®
 ***********************************************************************
 **/
 float adc_value[3];
@@ -82,7 +82,7 @@ _RAM_FUNC void vofa_start(void)
 * @brief:      vofa_transmit(uint8_t* buf, uint16_t len)
 * @param:		   void
 * @retval:     void
-* @details:    ĞŞ¸ÄÍ¨ĞÅ¹¤¾ß£¬USART»òÕßUSB
+* @details:    ä¿®æ”¹é€šä¿¡å·¥å…·ï¼ŒUSARTæˆ–è€…USB
 ***********************************************************************
 **/
 void vofa_transmit(uint8_t* buf, uint16_t len)
@@ -93,13 +93,15 @@ void vofa_transmit(uint8_t* buf, uint16_t len)
 /**
 ***********************************************************************
 * @brief:      vofa_send_data(float data)
-* @param[in]:  num: Êı¾İ±àºÅ data: Êı¾İ 
+* @param[in]:  num: æ•°æ®ç¼–å· data: æ•°æ®
 * @retval:     void
-* @details:    ½«¸¡µãÊı¾İ²ğ·Ö³Éµ¥×Ö½Ú
+* @details:    å°†æµ®ç‚¹æ•°æ®æ‹†åˆ†æˆå•å­—èŠ‚
 ***********************************************************************
 **/
 _RAM_FUNC void vofa_send_data(uint8_t num, float data) 
 {
+    (void)num;
+
 //	send_buf[cnt++] = byte0(data);
 //	send_buf[cnt++] = byte1(data);
 //	send_buf[cnt++] = byte2(data);
@@ -119,7 +121,7 @@ _RAM_FUNC void vofa_send_data(uint8_t num, float data)
 * @brief      vofa_sendframetail(void)
 * @param      NULL 
 * @retval     void
-* @details:   ¸øÊı¾İ°ü·¢ËÍÖ¡Î²
+* @details:   ç»™æ•°æ®åŒ…å‘é€å¸§å°¾
 ***********************************************************************
 **/
 void vofa_sendframetail(void) 
@@ -129,16 +131,16 @@ void vofa_sendframetail(void)
 	send_buf[cnt++] = 0x80;
 	send_buf[cnt++] = 0x7f;
 	
-	/* ½«Êı¾İºÍÖ¡Î²´ò°ü·¢ËÍ */
+	/* å°†æ•°æ®å’Œå¸§å°¾æ‰“åŒ…å‘é€ */
 	vofa_transmit((uint8_t *)send_buf, cnt);
-	cnt = 0;// Ã¿´Î·¢ËÍÍêÖ¡Î²¶¼ĞèÒªÇåÁã
+	cnt = 0;// æ¯æ¬¡å‘é€å®Œå¸§å°¾éƒ½éœ€è¦æ¸…é›¶
 }
 /**
 ***********************************************************************
 * @brief      vofa_demo(void)
 * @param      NULL 
 * @retval     void
-* @details:   demoÊ¾Àı
+* @details:   demoç¤ºä¾‹
 ***********************************************************************
 **/
 void vofa_demo(void) 
@@ -164,8 +166,6 @@ void vofa_demo(void)
 	// Call the function to send the frame tail
 	vofa_sendframetail();
 }
-
-
 
 
 

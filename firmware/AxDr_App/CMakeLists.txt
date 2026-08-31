@@ -88,6 +88,13 @@ add_executable(${CMAKE_PROJECT_NAME} ${AXDR_USER_SOURCES})
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
+# CubeMX 在未启用 USE_FULL_LL_DRIVER 时仍保留该源文件；此配置下原文件为空，
+# 因此只对该第三方文件关闭空翻译单元提示，不降低项目源码的警告等级。
+set_source_files_properties(
+    "${CMAKE_CURRENT_SOURCE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_ll_adc.c"
+    PROPERTIES COMPILE_OPTIONS "-Wno-pedantic"
+)
+
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
@@ -114,6 +121,14 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 
     # Add user defined libraries
 )
+
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    # 快速周期函数按设计从 Flash 复制到可写 RAM 执行；STM32G4 没有进程级
+    # 可执行内存权限边界，因此只关闭 GNU ld 针对该嵌入式布局的通用提示。
+    target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
+        "LINKER:--no-warn-rwx-segments"
+    )
+endif()
 
 add_custom_command(
     TARGET ${CMAKE_PROJECT_NAME}
