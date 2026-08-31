@@ -95,15 +95,21 @@ static _RAM_FUNC void drive_update_protection(pmsm_t *pm)
  */
 static _RAM_FUNC void drive_start_pwm(pmsm_t *pm)
 {
-    if (pm->pwm_active)
+    if (pm->pwm_active || !drive_mode_prepare(pm))
     {
         return;
     }
 
     drive_pwm_set_neutral(pm);
-    drive_pwm_start();
-    pmsm_reset(pm);
-    pm->pwm_active = true;
+    if (drive_pwm_start())
+    {
+        pmsm_reset(pm);
+        pm->pwm_active = true;
+    }
+    else
+    {
+        pm->fault.bit.pwm_err = 1U;
+    }
 }
 
 /**
@@ -120,9 +126,17 @@ static _RAM_FUNC void drive_stop_pwm(pmsm_t *pm)
         return;
     }
 
-    drive_pwm_stop();
+    const bool stopped = drive_pwm_stop();
+
     pmsm_reset(pm);
-    pm->pwm_active = false;
+    if (stopped)
+    {
+        pm->pwm_active = false;
+    }
+    else
+    {
+        pm->fault.bit.pwm_err = 1U;
+    }
 }
 
 /**
@@ -194,6 +208,7 @@ static _RAM_FUNC void drive_update_state(pmsm_t *pm, drive_req_e req)
             else
             {
                 pm->state = DRIVE_STATE_STOP;
+                pm->req = DRIVE_REQ_STOP;
             }
             break;
 

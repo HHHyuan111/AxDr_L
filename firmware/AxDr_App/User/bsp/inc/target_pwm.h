@@ -11,22 +11,29 @@
 #ifndef TARGET_PWM_H
 #define TARGET_PWM_H
 
+#include <stdbool.h>
+
 /**
  * @brief 启动 TIM1 三相主输出和互补输出。
  *
  * TIM1 的一个电机相通道包含主输出 CHx 和互补输出 CHxN。本函数依次启动
  * CH1/CH1N、CH2/CH2N、CH3/CH3N，使定时器能够把当前 CCR 比较值输出到引脚。
  * 本函数只负责打开定时器输出，不计算或修改占空比。
+ *
+ * @return 六路 HAL 启动均成功时返回 true；任一路失败会尝试关闭全部通道并返回 false。
  */
-void target_pwm_start_phase_outputs(void);
+bool target_pwm_start_phase_outputs(void);
 
 /**
  * @brief 停止 TIM1 三相主输出和互补输出。
  *
  * 本函数依次停止 CH1/CH1N、CH2/CH2N、CH3/CH3N。停止输出后，原有 CCR
  * 比较值仍然保留；以后重新启动时，是否先更新占空比由上层状态机决定。
+ *
+ * @return 六路 HAL 停止均成功时返回 true，否则返回 false。即使某一路失败，
+ *         函数仍会继续尝试停止其余通道。
  */
-void target_pwm_stop_phase_outputs(void);
+bool target_pwm_stop_phase_outputs(void);
 
 /**
  * @brief 设置 TIM1 三个物理通道的占空比。

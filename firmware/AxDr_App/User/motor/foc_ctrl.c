@@ -1,5 +1,4 @@
 #include "common.h"
-#include "control_limit.h"
 #include "control_mit.h"
 #include "drive_pwm.h"
 #include "modlue.h"
@@ -349,46 +348,6 @@ _RAM_FUNC void pmsm_reset(pmsm_t* pm)
     control_pid_clear(&pm->pos_pi);
     control_angle_speed_reset(&pm->elec_speed_diff, speed_angle_rad);
     foc_clear(pm);
-}
-
-_RAM_FUNC void pmsm_ctrl_set(pmsm_t* pm)
-{
-    if (pm->app_ctrl.polarity == motor_polarity_p)
-    {
-        pm->ctrl.torm_set = control_limit(pm->cmd.torm_set,
-                                          pm->app_ctrl.pmax_torm,
-                                          pm->app_ctrl.nmax_torm);
-        pm->ctrl.wm_set = control_limit(pm->cmd.wm_set,
-                                        pm->app_ctrl.pmax_velm,
-                                        pm->app_ctrl.nmax_velm);
-        pm->ctrl.posm_set = control_limit(pm->cmd.posm_set,
-                                          pm->app_ctrl.pmax_posm,
-                                          pm->app_ctrl.nmax_posm);
-    }
-    else if (pm->app_ctrl.polarity == motor_polarity_n)
-    {
-        pm->ctrl.torm_set = -1.0f * control_limit(pm->cmd.torm_set,
-                                                  pm->app_ctrl.pmax_torm,
-                                                  pm->app_ctrl.nmax_torm);
-        pm->ctrl.wm_set = -1.0f * control_limit(pm->cmd.wm_set,
-                                                pm->app_ctrl.pmax_velm,
-                                                pm->app_ctrl.nmax_velm);
-        pm->ctrl.posm_set = -1.0f * control_limit(pm->cmd.posm_set,
-                                                  pm->app_ctrl.pmax_posm,
-                                                  pm->app_ctrl.nmax_posm);
-    }
-
-    pm->ctrl.pmax_tor =  pm->app_ctrl.pmax_torm*pm->para.div_Gr;
-    pm->ctrl.nmax_tor =  pm->app_ctrl.nmax_torm*pm->para.div_Gr;
-    pm->ctrl.pmax_iq  =  pm->ctrl.pmax_tor*pm->para.div_Kt;
-    pm->ctrl.nmax_iq  =  pm->ctrl.nmax_tor*pm->para.div_Kt;
-    pm->ctrl.pmax_tor_vel =  pm->app_ctrl.pmax_torm_vel*pm->para.Gr;
-    pm->ctrl.nmax_tor_vel =  pm->app_ctrl.nmax_torm_vel*pm->para.Gr;
-
-    pm->ctrl.pmax_vel =  pm->app_ctrl.pmax_velm*pm->para.Gr;
-    pm->ctrl.nmax_vel =  pm->app_ctrl.nmax_velm*pm->para.Gr;
-    pm->ctrl.pmax_pos =  pm->app_ctrl.pmax_posm*pm->para.Gr;
-    pm->ctrl.nmax_pos =  pm->app_ctrl.nmax_posm*pm->para.Gr;
 }
 
 _RAM_FUNC void pmsm_anticog_comp(pmsm_t* pm)

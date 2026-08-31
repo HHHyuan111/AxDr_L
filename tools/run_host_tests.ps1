@@ -16,6 +16,7 @@ $motorDir = Join-Path $repoRoot "firmware/AxDr_App/User/motor"
 $driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
 $focTestSource = Join-Path $testDir "test_foc_math.c"
 $driveModeTestSource = Join-Path $testDir "test_drive_mode.c"
+$driveCommandTestSource = Join-Path $testDir "test_drive_command.c"
 $driveProtectionTestSource = Join-Path $testDir "test_drive_protection.c"
 $driveTestSource = Join-Path $testDir "test_drive_state.c"
 $drivePwmTestSource = Join-Path $testDir "test_drive_pwm.c"
@@ -48,11 +49,13 @@ $speedSource = Join-Path $controlDir "control_speed.c"
 $utilSource = Join-Path $motorDir "util.c"
 $driveSource = Join-Path $driveDir "drive.c"
 $driveModeSource = Join-Path $driveDir "drive_mode.c"
+$driveCommandSource = Join-Path $driveDir "drive_command.c"
 $driveProtectionSource = Join-Path $driveDir "drive_protection.c"
 $drivePwmSource = Join-Path $driveDir "drive_pwm.c"
 $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
 $focExecutablePath = Join-Path $outputDir "test_foc_math.exe"
 $driveModeExecutablePath = Join-Path $outputDir "test_drive_mode.exe"
+$driveCommandExecutablePath = Join-Path $outputDir "test_drive_command.exe"
 $driveProtectionExecutablePath = Join-Path $outputDir "test_drive_protection.exe"
 $driveExecutablePath = Join-Path $outputDir "test_drive_state.exe"
 $drivePwmExecutablePath = Join-Path $outputDir "test_drive_pwm.exe"
@@ -277,6 +280,27 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/Drive PWM 与 Fake Target 边界测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$motorDir" "-I$driveDir" `
+        $driveCommandTestSource $driveCommandSource $limitSource `
+        -o $driveCommandExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host Drive 命令适配测试编译失败，退出码：$compileExitCode"
+}
+
+& $driveCommandExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host Drive 命令适配测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/Drive 命令校验与限幅测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `

@@ -13,6 +13,8 @@
 static unsigned int start_count;
 static unsigned int stop_count;
 static unsigned int commit_count;
+static bool start_result;
+static bool stop_result;
 static float channel_1_duty;
 static float channel_2_duty;
 static float channel_3_duty;
@@ -22,19 +24,23 @@ static void fake_target_reset(void)
     start_count = 0U;
     stop_count = 0U;
     commit_count = 0U;
+    start_result = true;
+    stop_result = true;
     channel_1_duty = 0.0f;
     channel_2_duty = 0.0f;
     channel_3_duty = 0.0f;
 }
 
-void target_pwm_start_phase_outputs(void)
+bool target_pwm_start_phase_outputs(void)
 {
     start_count++;
+    return start_result;
 }
 
-void target_pwm_stop_phase_outputs(void)
+bool target_pwm_stop_phase_outputs(void)
 {
     stop_count++;
+    return stop_result;
 }
 
 void target_pwm_set_duty_ratios(float channel_1,
@@ -82,10 +88,12 @@ static bool test_start_and_stop(void)
 {
     fake_target_reset();
 
-    drive_pwm_start();
-    drive_pwm_stop();
+    const bool started = drive_pwm_start();
+    const bool stopped = drive_pwm_stop();
 
-    return expect_true(start_count == 1U, "PWM 启动应调用一次 Target。") &&
+    return expect_true(started, "Target 成功时 Drive 应报告 PWM 启动成功。") &&
+           expect_true(stopped, "Target 成功时 Drive 应报告 PWM 停止成功。") &&
+           expect_true(start_count == 1U, "PWM 启动应调用一次 Target。") &&
            expect_true(stop_count == 1U, "PWM 停止应调用一次 Target。");
 }
 
@@ -229,6 +237,23 @@ static bool test_invalid_duty_stops_output(void)
                        "越界占空比必须关闭 Target PWM。");
 }
 
+static bool test_failed_stop_keeps_active_state(void)
+{
+    pmsm_t pm = {
+        .para = {.phase_order = ABC_PHASE},
+        .foc = {.dtc_a = NAN, .dtc_b = 0.5f, .dtc_c = 0.5f},
+        .pwm_active = true
+    };
+
+    fake_target_reset();
+    stop_result = false;
+
+    return expect_true(!drive_pwm_commit(&pm),
+                       "无效占空比仍必须报告提交失败。") &&
+           expect_true(pm.pwm_active,
+                       "Target 停止失败时必须保留活动状态以便上层重试。");
+}
+
 static bool test_neutral_commit(void)
 {
     pmsm_t pm = {
@@ -293,6 +318,11 @@ int main(void)
     if (!test_invalid_duty_stops_output())
     {
         return 6;
+    }
+
+    if (!test_failed_stop_keeps_active_state())
+    {
+        return 7;
     }
 
     return 0;

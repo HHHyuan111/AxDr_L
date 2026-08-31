@@ -61,6 +61,7 @@ set(AXDR_USER_SOURCES
     User/control/foc_svm.c
     User/control/foc_transform.c
     User/drive/drive.c
+    User/drive/drive_command.c
     User/drive/drive_mode.c
     User/drive/drive_protection.c
     User/drive/drive_pwm.c

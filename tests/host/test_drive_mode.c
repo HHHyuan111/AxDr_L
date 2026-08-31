@@ -42,7 +42,9 @@ typedef struct
 static mode_event_e last_event;
 static unsigned int event_count;
 static unsigned int commit_count;
+static unsigned int command_apply_count;
 static bool foc_result_valid;
+static bool command_valid;
 static bool arguments_ok;
 
 static void reset_fakes(void)
@@ -50,8 +52,17 @@ static void reset_fakes(void)
     last_event = EVENT_MIT;
     event_count = 0U;
     commit_count = 0U;
+    command_apply_count = 0U;
     foc_result_valid = true;
+    command_valid = true;
     arguments_ok = true;
+}
+
+bool drive_cmd_apply(pmsm_t *pm)
+{
+    (void)pm;
+    command_apply_count++;
+    return command_valid;
 }
 
 static void log_event(mode_event_e event)
@@ -227,10 +238,6 @@ static bool expect_dispatch(pmsm_t *pm,
 static bool test_release_modes(pmsm_t *pm)
 {
     static const mode_case_t cases[] = {
-        {mit_mode, EVENT_MIT, false},
-        {tor_mode, EVENT_TORQUE, false},
-        {vel_mode, EVENT_VELOCITY, false},
-        {pos_mode, EVENT_POSITION, false},
         {cst_mode, EVENT_CST, false},
         {csv_mode, EVENT_CSV, false},
         {csp_mode, EVENT_CSP, false}
@@ -241,13 +248,22 @@ static bool test_release_modes(pmsm_t *pm)
     for (index = 0U; index < (sizeof(cases) / sizeof(cases[0])); index++)
     {
         pm->mode.release = (release_mode_e)cases[index].mode;
-        if (!expect_dispatch(pm, cases[index].event, cases[index].commits_pwm))
+        if (!expect_dispatch(pm, cases[index].event, cases[index].commits_pwm) ||
+            !expect_true(command_apply_count == 1U,
+                         "发布模式必须先应用一次外部命令。"))
         {
             return false;
         }
     }
 
-    return true;
+    reset_fakes();
+    command_valid = false;
+    pm->mode.release = cst_mode;
+
+    return expect_true(!drive_mode_step(pm),
+                       "无效发布命令必须终止本周期模式。") &&
+           expect_true(event_count == 0U,
+                       "无效发布命令不能进入控制算法。");
 }
 
 static bool test_halt_modes(pmsm_t *pm)
@@ -259,27 +275,7 @@ static bool test_halt_modes(pmsm_t *pm)
         return false;
     }
 
-    pm->mode.halt = fault_mode;
-    return expect_dispatch(pm, EVENT_FAULT_STOP, false);
-}
-
-static bool test_calibration_modes(pmsm_t *pm)
-{
-    pm->mode.sys = calibrat_mode;
-    pm->mode.calibrat = rotor_enc_cali;
-    if (!expect_dispatch(pm, EVENT_ENCODER_CALIBRATION, false))
-    {
-        return false;
-    }
-
-    pm->mode.calibrat = iden_pm;
-    if (!expect_dispatch(pm, EVENT_IDENTIFICATION, false))
-    {
-        return false;
-    }
-
-    pm->mode.calibrat = anticogging_pm;
-    return expect_dispatch(pm, EVENT_ANTICOGGING, false);
+    return true;
 }
 
 static bool test_debug_modes(pmsm_t *pm)
@@ -316,16 +312,41 @@ static bool test_debug_modes(pmsm_t *pm)
 
 static bool test_unimplemented_modes_do_nothing(pmsm_t *pm)
 {
+    static const release_mode_e release_modes[] = {
+        mit_mode,
+        tor_mode,
+        vel_mode,
+        pos_mode
+    };
     static const calibrat_mode_e calibration_modes[] = {
         rotor_enc_mod,
+        rotor_enc_cali,
         output_enc_mod,
-        output_enc_cali
+        output_enc_cali,
+        iden_pm,
+        anticogging_pm
     };
     static const debug_mode_e debug_modes[] = {
         spd_volt_cl,
         pos_spd_volt_cl
     };
     size_t index;
+
+    pm->mode.sys = release_mode;
+    for (index = 0U; index < (sizeof(release_modes) / sizeof(release_modes[0])); index++)
+    {
+        reset_fakes();
+        pm->mode.release = release_modes[index];
+        if (!expect_true(!drive_mode_is_supported(pm),
+                         "未验证的发布模式不能标记为正式支持。") ||
+            !expect_true(!drive_mode_step(pm),
+                         "未验证的发布模式必须明确返回失败。") ||
+            !expect_true(event_count == 0U,
+                         "未验证的发布模式不应调用算法实现。"))
+        {
+            return false;
+        }
+    }
 
     pm->mode.sys = calibrat_mode;
     for (index = 0U;
@@ -342,6 +363,17 @@ static bool test_unimplemented_modes_do_nothing(pmsm_t *pm)
         {
             return false;
         }
+    }
+
+    reset_fakes();
+    pm->mode.sys = halt_mode;
+    pm->mode.halt = fault_mode;
+    if (!expect_true(!drive_mode_is_supported(pm),
+                     "故障停车由 Drive 故障链直接处理，不进入运行模式。") ||
+        !expect_true(!drive_mode_step(pm),
+                     "未接入的故障停车模式必须明确返回失败。"))
+    {
+        return false;
     }
 
     pm->mode.sys = debug_mode;
@@ -395,24 +427,19 @@ int main(void)
         return 2;
     }
 
-    if (!test_calibration_modes(&pm))
+    if (!test_debug_modes(&pm))
     {
         return 3;
     }
 
-    if (!test_debug_modes(&pm))
+    if (!test_unimplemented_modes_do_nothing(&pm))
     {
         return 4;
     }
 
-    if (!test_unimplemented_modes_do_nothing(&pm))
-    {
-        return 5;
-    }
-
     if (!test_unknown_system_mode_returns_failure(&pm))
     {
-        return 6;
+        return 5;
     }
 
     return 0;

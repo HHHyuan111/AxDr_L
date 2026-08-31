@@ -17,14 +17,14 @@ static _RAM_FUNC bool drive_pwm_duty_is_valid(float duty)
     return isfinite(duty) && (duty >= 0.0f) && (duty <= 1.0f);
 }
 
-_RAM_FUNC void drive_pwm_start(void)
+_RAM_FUNC bool drive_pwm_start(void)
 {
-    target_pwm_start_phase_outputs();
+    return target_pwm_start_phase_outputs();
 }
 
-_RAM_FUNC void drive_pwm_stop(void)
+_RAM_FUNC bool drive_pwm_stop(void)
 {
-    target_pwm_stop_phase_outputs();
+    return target_pwm_stop_phase_outputs();
 }
 
 _RAM_FUNC void drive_pwm_set_neutral(pmsm_t *pm)
@@ -62,8 +62,10 @@ _RAM_FUNC bool drive_pwm_commit(pmsm_t *pm)
         !drive_pwm_duty_is_valid(pm->foc.dtc_b) ||
         !drive_pwm_duty_is_valid(pm->foc.dtc_c))
     {
-        target_pwm_stop_phase_outputs();
-        pm->pwm_active = false;
+        if (target_pwm_stop_phase_outputs())
+        {
+            pm->pwm_active = false;
+        }
         return false;
     }
 
@@ -83,8 +85,10 @@ _RAM_FUNC bool drive_pwm_commit(pmsm_t *pm)
 
         default:
             /* 无法确定物理相序时立即撤销功率输出，不能继续沿用上一拍占空比。 */
-            target_pwm_stop_phase_outputs();
-            pm->pwm_active = false;
+            if (target_pwm_stop_phase_outputs())
+            {
+                pm->pwm_active = false;
+            }
             return false;
     }
 

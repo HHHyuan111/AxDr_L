@@ -311,27 +311,25 @@ void pmsm_init(void)
     control_pid_set_limits(&pm.spd_pi, 20.0f, -20.0f, 20.0f, -20.0f);
     control_pid_set_limits(&pm.pos_pi, 200.0f, -200.0f, 200.0f, -200.0f);
     
-    iden_init();
-    scvm_init();
-    nlob_init();
-    alob_init();
     encoder_init(&pm.pos_box);
-    cali_init();
-    traj_init();
+
+    /* 辨识、标定、轨迹和无感观测器尚未进入正式运行链，上电时不初始化。 */
 
     /* 上电默认保持三相功率输出关闭，等待明确的 START 请求。 */
     pm.req = DRIVE_REQ_STOP;
     pm.state = DRIVE_STATE_STOP;
     pm.pwm_active = false;
 
-    pm.pos_box.pos_mode = Sensorsory_s; //Sensorsory_s; Sensorsory_d; //Sensorless;
-    pm.pos_box.sensory1 = MT6816; //DMENC; //MT6825; //MT6816; //MA732; // DMENC; //Hall; //Xhall;
-    pm.pos_box.senless  = Scvm;       //Nlob; //Alob; //Scvm; //Esmo; //Hfsi;
+    pm.pos_box.pos_mode = Sensorsory_s;
+    pm.pos_box.sensory1 = MT6816;
 
-    pm.mode.sys      = debug_mode;        //debug_mode; //release_mode; // calibrat_mode;
-    pm.mode.debug    = curr_cl;   //drag_vf; //volt_op; //drag_if; //curr_cl; //spd_curr_cl; //pos_spd_curr_cl;
-    pm.mode.release  = vel_mode;        // mit_mode; //tor_mode; //vel_mode; //pos_mode;
-    pm.mode.calibrat = iden_pm; // rotor_enc_cali; //iden_pm; //enc_mod;
+    /* 默认使用零电流闭环调试；切换模式前仍需显式发送 START 请求。 */
+    pm.mode.sys = debug_mode;
+    pm.mode.debug = curr_cl;
+    pm.mode.release = csv_mode;
+
+    pm.app_ctrl.polarity = motor_polarity_p;
+    pm.app_ctrl.pos_ctrl_mode = abs_pos_mode;
 
     pm.app_ctrl.p_curve = tcurve;
     pm.app_ctrl.v_curve = tcurve;

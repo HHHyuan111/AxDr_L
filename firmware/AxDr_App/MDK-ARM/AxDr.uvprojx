@@ -410,6 +410,11 @@
               <FilePath>..\User\drive\drive.c</FilePath>
             </File>
             <File>
+              <FileName>drive_command.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\drive\drive_command.c</FilePath>
+            </File>
+            <File>
               <FileName>drive_mode.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\drive\drive_mode.c</FilePath>

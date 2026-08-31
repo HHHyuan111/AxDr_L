@@ -621,6 +621,7 @@ typedef union
         uint32_t ioff_err : 1; // Offset error
         uint32_t off_link : 1; // Link off
         uint32_t ov_speed : 1;
+        uint32_t pwm_err  : 1; // PWM 启停执行失败
     } bit;
 
     uint32_t all;
@@ -1370,7 +1371,6 @@ bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos);
 
 /* FOC control functions */
 void pmsm_observe(pmsm_t* pm);
-void pmsm_ctrl_set(pmsm_t* pm);
 void pmsm_slow_down(pmsm_t* pm, float dec);
 void pmsm_reset(pmsm_t* pm);
 void pmsm_quick_stop_mode(pmsm_t* pm);

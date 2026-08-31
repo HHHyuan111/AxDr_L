@@ -36,6 +36,9 @@ static bool test_mode_sets_fault;
 static bool test_mode_requests_stop;
 static bool test_mode_valid;
 static bool test_mode_writes_pwm;
+static bool test_mode_supported;
+static bool test_pwm_start_result;
+static bool test_pwm_stop_result;
 
 static void test_log_event(test_event_e event)
 {
@@ -50,6 +53,15 @@ static void test_reset_fakes(void)
     test_mode_requests_stop = false;
     test_mode_valid = true;
     test_mode_writes_pwm = true;
+    test_mode_supported = true;
+    test_pwm_start_result = true;
+    test_pwm_stop_result = true;
+}
+
+bool drive_mode_prepare(pmsm_t *pm)
+{
+    (void)pm;
+    return test_mode_supported;
 }
 
 static bool test_expect(bool condition, const char *message)
@@ -92,14 +104,16 @@ static bool test_expect_events(const test_event_e *expected, size_t expected_cou
     return true;
 }
 
-void drive_pwm_start(void)
+bool drive_pwm_start(void)
 {
     test_log_event(TEST_EVENT_PWM_START);
+    return test_pwm_start_result;
 }
 
-void drive_pwm_stop(void)
+bool drive_pwm_stop(void)
 {
     test_log_event(TEST_EVENT_PWM_STOP);
+    return test_pwm_stop_result;
 }
 
 void drive_pwm_set_neutral(pmsm_t *pm)
@@ -244,6 +258,77 @@ static bool test_stop_runs_once(void)
                        "持续 STOP 时不应重复停止 PWM。") &&
            test_expect(pm.state == DRIVE_STATE_STOP,
                        "持续 STOP 时状态应保持 STOP。");
+}
+
+static bool test_unsupported_mode_never_starts_pwm(void)
+{
+    pmsm_t pm = {
+        .req = DRIVE_REQ_START,
+        .state = DRIVE_STATE_STOP
+    };
+
+    test_reset_fakes();
+    test_mode_supported = false;
+    drive_fast_step(&pm);
+
+    return test_expect(test_event_count == 0U,
+                       "未验证模式不能产生任何功率级启动动作。") &&
+           test_expect(pm.req == DRIVE_REQ_STOP,
+                       "未验证模式的 START 请求应退回 STOP。") &&
+           test_expect(pm.state == DRIVE_STATE_STOP,
+                       "未验证模式应保持 STOP 状态。") &&
+           test_expect(!pm.pwm_active,
+                       "未验证模式不能把 PWM 标记为已启动。");
+}
+
+static bool test_pwm_action_failure_is_reported(void)
+{
+    static const test_event_e start_failure_events[] = {
+        TEST_EVENT_DUTY_NEUTRAL,
+        TEST_EVENT_PWM_START
+    };
+    static const test_event_e stop_failure_events[] = {
+        TEST_EVENT_PWM_STOP,
+        TEST_EVENT_RESET,
+        TEST_EVENT_PWM_STOP,
+        TEST_EVENT_RESET
+    };
+    pmsm_t start_pm = {.req = DRIVE_REQ_START};
+    pmsm_t stop_pm = {
+        .req = DRIVE_REQ_STOP,
+        .state = DRIVE_STATE_RUN,
+        .pwm_active = true
+    };
+
+    test_reset_fakes();
+    test_pwm_start_result = false;
+    drive_fast_step(&start_pm);
+    if (!test_expect_events(
+            start_failure_events,
+            sizeof(start_failure_events) / sizeof(start_failure_events[0])) ||
+        !test_expect(start_pm.fault.bit.pwm_err == 1U,
+                     "PWM 启动失败必须锁存执行故障。") ||
+        !test_expect(start_pm.state == DRIVE_STATE_FAULT,
+                     "PWM 启动失败必须进入 FAULT。") ||
+        !test_expect(!start_pm.pwm_active,
+                     "PWM 启动失败不能标记为已启动。"))
+    {
+        return false;
+    }
+
+    test_reset_fakes();
+    test_pwm_stop_result = false;
+    drive_fast_step(&stop_pm);
+
+    return test_expect_events(
+               stop_failure_events,
+               sizeof(stop_failure_events) / sizeof(stop_failure_events[0])) &&
+           test_expect(stop_pm.fault.bit.pwm_err == 1U,
+                       "PWM 停止失败必须锁存执行故障。") &&
+           test_expect(stop_pm.state == DRIVE_STATE_FAULT,
+                       "PWM 停止失败必须进入 FAULT。") &&
+           test_expect(stop_pm.pwm_active,
+                       "PWM 停止失败必须保留活动状态供下一周期重试。");
 }
 
 static bool test_fault_stops_same_cycle(void)
@@ -549,39 +634,49 @@ int main(void)
         return 3;
     }
 
-    if (!test_fault_stops_same_cycle())
+    if (!test_unsupported_mode_never_starts_pwm())
     {
         return 4;
     }
 
-    if (!test_existing_fault_blocks_start_and_run())
+    if (!test_pwm_action_failure_is_reported())
     {
         return 5;
     }
 
-    if (!test_stop_request_during_mode_is_preserved())
+    if (!test_fault_stops_same_cycle())
     {
         return 6;
     }
 
-    if (!test_invalid_requests_do_not_run())
+    if (!test_existing_fault_blocks_start_and_run())
     {
         return 7;
     }
 
-    if (!test_invalid_mode_or_missing_pwm_stops())
+    if (!test_stop_request_during_mode_is_preserved())
     {
         return 8;
     }
 
-    if (!test_protection_blocks_power_actions())
+    if (!test_invalid_requests_do_not_run())
     {
         return 9;
     }
 
-    if (!test_invalid_feedback_blocks_start())
+    if (!test_invalid_mode_or_missing_pwm_stops())
     {
         return 10;
+    }
+
+    if (!test_protection_blocks_power_actions())
+    {
+        return 11;
+    }
+
+    if (!test_invalid_feedback_blocks_start())
+    {
+        return 12;
     }
 
     return 0;

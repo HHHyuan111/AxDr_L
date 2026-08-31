@@ -11,34 +11,37 @@
 #include "compiler.h"
 #include "tim.h"
 
-void target_pwm_start_phase_outputs(void)
+bool target_pwm_stop_phase_outputs(void)
 {
-    /* 通道 1：启动主输出 CH1 和互补输出 CH1N。 */
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1);
+    bool stopped = true;
 
-    /* 通道 2：启动主输出 CH2 和互补输出 CH2N。 */
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
-    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_2);
+    /* 六路停止都要尝试，不能因为前一路失败而跳过其余通道。 */
+    stopped &= HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1) == HAL_OK;
+    stopped &= HAL_TIMEx_PWMN_Stop(&htim1, TIM_CHANNEL_1) == HAL_OK;
+    stopped &= HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2) == HAL_OK;
+    stopped &= HAL_TIMEx_PWMN_Stop(&htim1, TIM_CHANNEL_2) == HAL_OK;
+    stopped &= HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3) == HAL_OK;
+    stopped &= HAL_TIMEx_PWMN_Stop(&htim1, TIM_CHANNEL_3) == HAL_OK;
 
-    /* 通道 3：启动主输出 CH3 和互补输出 CH3N。 */
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
-    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_3);
+    return stopped;
 }
 
-void target_pwm_stop_phase_outputs(void)
+bool target_pwm_start_phase_outputs(void)
 {
-    /* 通道 1：停止主输出 CH1 和互补输出 CH1N。 */
-    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
-    HAL_TIMEx_PWMN_Stop(&htim1, TIM_CHANNEL_1);
+    const bool started =
+        (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) == HAL_OK) &&
+        (HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1) == HAL_OK) &&
+        (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2) == HAL_OK) &&
+        (HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_2) == HAL_OK) &&
+        (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3) == HAL_OK) &&
+        (HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_3) == HAL_OK);
 
-    /* 通道 2：停止主输出 CH2 和互补输出 CH2N。 */
-    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
-    HAL_TIMEx_PWMN_Stop(&htim1, TIM_CHANNEL_2);
+    if (!started)
+    {
+        (void)target_pwm_stop_phase_outputs();
+    }
 
-    /* 通道 3：停止主输出 CH3 和互补输出 CH3N。 */
-    HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3);
-    HAL_TIMEx_PWMN_Stop(&htim1, TIM_CHANNEL_3);
+    return started;
 }
 
 /*

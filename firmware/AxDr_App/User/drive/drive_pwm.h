@@ -12,13 +12,15 @@
 
 /**
  * @brief 启动三相主输出和互补输出。
+ * @return Target 报告六路输出均成功启动时返回 true，否则返回 false。
  */
-void drive_pwm_start(void);
+bool drive_pwm_start(void);
 
 /**
  * @brief 停止三相主输出和互补输出。
+ * @return Target 报告六路输出均成功停止时返回 true，否则返回 false。
  */
-void drive_pwm_stop(void);
+bool drive_pwm_stop(void);
 
 /**
  * @brief 向三个物理 PWM 通道写入 50% 占空比。
@@ -26,7 +28,7 @@ void drive_pwm_stop(void);
  * @param[in,out] pm 电机控制对象，用于记录本周期命令和提交结果。
  * @pre pm 指向快速周期独占写入的有效对象。
  *
- * 该接口只用于现有 START 流程，保持原工程先启动输出、再写 50% 的顺序。
+ * 该接口只用于 START 流程，在启动输出前先写入已知的 50% 比较值。
  */
 void drive_pwm_set_neutral(pmsm_t *pm);
 
