@@ -604,7 +604,16 @@ _RAM_FUNC void foc_feedback_update(pmsm_t *pm)
 {
     /* 第 1 步：把母线 ADC 计数换算成电压，并计算调制所需的电压系数和余量。 */
     pm->foc.vbus = ((float)pm->adc.vbus * pm->board.v_ratio);
-    pm->foc.inv_vbus = 1.5f / (pm->foc.vbus);
+
+    if (pm->adc.vbus > 0U)
+    {
+        pm->foc.inv_vbus = 1.5f / pm->foc.vbus;
+    }
+    else
+    {
+        pm->foc.inv_vbus = 0.0f;
+    }
+
     pm->foc.vs = pm->foc.vbus*0.5f*0.96f;
 
     /* 第 2 步：把本周期允许的电压、电流和速度范围交给各级 PI 控制器。 */
