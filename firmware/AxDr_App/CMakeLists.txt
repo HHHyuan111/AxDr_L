@@ -33,6 +33,7 @@ include_directories(
     "User/bsp/inc"
     "User/common"
     "User/control"
+    "User/diagnostic/include"
     "User/drive"
     "User/motor"
     "User/moldue/inc"
@@ -54,6 +55,19 @@ set(AXDR_USER_SOURCES
     User/control/foc_core.c
     User/control/foc_svm.c
     User/control/foc_transform.c
+    User/diagnostic/core/mc_bias_bandwidth.c
+    User/diagnostic/core/mc_biased_l_ident.c
+    User/diagnostic/core/mc_common.c
+    User/diagnostic/core/mc_current_pi.c
+    User/diagnostic/core/mc_current_sweep.c
+    User/diagnostic/core/mc_deadtime_comp.c
+    User/diagnostic/core/mc_deadtime_test.c
+    User/diagnostic/core/mc_decoupling.c
+    User/diagnostic/core/mc_diag_manager.c
+    User/diagnostic/core/mc_encoder_alignment.c
+    User/diagnostic/core/mc_flux_observer.c
+    User/diagnostic/core/mc_pole_pair_ident.c
+    User/diagnostic/core/mc_rs_ident.c
     User/drive/drive.c
     User/drive/drive_command.c
     User/drive/drive_mode.c

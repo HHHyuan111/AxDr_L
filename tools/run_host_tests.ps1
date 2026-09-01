@@ -414,3 +414,5 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/Drive 状态测试通过。"
+
+& (Join-Path $PSScriptRoot "run_diagnostic_tests.ps1") -Compiler $Compiler

@@ -6,6 +6,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $formalDirs = @(
     (Join-Path $repoRoot "firmware/AxDr_App/User/app"),
     (Join-Path $repoRoot "firmware/AxDr_App/User/control"),
+    (Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic"),
     (Join-Path $repoRoot "firmware/AxDr_App/User/drive"),
     (Join-Path $repoRoot "tests/host")
 )

@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../USB_Device/App;../USB_Device/Target;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/ST/STM32_USB_Device_Library/Core/Inc;../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;..\User\app;..\User\common;..\User\control;..\User\drive;..\User\motor;..\User\bsp\inc;..\User\bsp;..\User\moldue\inc</IncludePath>
+              <IncludePath>../Core/Inc;../USB_Device/App;../USB_Device/Target;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/ST/STM32_USB_Device_Library/Core/Inc;../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;..\User\app;..\User\common;..\User\control;..\User\diagnostic\include;..\User\drive;..\User\motor;..\User\bsp\inc;..\User\bsp;..\User\moldue\inc</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -483,6 +483,76 @@
               <FileName>foc_transform.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\control\foc_transform.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>User/diagnostic/core</GroupName>
+          <Files>
+            <File>
+              <FileName>mc_bias_bandwidth.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_bias_bandwidth.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_biased_l_ident.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_biased_l_ident.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_common.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_common.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_current_pi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_current_pi.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_current_sweep.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_current_sweep.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_deadtime_comp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_deadtime_comp.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_deadtime_test.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_deadtime_test.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_decoupling.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_decoupling.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_diag_manager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_diag_manager.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_encoder_alignment.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_encoder_alignment.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_flux_observer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_flux_observer.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_pole_pair_ident.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_pole_pair_ident.c</FilePath>
+            </File>
+            <File>
+              <FileName>mc_rs_ident.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_rs_ident.c</FilePath>
             </File>
           </Files>
         </Group>
