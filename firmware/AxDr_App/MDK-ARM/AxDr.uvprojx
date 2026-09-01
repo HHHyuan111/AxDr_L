@@ -415,6 +415,11 @@
               <FilePath>..\User\drive\drive_command.c</FilePath>
             </File>
             <File>
+              <FileName>drive_diag.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\drive\drive_diag.c</FilePath>
+            </File>
+            <File>
               <FileName>drive_mode.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\drive\drive_mode.c</FilePath>
@@ -489,6 +494,11 @@
         <Group>
           <GroupName>User/diagnostic/core</GroupName>
           <Files>
+            <File>
+              <FileName>diag_runtime.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\diag_runtime.c</FilePath>
+            </File>
             <File>
               <FileName>mc_bias_bandwidth.c</FileName>
               <FileType>1</FileType>

@@ -6,6 +6,7 @@
 #include "drive.h"
 
 #include "common.h"
+#include "drive_diag.h"
 #include "drive_mode.h"
 #include "drive_pwm.h"
 #include "drive_reset.h"
@@ -124,6 +125,7 @@ static _RAM_FUNC void drive_stop_pwm(pmsm_t *pm)
 {
     if (!pm->pwm_active)
     {
+        drive_diag_on_stopped(pm);
         return;
     }
 
@@ -133,6 +135,7 @@ static _RAM_FUNC void drive_stop_pwm(pmsm_t *pm)
     if (stopped)
     {
         pm->pwm_active = false;
+        drive_diag_on_stopped(pm);
     }
     else
     {
@@ -249,6 +252,7 @@ bool drive_fault_clear(pmsm_t *pm)
 
 _RAM_FUNC void drive_fast_step(pmsm_t *pm)
 {
+    drive_diag_poll_request(pm);
     const drive_req_e req = pm->req;
 
     /* 每周期从空命令开始；只有实际执行的启动或控制路径可以重新生成命令。 */
@@ -260,6 +264,7 @@ _RAM_FUNC void drive_fast_step(pmsm_t *pm)
     /* 已锁存故障时，当前周期禁止执行 START 或 RUN。 */
     if (pm->fault.all > 0U)
     {
+        drive_diag_on_fault(pm);
         drive_stop_pwm(pm);
         pm->state = DRIVE_STATE_FAULT;
         pm->req = DRIVE_REQ_STOP;
@@ -271,6 +276,7 @@ _RAM_FUNC void drive_fast_step(pmsm_t *pm)
     if (pm->fault.all > 0U)
     {
         /* 故障在本周期末关闭输出；已关闭时不会重复调用停止接口。 */
+        drive_diag_on_fault(pm);
         drive_stop_pwm(pm);
         pm->state = DRIVE_STATE_FAULT;
         pm->req = DRIVE_REQ_STOP;

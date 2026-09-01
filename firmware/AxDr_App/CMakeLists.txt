@@ -56,6 +56,7 @@ set(AXDR_USER_SOURCES
     User/control/foc_svm.c
     User/control/foc_transform.c
     User/diagnostic/core/mc_bias_bandwidth.c
+    User/diagnostic/core/diag_runtime.c
     User/diagnostic/core/mc_biased_l_ident.c
     User/diagnostic/core/mc_common.c
     User/diagnostic/core/mc_current_pi.c
@@ -70,6 +71,7 @@ set(AXDR_USER_SOURCES
     User/diagnostic/core/mc_rs_ident.c
     User/drive/drive.c
     User/drive/drive_command.c
+    User/drive/drive_diag.c
     User/drive/drive_mode.c
     User/drive/drive_protection.c
     User/drive/drive_pwm.c

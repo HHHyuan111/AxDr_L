@@ -48,6 +48,39 @@ void drive_control_reset(pmsm_t *motor)
     motor->ctrl.vq_set = 0.0f;
 }
 
+void drive_diag_poll_request(pmsm_t *motor)
+{
+    (void)motor;
+}
+
+bool drive_diag_is_supported(const pmsm_t *motor)
+{
+    (void)motor;
+    return false;
+}
+
+bool drive_diag_prepare(pmsm_t *motor)
+{
+    (void)motor;
+    return false;
+}
+
+bool drive_diag_step(pmsm_t *motor)
+{
+    (void)motor;
+    return false;
+}
+
+void drive_diag_on_stopped(pmsm_t *motor)
+{
+    (void)motor;
+}
+
+void drive_diag_on_fault(pmsm_t *motor)
+{
+    (void)motor;
+}
+
 void force_volt_mode(pmsm_t *motor)
 {
     (void)motor;

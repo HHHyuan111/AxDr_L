@@ -7,6 +7,7 @@
 #include "control_cycle.h"
 #include "debug_snapshot.h"
 #include "drive.h"
+#include "drive_diag.h"
 #include "drive_io.h"
 #include "drive_mode.h"
 #include "drive_pwm.h"

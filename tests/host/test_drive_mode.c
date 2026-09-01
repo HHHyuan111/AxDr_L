@@ -47,6 +47,8 @@ static bool foc_result_valid;
 static bool command_valid;
 static bool arguments_ok;
 
+static void log_event(mode_event_e event);
+
 static void reset_fakes(void)
 {
     last_event = EVENT_MIT;
@@ -63,6 +65,25 @@ bool drive_cmd_apply(pmsm_t *pm)
     (void)pm;
     command_apply_count++;
     return command_valid;
+}
+
+bool drive_diag_is_supported(const pmsm_t *pm)
+{
+    return (pm->mode.sys == calibrat_mode)
+        && (pm->mode.calibrat == iden_pm);
+}
+
+bool drive_diag_prepare(pmsm_t *pm)
+{
+    (void)pm;
+    return true;
+}
+
+bool drive_diag_step(pmsm_t *pm)
+{
+    (void)pm;
+    log_event(EVENT_IDENTIFICATION);
+    return true;
 }
 
 static void log_event(mode_event_e event)
@@ -310,6 +331,14 @@ static bool test_debug_modes(pmsm_t *pm)
            expect_true(commit_count == 0U, "无效 FOC 结果不能提交 PWM。");
 }
 
+static bool test_diagnostic_mode(pmsm_t *pm)
+{
+    pm->mode.sys = calibrat_mode;
+    pm->mode.calibrat = iden_pm;
+
+    return expect_dispatch(pm, EVENT_IDENTIFICATION, false);
+}
+
 static bool test_unimplemented_modes_do_nothing(pmsm_t *pm)
 {
     static const release_mode_e release_modes[] = {
@@ -323,7 +352,6 @@ static bool test_unimplemented_modes_do_nothing(pmsm_t *pm)
         rotor_enc_cali,
         output_enc_mod,
         output_enc_cali,
-        iden_pm,
         anticogging_pm
     };
     static const debug_mode_e debug_modes[] = {
@@ -432,14 +460,19 @@ int main(void)
         return 3;
     }
 
-    if (!test_unimplemented_modes_do_nothing(&pm))
+    if (!test_diagnostic_mode(&pm))
     {
         return 4;
     }
 
-    if (!test_unknown_system_mode_returns_failure(&pm))
+    if (!test_unimplemented_modes_do_nothing(&pm))
     {
         return 5;
+    }
+
+    if (!test_unknown_system_mode_returns_failure(&pm))
+    {
+        return 6;
     }
 
     return 0;

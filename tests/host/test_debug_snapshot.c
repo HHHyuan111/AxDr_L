@@ -51,6 +51,17 @@ static void fill_source(pmsm_t *motor)
     motor->fault.all = UINT32_C(0x00000125);
     motor->mode.sys = debug_mode;
     motor->mode.debug = pos_spd_curr_cl;
+    motor->diag.request = DIAG_REQUEST_START;
+    motor->diag.active_job = DIAG_JOB_CURRENT_SWEEP;
+    motor->diag.manager.state = MC_DIAG_RUNNING;
+    motor->diag.last_status = MC_BUSY;
+    motor->diag.active = true;
+    motor->diag.voltage_saturated = true;
+    motor->diag.command.id_ref_a = 0.4f;
+    motor->diag.command.iq_ref_a = 0.5f;
+    motor->diag.command.vd_ref_v = 0.6f;
+    motor->diag.command.vq_ref_v = 0.7f;
+    motor->diag.sweep.active_frequency_hz = 100.0f;
 
     motor->pwm_cmd.seq = motor->fast_seq;
     motor->pwm_cmd.valid = true;
@@ -112,6 +123,22 @@ static int expect_snapshot_fields(const pmsm_t *motor,
                       g_debug_snapshot.pwm_committed,
                       (uint32_t)(motor->pwm_commit.valid &&
                                  (motor->pwm_commit.seq == motor->fast_seq))) &&
+           expect_u32("diag_req", g_debug_snapshot.diag_req, motor->diag.request) &&
+           expect_u32("diag_job",
+                      g_debug_snapshot.diag_job,
+                      (uint32_t)motor->diag.active_job) &&
+           expect_u32("diag_state",
+                      g_debug_snapshot.diag_state,
+                      (uint32_t)motor->diag.manager.state) &&
+           expect_u32("diag_status",
+                      g_debug_snapshot.diag_status,
+                      (uint32_t)motor->diag.last_status) &&
+           expect_u32("diag_active",
+                      g_debug_snapshot.diag_active,
+                      (uint32_t)motor->diag.active) &&
+           expect_u32("diag_v_sat",
+                      g_debug_snapshot.diag_v_sat,
+                      (uint32_t)motor->diag.voltage_saturated) &&
            expect_float_bits("v_bus", g_debug_snapshot.v_bus, motor->foc.vbus) &&
            expect_float_bits("i_a", g_debug_snapshot.i_a, motor->foc.i_a) &&
            expect_float_bits("i_b", g_debug_snapshot.i_b, motor->foc.i_b) &&
@@ -128,6 +155,21 @@ static int expect_snapshot_fields(const pmsm_t *motor,
            expect_float_bits("i_q_fbk", g_debug_snapshot.i_q_fbk, motor->foc.i_q) &&
            expect_float_bits("v_d_cmd", g_debug_snapshot.v_d_cmd, motor->foc.v_d) &&
            expect_float_bits("v_q_cmd", g_debug_snapshot.v_q_cmd, motor->foc.v_q) &&
+           expect_float_bits("diag_id_ref",
+                             g_debug_snapshot.diag_id_ref,
+                             motor->diag.command.id_ref_a) &&
+           expect_float_bits("diag_iq_ref",
+                             g_debug_snapshot.diag_iq_ref,
+                             motor->diag.command.iq_ref_a) &&
+           expect_float_bits("diag_vd_ref",
+                             g_debug_snapshot.diag_vd_ref,
+                             motor->diag.command.vd_ref_v) &&
+           expect_float_bits("diag_vq_ref",
+                             g_debug_snapshot.diag_vq_ref,
+                             motor->diag.command.vq_ref_v) &&
+           expect_float_bits("diag_freq",
+                             g_debug_snapshot.diag_freq,
+                             motor->diag.sweep.active_frequency_hz) &&
            expect_float_bits("duty_a", g_debug_snapshot.duty_a, motor->foc.dtc_a) &&
            expect_float_bits("duty_b", g_debug_snapshot.duty_b, motor->foc.dtc_b) &&
            expect_float_bits("duty_c", g_debug_snapshot.duty_c, motor->foc.dtc_c) &&
@@ -201,7 +243,7 @@ int main(void)
     pmsm_t motor;
     uint32_t expected_seq;
 
-    _Static_assert(sizeof(debug_snapshot_t) == 144U, "调试快照布局发生了变化");
+    _Static_assert(sizeof(debug_snapshot_t) == 188U, "调试快照布局发生了变化");
 
     fill_source(&motor);
     debug_snapshot_publish(&motor);

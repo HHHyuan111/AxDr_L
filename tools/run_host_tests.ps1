@@ -16,6 +16,7 @@ $motorDir = Join-Path $repoRoot "firmware/AxDr_App/User/motor"
 $driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
 $focTestSource = Join-Path $testDir "test_foc_math.c"
 $driveModeTestSource = Join-Path $testDir "test_drive_mode.c"
+$driveDiagTestSource = Join-Path $testDir "test_drive_diag.c"
 $driveCommandTestSource = Join-Path $testDir "test_drive_command.c"
 $driveProtectionTestSource = Join-Path $testDir "test_drive_protection.c"
 $driveResetTestSource = Join-Path $testDir "test_drive_reset.c"
@@ -50,6 +51,7 @@ $controlPidSource = Join-Path $controlDir "control_pid.c"
 $speedSource = Join-Path $controlDir "control_speed.c"
 $utilSource = Join-Path $motorDir "util.c"
 $driveSource = Join-Path $driveDir "drive.c"
+$driveDiagSource = Join-Path $driveDir "drive_diag.c"
 $driveModeSource = Join-Path $driveDir "drive_mode.c"
 $driveCommandSource = Join-Path $driveDir "drive_command.c"
 $driveProtectionSource = Join-Path $driveDir "drive_protection.c"
@@ -58,6 +60,7 @@ $drivePwmSource = Join-Path $driveDir "drive_pwm.c"
 $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
 $focExecutablePath = Join-Path $outputDir "test_foc_math.exe"
 $driveModeExecutablePath = Join-Path $outputDir "test_drive_mode.exe"
+$driveDiagExecutablePath = Join-Path $outputDir "test_drive_diag.exe"
 $driveCommandExecutablePath = Join-Path $outputDir "test_drive_command.exe"
 $driveProtectionExecutablePath = Join-Path $outputDir "test_drive_protection.exe"
 $driveResetExecutablePath = Join-Path $outputDir "test_drive_reset.exe"
@@ -414,5 +417,28 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/Drive 状态测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" `
+        "-I$motorDir" "-I$driveDir" `
+        $driveDiagTestSource $driveDiagSource $focCoreSource `
+        $svmSource $transformSource `
+        -o $driveDiagExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host 诊断适配层测试编译失败，退出码：$compileExitCode"
+}
+
+& $driveDiagExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host 诊断适配层测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/诊断采样、FOC 与 PWM 适配测试通过。"
 
 & (Join-Path $PSScriptRoot "run_diagnostic_tests.ps1") -Compiler $Compiler

@@ -33,6 +33,14 @@ typedef struct
     uint32_t pwm_cmd_valid;
     uint32_t pwm_committed;
 
+    /* 诊断任务、状态、最近结果和本拍电压限幅标记。 */
+    uint32_t diag_req;
+    uint32_t diag_job;
+    uint32_t diag_state;
+    uint32_t diag_status;
+    uint32_t diag_active;
+    uint32_t diag_v_sat;
+
     /* 母线电压单位 V；三相电流单位 A；电角度单位 rad。 */
     float v_bus;
     float i_a;
@@ -56,6 +64,11 @@ typedef struct
     /* dq 轴电压指令单位 V；三相 duty 是范围通常为 [0, 1] 的候选比例。 */
     float v_d_cmd;
     float v_q_cmd;
+    float diag_id_ref;
+    float diag_iq_ref;
+    float diag_vd_ref;
+    float diag_vq_ref;
+    float diag_freq;
     float duty_a;
     float duty_b;
     float duty_c;

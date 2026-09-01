@@ -7,6 +7,7 @@
 
 #include "common.h"
 #include "drive_command.h"
+#include "drive_diag.h"
 #include "drive_pwm.h"
 
 bool drive_mode_is_supported(const pmsm_t *pm)
@@ -30,6 +31,8 @@ bool drive_mode_is_supported(const pmsm_t *pm)
                    (pm->mode.debug == pos_spd_curr_cl);
 
         case calibrat_mode:
+            return drive_diag_is_supported(pm);
+
         default:
             return false;
     }
@@ -45,6 +48,10 @@ bool drive_mode_prepare(pmsm_t *pm)
     if (pm->mode.sys == release_mode)
     {
         return drive_cmd_apply(pm);
+    }
+    if (pm->mode.sys == calibrat_mode)
+    {
+        return drive_diag_prepare(pm);
     }
 
     return true;
@@ -139,6 +146,8 @@ _RAM_FUNC bool drive_mode_step(pmsm_t *pm)
             }
 
         case calibrat_mode:
+            return drive_diag_step(pm);
+
         default:
             return false;
     }

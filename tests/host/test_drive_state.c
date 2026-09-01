@@ -58,6 +58,21 @@ static void test_reset_fakes(void)
     test_pwm_stop_result = true;
 }
 
+void drive_diag_poll_request(pmsm_t *pm)
+{
+    (void)pm;
+}
+
+void drive_diag_on_stopped(pmsm_t *pm)
+{
+    (void)pm;
+}
+
+void drive_diag_on_fault(pmsm_t *pm)
+{
+    (void)pm;
+}
+
 bool drive_mode_prepare(pmsm_t *pm)
 {
     (void)pm;

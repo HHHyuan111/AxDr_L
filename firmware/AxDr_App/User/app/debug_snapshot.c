@@ -48,6 +48,12 @@ _RAM_FUNC void debug_snapshot_publish(const pmsm_t *pm)
     g_debug_snapshot.pwm_committed =
         (uint32_t)(pm->pwm_commit.valid &&
                    (pm->pwm_commit.seq == pm->fast_seq));
+    g_debug_snapshot.diag_req = pm->diag.request;
+    g_debug_snapshot.diag_job = (uint32_t)pm->diag.active_job;
+    g_debug_snapshot.diag_state = (uint32_t)pm->diag.manager.state;
+    g_debug_snapshot.diag_status = (uint32_t)pm->diag.last_status;
+    g_debug_snapshot.diag_active = (uint32_t)pm->diag.active;
+    g_debug_snapshot.diag_v_sat = (uint32_t)pm->diag.voltage_saturated;
 
     g_debug_snapshot.v_bus = pm->foc.vbus;
     g_debug_snapshot.i_a = pm->foc.i_a;
@@ -68,6 +74,11 @@ _RAM_FUNC void debug_snapshot_publish(const pmsm_t *pm)
 
     g_debug_snapshot.v_d_cmd = pm->foc.v_d;
     g_debug_snapshot.v_q_cmd = pm->foc.v_q;
+    g_debug_snapshot.diag_id_ref = pm->diag.command.id_ref_a;
+    g_debug_snapshot.diag_iq_ref = pm->diag.command.iq_ref_a;
+    g_debug_snapshot.diag_vd_ref = pm->diag.command.vd_ref_v;
+    g_debug_snapshot.diag_vq_ref = pm->diag.command.vq_ref_v;
+    g_debug_snapshot.diag_freq = pm->diag.sweep.active_frequency_hz;
     g_debug_snapshot.duty_a = pm->foc.dtc_a;
     g_debug_snapshot.duty_b = pm->foc.dtc_b;
     g_debug_snapshot.duty_c = pm->foc.dtc_c;
