@@ -96,6 +96,46 @@ static void test_rs_requires_explicit_current_points(void)
     diag_runtime_confirm_stopped(&runtime, true);
 }
 
+static void start_abort_and_release(diag_runtime_t *runtime)
+{
+    mc_command_t command;
+
+    assert(diag_runtime_start(runtime, 24.0f, true) == MC_OK);
+    assert(runtime->active);
+    assert(diag_runtime_abort(runtime, &command) == MC_ABORTED);
+    assert(command.disable_request);
+    diag_runtime_confirm_stopped(runtime, true);
+    assert(!runtime->active);
+}
+
+static void test_all_active_job_routes(void)
+{
+    const diag_seed_t seed = make_pr60_seed();
+    diag_runtime_t runtime;
+
+    diag_runtime_init(&runtime, &seed);
+    set_test_limits(&runtime);
+    runtime.requested_job = DIAG_JOB_L_IDENT;
+    start_abort_and_release(&runtime);
+
+    diag_runtime_init(&runtime, &seed);
+    set_test_limits(&runtime);
+    runtime.profile.pole_pair.drive_current_a = 0.5f;
+    runtime.requested_job = DIAG_JOB_POLE_PAIR_IDENT;
+    start_abort_and_release(&runtime);
+
+    diag_runtime_init(&runtime, &seed);
+    set_test_limits(&runtime);
+    runtime.profile.encoder_align.align_current_a = 0.5f;
+    runtime.requested_job = DIAG_JOB_ENCODER_ALIGN;
+    start_abort_and_release(&runtime);
+
+    diag_runtime_init(&runtime, &seed);
+    set_test_limits(&runtime);
+    runtime.requested_job = DIAG_JOB_DEADTIME_TEST;
+    start_abort_and_release(&runtime);
+}
+
 static void test_project_pi_unit_conversion(void)
 {
     float kp_d;
@@ -127,6 +167,7 @@ int main(void)
     test_default_profile_cannot_start_power();
     test_sweep_start_abort_and_stop();
     test_rs_requires_explicit_current_points();
+    test_all_active_job_routes();
     test_project_pi_unit_conversion();
     puts("diagnostic runtime tests: PASS");
     return 0;

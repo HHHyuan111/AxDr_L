@@ -116,7 +116,7 @@ HJY 核心只看得到物理量和抽象命令，看不到 `pmsm_t`、HAL、TIM1
 | `theta_mech_rad` | `pm->foc.mp_r` | 已是机械角弧度，直接映射 |
 | `omega_mech_rad_s` | `pm->foc.wr_f` | 直接映射 |
 | `vbus_v` | `pm->foc.vbus` | 已是伏特，直接映射 |
-| `encoder_raw` | `pm->pos_box.raw_1` | MT6816 原始计数，满量程使用实际 CPR |
+| `encoder_raw` | `pm->pos_box.raw_1` | MA732 原始计数，满量程使用实际 CPR |
 | `vd_v/vq_v` | 上一拍实际控制命令 `pm->foc.v_d/v_q` | 用于 L 辨识，必须与当前样本时序对应 |
 | `fault_code` | `pm->fault.all` | 任一 Drive 故障立即终止辨识 |
 | `voltage_saturated` | 当前框架尚无正式字段 | 迁移时补一个明确的调制/电压限幅结果 |
@@ -264,7 +264,7 @@ IDLE
 改动：
 
 - 接入缓慢开环电角度旋转；
-- 使用 MT6816 原始计数做跨零解包；
+- 使用 MA732 原始计数做跨零解包；
 - 极对数确认后重新计算电角度，再做零位求解；
 - 不自动覆盖现有极对数和零位。
 

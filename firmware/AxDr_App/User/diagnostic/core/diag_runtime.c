@@ -69,6 +69,7 @@ static void diag_profile_init(diag_profile_t *profile,
 {
     memset(profile, 0, sizeof(*profile));
 
+    profile->control_period_s = seed->control_period_s;
     profile->phase_resistance_ohm = seed->phase_resistance_ohm;
     profile->pole_pairs = seed->pole_pairs;
     profile->encoder_full_scale = seed->encoder_full_scale;
@@ -140,7 +141,6 @@ void diag_runtime_init(diag_runtime_t *runtime,
 static bool diag_align_config_valid(const diag_runtime_t *runtime)
 {
     const diag_align_config_t *config = &runtime->profile.encoder_align;
-    const mc_pole_pair_ident_config_t *pole = &runtime->profile.pole_pair;
 
     return mc_float_is_finite(config->align_current_a)
         && mc_float_is_finite(config->ramp_duration_s)
@@ -158,7 +158,7 @@ static bool diag_align_config_valid(const diag_runtime_t *runtime)
             || (config->encoder_direction == -1))
         && (config->minimum_resultant_ratio >= 0.0f)
         && (config->minimum_resultant_ratio <= 1.0f)
-        && (pole->control_period_s > 0.0f)
+        && (runtime->profile.control_period_s > 0.0f)
         && (runtime->profile.encoder_full_scale > 1U)
         && (runtime->profile.pole_pairs > 0U);
 }
@@ -166,7 +166,7 @@ static bool diag_align_config_valid(const diag_runtime_t *runtime)
 static mc_status_t diag_align_start(diag_runtime_t *runtime)
 {
     diag_align_runtime_t *align = &runtime->encoder_align;
-    const float sample_time_s = runtime->profile.pole_pair.control_period_s;
+    const float sample_time_s = runtime->profile.control_period_s;
 
     if (!diag_align_config_valid(runtime))
     {
@@ -200,7 +200,7 @@ static mc_status_t diag_start_job(diag_runtime_t *runtime,
             runtime->command_primed = true;
             return mc_current_sweep_start(&runtime->sweep,
                                           &config,
-                                          runtime->profile.rs.control_period_s,
+                                          runtime->profile.control_period_s,
                                           &runtime->command);
         }
 

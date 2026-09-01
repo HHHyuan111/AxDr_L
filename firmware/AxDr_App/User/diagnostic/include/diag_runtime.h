@@ -88,6 +88,7 @@ typedef struct
  */
 typedef struct
 {
+    float control_period_s;
     float current_limit_a;
     float voltage_limit_v;
     float minimum_vbus_v;
