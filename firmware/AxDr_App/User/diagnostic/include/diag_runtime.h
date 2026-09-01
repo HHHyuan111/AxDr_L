@@ -129,7 +129,7 @@ typedef struct
  * request 和 requested_job 可由调试器在电机停止时写入；其余字段由快速周期
  * 独占写入。各算法上下文分开保存，便于完成后查看结果，不使用动态内存。
  */
-typedef struct
+typedef struct diag_runtime
 {
     volatile uint32_t request;
     volatile uint32_t requested_job;

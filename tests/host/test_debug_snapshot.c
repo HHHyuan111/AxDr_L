@@ -9,7 +9,11 @@
 #include <string.h>
 
 #include "common.h"
+#include "diag_runtime.h"
 #include "debug_snapshot.h"
+#include "drive_diag.h"
+
+diag_runtime_t g_diag;
 
 static int expect_u32(const char *name, uint32_t actual, uint32_t expected)
 {
@@ -43,6 +47,7 @@ static int expect_float_bits(const char *name, float actual, float expected)
 static void fill_source(pmsm_t *motor)
 {
     memset(motor, 0, sizeof(*motor));
+    memset(&g_diag, 0, sizeof(g_diag));
 
     motor->fast_seq = 41U;
     motor->req = DRIVE_REQ_START;
@@ -51,17 +56,17 @@ static void fill_source(pmsm_t *motor)
     motor->fault.all = UINT32_C(0x00000125);
     motor->mode.sys = debug_mode;
     motor->mode.debug = pos_spd_curr_cl;
-    motor->diag.request = DIAG_REQUEST_START;
-    motor->diag.active_job = DIAG_JOB_CURRENT_SWEEP;
-    motor->diag.manager.state = MC_DIAG_RUNNING;
-    motor->diag.last_status = MC_BUSY;
-    motor->diag.active = true;
-    motor->diag.voltage_saturated = true;
-    motor->diag.command.id_ref_a = 0.4f;
-    motor->diag.command.iq_ref_a = 0.5f;
-    motor->diag.command.vd_ref_v = 0.6f;
-    motor->diag.command.vq_ref_v = 0.7f;
-    motor->diag.sweep.active_frequency_hz = 100.0f;
+    g_diag.request = DIAG_REQUEST_START;
+    g_diag.active_job = DIAG_JOB_CURRENT_SWEEP;
+    g_diag.manager.state = MC_DIAG_RUNNING;
+    g_diag.last_status = MC_BUSY;
+    g_diag.active = true;
+    g_diag.voltage_saturated = true;
+    g_diag.command.id_ref_a = 0.4f;
+    g_diag.command.iq_ref_a = 0.5f;
+    g_diag.command.vd_ref_v = 0.6f;
+    g_diag.command.vq_ref_v = 0.7f;
+    g_diag.sweep.active_frequency_hz = 100.0f;
 
     motor->pwm_cmd.seq = motor->fast_seq;
     motor->pwm_cmd.valid = true;
@@ -123,22 +128,22 @@ static int expect_snapshot_fields(const pmsm_t *motor,
                       g_debug_snapshot.pwm_committed,
                       (uint32_t)(motor->pwm_commit.valid &&
                                  (motor->pwm_commit.seq == motor->fast_seq))) &&
-           expect_u32("diag_req", g_debug_snapshot.diag_req, motor->diag.request) &&
+           expect_u32("diag_req", g_debug_snapshot.diag_req, g_diag.request) &&
            expect_u32("diag_job",
                       g_debug_snapshot.diag_job,
-                      (uint32_t)motor->diag.active_job) &&
+                      (uint32_t)g_diag.active_job) &&
            expect_u32("diag_state",
                       g_debug_snapshot.diag_state,
-                      (uint32_t)motor->diag.manager.state) &&
+                      (uint32_t)g_diag.manager.state) &&
            expect_u32("diag_status",
                       g_debug_snapshot.diag_status,
-                      (uint32_t)motor->diag.last_status) &&
+                      (uint32_t)g_diag.last_status) &&
            expect_u32("diag_active",
                       g_debug_snapshot.diag_active,
-                      (uint32_t)motor->diag.active) &&
+                      (uint32_t)g_diag.active) &&
            expect_u32("diag_v_sat",
                       g_debug_snapshot.diag_v_sat,
-                      (uint32_t)motor->diag.voltage_saturated) &&
+                      (uint32_t)g_diag.voltage_saturated) &&
            expect_float_bits("v_bus", g_debug_snapshot.v_bus, motor->foc.vbus) &&
            expect_float_bits("i_a", g_debug_snapshot.i_a, motor->foc.i_a) &&
            expect_float_bits("i_b", g_debug_snapshot.i_b, motor->foc.i_b) &&
@@ -157,19 +162,19 @@ static int expect_snapshot_fields(const pmsm_t *motor,
            expect_float_bits("v_q_cmd", g_debug_snapshot.v_q_cmd, motor->foc.v_q) &&
            expect_float_bits("diag_id_ref",
                              g_debug_snapshot.diag_id_ref,
-                             motor->diag.command.id_ref_a) &&
+                             g_diag.command.id_ref_a) &&
            expect_float_bits("diag_iq_ref",
                              g_debug_snapshot.diag_iq_ref,
-                             motor->diag.command.iq_ref_a) &&
+                             g_diag.command.iq_ref_a) &&
            expect_float_bits("diag_vd_ref",
                              g_debug_snapshot.diag_vd_ref,
-                             motor->diag.command.vd_ref_v) &&
+                             g_diag.command.vd_ref_v) &&
            expect_float_bits("diag_vq_ref",
                              g_debug_snapshot.diag_vq_ref,
-                             motor->diag.command.vq_ref_v) &&
+                             g_diag.command.vq_ref_v) &&
            expect_float_bits("diag_freq",
                              g_debug_snapshot.diag_freq,
-                             motor->diag.sweep.active_frequency_hz) &&
+                             g_diag.sweep.active_frequency_hz) &&
            expect_float_bits("duty_a", g_debug_snapshot.duty_a, motor->foc.dtc_a) &&
            expect_float_bits("duty_b", g_debug_snapshot.duty_b, motor->foc.dtc_b) &&
            expect_float_bits("duty_c", g_debug_snapshot.duty_c, motor->foc.dtc_c) &&

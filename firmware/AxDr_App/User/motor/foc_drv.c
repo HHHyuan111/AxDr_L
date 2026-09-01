@@ -1,6 +1,7 @@
 #include "common.h"
 #include "control_filter.h"
 #include "control_loop.h"
+#include "drive_diag.h"
 #include "target_adc.h"
 
 /* 快速控制和电角度差分当前都按 20 kHz 执行。 */
@@ -278,29 +279,6 @@ void pmsm_lpf_init(void)
 }
 
 /**
- * @brief 使用当前电机和主编码器参数建立诊断算法初始配置。
- *
- * 激励电流和电压上限仍保持 0，必须在实物试验前明确填写后才能启动任务。
- */
-static void pmsm_diag_init(pmsm_t *motor)
-{
-    const enc_para_t *encoder = &motor->pos_box.ma732;
-    const diag_seed_t seed = {
-        .control_period_s = motor->period.foc_ts,
-        .phase_resistance_ohm = motor->para.Rs,
-        .d_axis_inductance_h = motor->para.Ld,
-        .q_axis_inductance_h = motor->para.Lq,
-        .flux_linkage_wb = motor->para.flux,
-        .pole_pairs = (uint32_t)motor->para.pn,
-        .encoder_full_scale = encoder->cpr,
-        .encoder_direction = (int8_t)encoder->dir,
-    };
-
-    diag_runtime_init(&motor->diag, &seed);
-    motor->diag.profile.minimum_vbus_v = motor->prot_cfg.under_voltage_v;
-}
-
-/**
 ***********************************************************************
 * @brief:      pmsm_init(void)
 * @param[in]:  void
@@ -335,7 +313,7 @@ void pmsm_init(void)
     control_pid_set_limits(&pm.pos_pi, 200.0f, -200.0f, 200.0f, -200.0f);
     
     encoder_init(&pm.pos_box);
-    pmsm_diag_init(&pm);
+    drive_diag_init(&pm);
 
     /* 辨识、标定、轨迹和无感观测器尚未进入正式运行链，上电时不初始化。 */
 

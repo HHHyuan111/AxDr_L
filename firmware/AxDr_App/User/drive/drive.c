@@ -125,7 +125,7 @@ static _RAM_FUNC void drive_stop_pwm(pmsm_t *pm)
 {
     if (!pm->pwm_active)
     {
-        drive_diag_on_stopped(pm);
+        drive_diag_on_stopped();
         return;
     }
 
@@ -135,7 +135,7 @@ static _RAM_FUNC void drive_stop_pwm(pmsm_t *pm)
     if (stopped)
     {
         pm->pwm_active = false;
-        drive_diag_on_stopped(pm);
+        drive_diag_on_stopped();
     }
     else
     {
@@ -264,7 +264,7 @@ _RAM_FUNC void drive_fast_step(pmsm_t *pm)
     /* 已锁存故障时，当前周期禁止执行 START 或 RUN。 */
     if (pm->fault.all > 0U)
     {
-        drive_diag_on_fault(pm);
+        drive_diag_on_fault();
         drive_stop_pwm(pm);
         pm->state = DRIVE_STATE_FAULT;
         pm->req = DRIVE_REQ_STOP;
@@ -276,7 +276,7 @@ _RAM_FUNC void drive_fast_step(pmsm_t *pm)
     if (pm->fault.all > 0U)
     {
         /* 故障在本周期末关闭输出；已关闭时不会重复调用停止接口。 */
-        drive_diag_on_fault(pm);
+        drive_diag_on_fault();
         drive_stop_pwm(pm);
         pm->state = DRIVE_STATE_FAULT;
         pm->req = DRIVE_REQ_STOP;

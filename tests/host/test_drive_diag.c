@@ -6,8 +6,10 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "common.h"
+#include "diag_runtime.h"
 #include "drive_diag.h"
 
 static mc_status_t fake_start_status;
@@ -25,6 +27,10 @@ static unsigned int stopped_count;
 
 static void reset_fakes(void)
 {
+    memset(&g_diag, 0, sizeof(g_diag));
+    g_diag.profile.current_limit_a = 2.0f;
+    g_diag.profile.voltage_limit_v = 5.0f;
+    g_diag.profile.encoder_full_scale = 16384U;
     fake_start_status = MC_OK;
     fake_step_status = MC_BUSY;
     fake_command = (mc_command_t){0};
@@ -37,6 +43,16 @@ static void reset_fakes(void)
     pwm_commit_count = 0U;
     abort_count = 0U;
     stopped_count = 0U;
+}
+
+void diag_runtime_init(diag_runtime_t *runtime, const diag_seed_t *seed)
+{
+    memset(runtime, 0, sizeof(*runtime));
+    runtime->profile.control_period_s = seed->control_period_s;
+    runtime->profile.phase_resistance_ohm = seed->phase_resistance_ohm;
+    runtime->profile.pole_pairs = seed->pole_pairs;
+    runtime->profile.encoder_full_scale = seed->encoder_full_scale;
+    runtime->profile.encoder_direction = seed->encoder_direction;
 }
 
 mc_status_t diag_runtime_start(diag_runtime_t *runtime,
@@ -139,21 +155,44 @@ static pmsm_t make_motor(void)
     pm.foc.vbus = 24.0f;
     pm.period.foc_ts = 0.00005f;
     pm.pos_box.raw_1 = 1234;
-    pm.diag.profile.current_limit_a = 2.0f;
-    pm.diag.profile.voltage_limit_v = 5.0f;
-    pm.diag.profile.encoder_full_scale = 16384U;
     return pm;
+}
+
+static bool test_init_builds_independent_profile(void)
+{
+    pmsm_t pm = make_motor();
+
+    reset_fakes();
+    pm.para.Rs = 0.16f;
+    pm.para.pn = 10;
+    pm.pos_box.ma732.cpr = 16384U;
+    pm.pos_box.ma732.dir = 1;
+    pm.prot_cfg.under_voltage_v = 15.0f;
+    drive_diag_init(&pm);
+
+    return expect_true(nearly_equal(g_diag.profile.control_period_s,
+                                    pm.period.foc_ts),
+                       "诊断对象应取得当前快速控制周期。")
+        && expect_true(nearly_equal(g_diag.profile.phase_resistance_ohm,
+                                    pm.para.Rs),
+                       "诊断对象应取得当前电机相电阻。")
+        && expect_true(g_diag.profile.pole_pairs == 10U,
+                       "诊断对象应取得当前电机极对数。")
+        && expect_true(g_diag.profile.encoder_full_scale == 16384U,
+                       "诊断对象应取得 MA732 满量程。")
+        && expect_true(nearly_equal(g_diag.profile.minimum_vbus_v, 15.0f),
+                       "诊断对象应复用 Drive 欠压门槛。");
 }
 
 static bool test_request_enters_diagnostic_mode(void)
 {
     pmsm_t pm = make_motor();
 
-    pm.diag.request = DIAG_REQUEST_START;
-    pm.diag.requested_job = DIAG_JOB_CURRENT_SWEEP;
+    g_diag.request = DIAG_REQUEST_START;
+    g_diag.requested_job = DIAG_JOB_CURRENT_SWEEP;
     drive_diag_poll_request(&pm);
 
-    return expect_true(pm.diag.request == DIAG_REQUEST_NONE,
+    return expect_true(g_diag.request == DIAG_REQUEST_NONE,
                        "诊断请求应在读取后清零。")
         && expect_true(pm.mode.sys == calibrat_mode,
                        "START 请求应选择标定系统模式。")
@@ -170,19 +209,19 @@ static bool test_prepare_uses_stopped_platform(void)
     reset_fakes();
     if (!expect_true(drive_diag_prepare(&pm),
                      "STOP 状态下应允许启动有效诊断任务。")
-        || !expect_true(pm.diag.active,
+        || !expect_true(g_diag.active,
                         "算法启动成功后应记录为活动任务。")
-        || !expect_true(nearly_equal(pm.diag.last_sample.vbus_v, 24.0f),
+        || !expect_true(nearly_equal(g_diag.last_sample.vbus_v, 24.0f),
                         "启动算法时应传入当前母线电压。"))
     {
         return false;
     }
 
-    pm.diag.active = false;
+    g_diag.active = false;
     fake_start_status = MC_INVALID_ARGUMENT;
     return expect_true(!drive_diag_prepare(&pm),
                        "算法参数无效时不得启动 PWM。")
-        && expect_true(pm.diag.last_status == MC_INVALID_ARGUMENT,
+        && expect_true(g_diag.last_status == MC_INVALID_ARGUMENT,
                        "启动失败原因应保留给调试器查看。");
 }
 
@@ -191,7 +230,7 @@ static bool test_current_command_uses_fresh_feedback(void)
     pmsm_t pm = make_motor();
 
     reset_fakes();
-    pm.diag.active = true;
+    g_diag.active = true;
     fake_command = (mc_command_t){
         .mode = MC_CONTROL_CURRENT,
         .id_ref_a = 0.2f,
@@ -230,7 +269,7 @@ static bool test_openloop_voltage_uses_command_angle(void)
     pmsm_t pm = make_motor();
 
     reset_fakes();
-    pm.diag.active = true;
+    g_diag.active = true;
     fake_command = (mc_command_t){
         .mode = MC_CONTROL_VOLTAGE,
         .vd_ref_v = 0.8f,
@@ -256,7 +295,7 @@ static bool test_finish_and_limit_return_to_stop(void)
     pmsm_t limited_pm = make_motor();
 
     reset_fakes();
-    done_pm.diag.active = true;
+    g_diag.active = true;
     fake_step_status = MC_DONE;
     if (!expect_true(!drive_diag_step(&done_pm),
                      "任务完成后本周期应停止继续输出。")
@@ -269,13 +308,13 @@ static bool test_finish_and_limit_return_to_stop(void)
     }
 
     reset_fakes();
-    limited_pm.diag.active = true;
+    g_diag.active = true;
     fake_command = (mc_command_t){
         .mode = MC_CONTROL_CURRENT,
         .id_ref_a = 0.2f,
         .enable_request = true,
     };
-    limited_pm.diag.profile.voltage_limit_v = 0.5f;
+    g_diag.profile.voltage_limit_v = 0.5f;
     return expect_true(!drive_diag_step(&limited_pm),
                        "FOC 输出超过诊断电压上限时必须停止。")
         && expect_true(abort_count == 1U,
@@ -289,8 +328,8 @@ static bool test_stop_and_fault_close_runtime(void)
     pmsm_t pm = make_motor();
 
     reset_fakes();
-    pm.diag.active = true;
-    pm.diag.request = DIAG_REQUEST_STOP;
+    g_diag.active = true;
+    g_diag.request = DIAG_REQUEST_STOP;
     drive_diag_poll_request(&pm);
     if (!expect_true(abort_count == 1U,
                      "显式 STOP 应中止活动算法。")
@@ -300,15 +339,15 @@ static bool test_stop_and_fault_close_runtime(void)
         return false;
     }
 
-    drive_diag_on_stopped(&pm);
+    drive_diag_on_stopped();
     if (!expect_true(stopped_count == 1U,
                      "PWM 关闭后应释放诊断任务。"))
     {
         return false;
     }
 
-    pm.diag.active = true;
-    drive_diag_on_fault(&pm);
+    g_diag.active = true;
+    drive_diag_on_fault();
     return expect_true(abort_count == 2U,
                        "Drive 故障应中止活动算法。")
         && expect_true(pm.req == DRIVE_REQ_STOP,
@@ -318,11 +357,12 @@ static bool test_stop_and_fault_close_runtime(void)
 int main(void)
 {
     reset_fakes();
-    if (!test_request_enters_diagnostic_mode()) return 1;
-    if (!test_prepare_uses_stopped_platform()) return 2;
-    if (!test_current_command_uses_fresh_feedback()) return 3;
-    if (!test_openloop_voltage_uses_command_angle()) return 4;
-    if (!test_finish_and_limit_return_to_stop()) return 5;
-    if (!test_stop_and_fault_close_runtime()) return 6;
+    if (!test_init_builds_independent_profile()) return 1;
+    if (!test_request_enters_diagnostic_mode()) return 2;
+    if (!test_prepare_uses_stopped_platform()) return 3;
+    if (!test_current_command_uses_fresh_feedback()) return 4;
+    if (!test_openloop_voltage_uses_command_angle()) return 5;
+    if (!test_finish_and_limit_return_to_stop()) return 6;
+    if (!test_stop_and_fault_close_runtime()) return 7;
     return 0;
 }

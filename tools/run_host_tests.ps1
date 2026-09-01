@@ -12,6 +12,7 @@ $appDir = Join-Path $repoRoot "firmware/AxDr_App/User/app"
 $bspIncludeDir = Join-Path $repoRoot "firmware/AxDr_App/User/bsp/inc"
 $commonDir = Join-Path $repoRoot "firmware/AxDr_App/User/common"
 $controlDir = Join-Path $repoRoot "firmware/AxDr_App/User/control"
+$diagnosticIncludeDir = Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic/include"
 $motorDir = Join-Path $repoRoot "firmware/AxDr_App/User/motor"
 $driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
 $focTestSource = Join-Path $testDir "test_foc_math.c"
@@ -183,7 +184,7 @@ Write-Host "Host C11/电压电流速度位置与 MIT 主链测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
-        "-I$motorDir" "-I$driveDir" `
+        "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $debugSnapshotTestSource $debugSnapshotSource `
         -o $debugSnapshotExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -421,7 +422,7 @@ Write-Host "Host C11/Drive 状态测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" `
-        "-I$motorDir" "-I$driveDir" `
+        "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $driveDiagTestSource $driveDiagSource $focCoreSource `
         $svmSource $transformSource `
         -o $driveDiagExecutablePath -lm 2>&1 |

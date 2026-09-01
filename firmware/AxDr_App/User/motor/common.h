@@ -15,7 +15,6 @@
 #include "control_speed.h"
 #include "drive_io.h"
 #include "drive_protection.h"
-#include "../diagnostic/include/diag_runtime.h"
 #include "main.h"
 #include "bsp.h"
 #include "motor_fwd.h"
@@ -1286,7 +1285,6 @@ struct pmsm
     pmsm_flag_t flag;
     drive_protection_config_t prot_cfg;
     drive_protection_state_t prot_state;
-    diag_runtime_t diag;
 
     pos_box_t pos_box;
 

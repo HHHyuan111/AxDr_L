@@ -71,14 +71,12 @@ bool drive_diag_step(pmsm_t *motor)
     return false;
 }
 
-void drive_diag_on_stopped(pmsm_t *motor)
+void drive_diag_on_stopped(void)
 {
-    (void)motor;
 }
 
-void drive_diag_on_fault(pmsm_t *motor)
+void drive_diag_on_fault(void)
 {
-    (void)motor;
 }
 
 void force_volt_mode(pmsm_t *motor)
