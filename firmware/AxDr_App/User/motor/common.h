@@ -1395,7 +1395,7 @@ void csp_pos_mode(pmsm_t* pm);
 void encoder_init(pos_box_t *pos_box);
 uint32_t read_mt6825_raw(void);
 bool read_mt6816_raw(enc_para_t *enc);
-uint32_t read_ma732_raw(void);
+bool read_ma732_raw(enc_para_t *enc);
 uint32_t read_dm485enc_raw(void);
 uint32_t send_mod_dm485enc(void);
 

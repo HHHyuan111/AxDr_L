@@ -1,24 +1,52 @@
 /**
  * @file encoder_feedback.c
- * @brief 正式单 MT6816 位置反馈所需的编码器适配。
+ * @brief 正式单 MA732/MT6816 位置反馈所需的编码器适配。
  */
 
 #include "common.h"
 #include "target_encoder.h"
 
 /**
- * @brief 初始化正式使用的 MT6816 参数。
+ * @brief 初始化正式使用的 MA732 和 MT6816 参数。
  *
  * @param[in,out] pos_box 位置反馈对象；写入位宽、每圈计数和弧度换算系数。
  */
 void encoder_init(pos_box_t *pos_box)
 {
+    pos_box->ma732.dir = 1;
+    pos_box->ma732.bit = 14U;
+    pos_box->ma732.cpr = 16384U;
+    pos_box->ma732.shift_bit = (uint8_t)log2f(
+        (float)pos_box->ma732.cpr / 256.0f);
+    pos_box->ma732.factor = M_2PI / (float)pos_box->ma732.cpr;
+
     pos_box->mt6816.dir = 1;
     pos_box->mt6816.bit = 14U;
     pos_box->mt6816.cpr = 16384U;
     pos_box->mt6816.shift_bit = (uint8_t)log2f(
         (float)pos_box->mt6816.cpr / 256.0f);
     pos_box->mt6816.factor = M_2PI / (float)pos_box->mt6816.cpr;
+}
+
+/**
+ * @brief 从 Target 层读取一帧新的 MA732 原始位置。
+ *
+ * @param[in,out] enc 编码器对象；成功时更新原始计数和新数据标志。
+ * @return SPI 读取成功返回 true，否则保持旧原始计数并返回 false。
+ */
+_RAM_FUNC bool read_ma732_raw(enc_para_t *enc)
+{
+    uint16_t raw_count;
+
+    if (!target_encoder_read_ma732_raw(&raw_count))
+    {
+        enc->rev_flag = 0U;
+        return false;
+    }
+
+    enc->raw = (int32_t)raw_count;
+    enc->rev_flag = 1U;
+    return true;
 }
 
 /**

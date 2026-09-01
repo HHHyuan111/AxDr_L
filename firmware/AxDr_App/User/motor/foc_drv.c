@@ -288,7 +288,7 @@ void pmsm_lpf_init(void)
 void pmsm_init(void)
 {
     memset(&pm, 0, sizeof(pm));
-    pmsm_2312s_init();
+    pmsm_pr60_init();
 
     pmsm_board_init();
     pmsm_peroid_init();
@@ -321,7 +321,7 @@ void pmsm_init(void)
     pm.pwm_active = false;
 
     pm.pos_box.pos_mode = Sensorsory_s;
-    pm.pos_box.sensory1 = MT6816;
+    pm.pos_box.sensory1 = MA732;
 
     /* 默认使用零电流闭环调试；切换模式前仍需显式发送 START 请求。 */
     pm.mode.sys = debug_mode;

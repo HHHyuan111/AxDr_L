@@ -69,17 +69,25 @@ _RAM_FUNC uint32_t read_mt6825_raw(void)
     return raw;
 }
 
-_RAM_FUNC uint32_t read_ma732_raw(void)
+/**
+ * @brief 读取一次 MA732 原始位置并保存到指定编码器对象。
+ *
+ * @param[in,out] enc 接收本次 14 位原始计数和新数据标志。
+ * @return SPI 读取成功返回 true，否则返回 false。
+ */
+_RAM_FUNC bool read_ma732_raw(enc_para_t *enc)
 {
-    uint16_t tx[2] = {0x0000};
-    uint16_t rx[2] = {0x0000};
-    cs_down;
-    spi_transmit_receive_sync(&hspi1, tx[0], rx, 200);
-    //	HAL_SPI_TransmitReceive(&hspi1, (uint8_t*)&tx_data, (uint8_t*)&rx_data, 1, 1000);
-    cs_up;
-    pm.pos_box.ma732.rev_flag = 1;
-    pm.pos_box.ma732.raw = (rx[0] >> 2);
-    return 0;
+    uint16_t raw_count;
+
+    if (!target_encoder_read_ma732_raw(&raw_count))
+    {
+        enc->rev_flag = 0U;
+        return false;
+    }
+
+    enc->rev_flag = 1U;
+    enc->raw = raw_count;
+    return true;
 }
 
 /**
