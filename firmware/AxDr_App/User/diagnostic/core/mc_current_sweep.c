@@ -3,16 +3,17 @@
 #include <math.h>
 #include <string.h>
 
-#define MC_SWEEP_MIN_HZ        (20.0f)
-#define MC_SWEEP_MAX_HZ        (2000.0f)
 #define MC_SWEEP_RAD_TO_DEG    (57.295779513082320876f)
 
 static float mc_sweep_frequency(const mc_current_sweep_t *sweep, uint32_t index)
 {
-    if (sweep->config.single_point || sweep->config.requested_points <= 1u)
-        return mc_clampf(sweep->config.single_frequency_hz, MC_SWEEP_MIN_HZ, MC_SWEEP_MAX_HZ);
+    if (sweep->config.single_point || sweep->config.requested_points <= 1U)
+    {
+        return sweep->config.single_frequency_hz;
+    }
+
     return sweep->config.start_frequency_hz * expf(
-        ((float)index / (float)(sweep->config.requested_points - 1u)) *
+        ((float)index / (float)(sweep->config.requested_points - 1U)) *
         logf(sweep->config.end_frequency_hz / sweep->config.start_frequency_hz));
 }
 
@@ -38,10 +39,6 @@ static void mc_sweep_prepare_point(mc_current_sweep_t *sweep)
     uint32_t measure_time;
 
     sweep->active_frequency_hz = mc_sweep_frequency(sweep, sweep->point_index);
-    if (sweep->active_frequency_hz >= 100.0f && sweep->active_frequency_hz <= 350.0f) {
-        if (settle_min < 0.40f) settle_min = 0.40f;
-        if (measure_min < 0.50f) measure_min = 0.50f;
-    }
     settle_cycles = (uint32_t)((float)sweep->config.settle_cycles * fs /
                                sweep->active_frequency_hz + 0.5f);
     settle_time = (uint32_t)(settle_min * fs + 0.5f);
@@ -51,15 +48,26 @@ static void mc_sweep_prepare_point(mc_current_sweep_t *sweep)
     sweep->settle_ticks = settle_cycles > settle_time ? settle_cycles : settle_time;
     sweep->measure_ticks = measure_cycles > measure_time ? measure_cycles : measure_time;
     if (sweep->measure_ticks < sweep->config.minimum_measure_samples)
+    {
         sweep->measure_ticks = sweep->config.minimum_measure_samples;
-    if (sweep->active_frequency_hz >= 100.0f && sweep->active_frequency_hz <= 350.0f) {
-        uint32_t whole_cycles = (uint32_t)ceilf((float)sweep->measure_ticks *
-                                                sweep->active_frequency_hz / fs);
-        sweep->measure_ticks = (uint32_t)((float)whole_cycles * fs /
-                                          sweep->active_frequency_hz + 0.5f);
     }
-    if (sweep->settle_ticks == 0u) sweep->settle_ticks = 1u;
-    if (sweep->measure_ticks < 8u) sweep->measure_ticks = 8u;
+
+    /* 对所有频点按完整周期测量，避免直流偏置和频谱泄漏影响幅相结果。 */
+    {
+        const uint32_t whole_cycles = (uint32_t)ceilf(
+            (float)sweep->measure_ticks * sweep->active_frequency_hz / fs);
+
+        sweep->measure_ticks = (uint32_t)(
+            (float)whole_cycles * fs / sweep->active_frequency_hz + 0.5f);
+    }
+    if (sweep->settle_ticks == 0U)
+    {
+        sweep->settle_ticks = 1U;
+    }
+    if (sweep->measure_ticks < 8U)
+    {
+        sweep->measure_ticks = 8U;
+    }
     sweep->phase_rad = 0.0f;
     sweep->tick = 0u;
     sweep->sum_y_sin = 0.0;
@@ -146,7 +154,8 @@ void mc_current_sweep_default_config(mc_current_sweep_config_t *config)
     config->minimum_settle_time_s = 0.20f;
     config->minimum_measure_time_s = 0.20f;
     config->minimum_measure_samples = 4000u;
-    config->feedback_filter_alpha = 0.65f;
+    /* 通用算法不假设反馈通道存在固定低通滤波器。 */
+    config->feedback_filter_alpha = 0.0f;
     config->reject_saturated_points = true;
 }
 
@@ -169,11 +178,9 @@ mc_status_t mc_current_sweep_start(mc_current_sweep_t *sweep,
         config->safe_current_limit_a <= 0.0f ||
         fabsf(config->offset_a) + fabsf(config->amplitude_a) >
             config->safe_current_limit_a ||
-        config->start_frequency_hz < MC_SWEEP_MIN_HZ ||
-        config->end_frequency_hz > MC_SWEEP_MAX_HZ ||
+        config->start_frequency_hz <= 0.0f ||
         config->end_frequency_hz < config->start_frequency_hz ||
-        config->single_frequency_hz < MC_SWEEP_MIN_HZ ||
-        config->single_frequency_hz > MC_SWEEP_MAX_HZ ||
+        config->single_frequency_hz <= 0.0f ||
         config->minimum_settle_time_s < 0.0f ||
         config->minimum_measure_time_s < 0.0f ||
         config->feedback_filter_alpha < 0.0f ||
@@ -274,7 +281,5 @@ mc_status_t mc_current_sweep_abort(mc_current_sweep_t *sweep,
     sweep->status = MC_ABORTED;
     return MC_ABORTED;
 }
-
-
 
 

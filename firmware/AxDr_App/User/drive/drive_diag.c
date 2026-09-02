@@ -14,6 +14,7 @@
 #include "diag_runtime.h"
 #include "drive_pwm.h"
 #include "foc_core.h"
+#include "motor_drive_config.h"
 
 diag_runtime_t g_diag;
 
@@ -32,6 +33,8 @@ void drive_diag_init(const pmsm_t *pm)
     };
 
     diag_runtime_init(&g_diag, &seed);
+    g_diag.profile.current_limit_a = DRIVE_DIAG_CURRENT_LIMIT_A;
+    g_diag.profile.voltage_limit_v = DRIVE_DIAG_VOLTAGE_LIMIT_V;
     g_diag.profile.minimum_vbus_v = pm->prot_cfg.under_voltage_v;
 }
 

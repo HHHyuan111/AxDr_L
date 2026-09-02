@@ -4,6 +4,7 @@
  */
 
 #include "common.h"
+#include "motor_drive_config.h"
 #include "target_encoder.h"
 
 /**
@@ -13,16 +14,16 @@
  */
 void encoder_init(pos_box_t *pos_box)
 {
-    pos_box->ma732.dir = 1;
-    pos_box->ma732.bit = 14U;
-    pos_box->ma732.cpr = 16384U;
+    pos_box->ma732.dir = MA732_DIRECTION;
+    pos_box->ma732.bit = MA732_RESOLUTION_BITS;
+    pos_box->ma732.cpr = MA732_COUNTS_PER_REV;
     pos_box->ma732.shift_bit = (uint8_t)log2f(
         (float)pos_box->ma732.cpr / 256.0f);
     pos_box->ma732.factor = M_2PI / (float)pos_box->ma732.cpr;
 
-    pos_box->mt6816.dir = 1;
-    pos_box->mt6816.bit = 14U;
-    pos_box->mt6816.cpr = 16384U;
+    pos_box->mt6816.dir = MT6816_DIRECTION;
+    pos_box->mt6816.bit = MT6816_RESOLUTION_BITS;
+    pos_box->mt6816.cpr = MT6816_COUNTS_PER_REV;
     pos_box->mt6816.shift_bit = (uint8_t)log2f(
         (float)pos_box->mt6816.cpr / 256.0f);
     pos_box->mt6816.factor = M_2PI / (float)pos_box->mt6816.cpr;

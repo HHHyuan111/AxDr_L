@@ -2,10 +2,8 @@
 #include "control_filter.h"
 #include "control_loop.h"
 #include "drive_diag.h"
+#include "motor_drive_config.h"
 #include "target_adc.h"
-
-/* 快速控制和电角度差分当前都按 20 kHz 执行。 */
-#define FOC_FS_HZ (20000.0f)
 
 _RAM_DATA pmsm_t pm;
 
@@ -20,14 +18,14 @@ _RAM_DATA pmsm_t pm;
 **/
 void pmsm_board_init(void)
 {
-    pm.board.v_ref = 3.3f;
-    pm.board.v_adc = 4096.0f;
+    pm.board.v_ref = DRIVE_ADC_REFERENCE_V;
+    pm.board.v_adc = DRIVE_ADC_FULL_SCALE_COUNT;
 
-    pm.board.i_res = 0.001f;
-    pm.board.i_op = 20.0f;
+    pm.board.i_res = DRIVE_CURRENT_SHUNT_OHM;
+    pm.board.i_op = DRIVE_CURRENT_AMP_GAIN;
 
-    pm.board.v1_res = 20000.0f; //
-    pm.board.v2_res = 1000.0f;
+    pm.board.v1_res = DRIVE_VBUS_DIVIDER_HIGH_OHM;
+    pm.board.v2_res = DRIVE_VBUS_DIVIDER_LOW_OHM;
 
     pm.board.v_op = (pm.board.v1_res + pm.board.v2_res) / pm.board.v2_res;
     pm.board.i_ratio = pm.board.v_ref / pm.board.v_adc / pm.board.i_res / pm.board.i_op;
@@ -36,17 +34,17 @@ void pmsm_board_init(void)
     pm.board.i_max = pm.board.v_adc * pm.board.i_ratio * 0.5f;
     pm.board.v_max = pm.board.v_adc * pm.board.v_ratio;
 
-    pm.board.Rt_Mos = 10000.0f;
-    pm.board.Rt_Mos_res = 10000.0f;
-    pm.board.Rt_Mos_Ka = 273.15f;
-    pm.board.Rt_Mos_B = 3950.0f;
+    pm.board.Rt_Mos = DRIVE_NTC_NOMINAL_OHM;
+    pm.board.Rt_Mos_res = DRIVE_NTC_DIVIDER_OHM;
+    pm.board.Rt_Mos_Ka = DRIVE_NTC_ZERO_CELSIUS_K;
+    pm.board.Rt_Mos_B = DRIVE_NTC_BETA_K;
 
-    pm.board.Rt_rotor = 10000.0f;
-    pm.board.Rt_rotor_res = 10000.0f;
-    pm.board.Rt_rotor_Ka = 273.15f;
-    pm.board.Rt_rotor_B = 3950.0f;
+    pm.board.Rt_rotor = DRIVE_NTC_NOMINAL_OHM;
+    pm.board.Rt_rotor_res = DRIVE_NTC_DIVIDER_OHM;
+    pm.board.Rt_rotor_Ka = DRIVE_NTC_ZERO_CELSIUS_K;
+    pm.board.Rt_rotor_B = DRIVE_NTC_BETA_K;
 
-    pm.board.dead_time = 0.5f; //us
+    pm.board.dead_time = DRIVE_HARDWARE_DEADTIME_US;
 }
 
 /**
@@ -62,11 +60,11 @@ void pmsm_protect_init(void)
     const uint32_t delayed_trip_samples = (uint32_t)(0.1f * pm.period.foc_fs);
 
     pm.prot_cfg = (drive_protection_config_t){
-        .under_voltage_v = 15.0f,
-        .over_voltage_v = 60.0f,
-        .over_current_a = 80.0f,
-        .mos_over_temperature_c = 100.0f,
-        .coil_over_temperature_c = 100.0f,
+        .under_voltage_v = DRIVE_UNDER_VOLTAGE_V,
+        .over_voltage_v = DRIVE_OVER_VOLTAGE_V,
+        .over_current_a = DRIVE_OVER_CURRENT_A,
+        .mos_over_temperature_c = DRIVE_MOS_OVER_TEMPERATURE_C,
+        .coil_over_temperature_c = DRIVE_COIL_OVER_TEMPERATURE_C,
         .over_speed_rad_s = pm.para.peak_speed * pm.para.Gr,
         .under_voltage_samples = 1U,
         .over_voltage_samples = 1U,
@@ -87,33 +85,33 @@ void pmsm_protect_init(void)
 * @brief:      pmsm_pr60_init(void)
 * @param[in]:  void
 * @retval:     void
-* @details:    PMSM 4310 电机参数初始化，包括极对数、电阻、电感、磁链、转动惯量等参数的设置
+* @details:    PR60 电机参数初始化，包括极对数、电阻、电感、磁链和转动惯量
 ***********************************************************************
 **/
 void pmsm_pr60_init(void)
 {
-    pm.para.rated_voltage = 24.0f;
-    pm.para.rated_current = 0.0f;
-    pm.para.rated_speed   = 3000.0f/9.55f;
-    pm.para.rated_torque  = 0.8f;
-    pm.para.rated_power   = 0.0f;
-    pm.para.peak_current  = 0.0f;
-    pm.para.peak_torque   = 2.0f;
-    pm.para.peak_speed    = 3000.0f/9.55f;
+    pm.para.rated_voltage = PR60_RATED_VOLTAGE_V;
+    pm.para.rated_current = PR60_RATED_CURRENT_A;
+    pm.para.rated_speed = PR60_RATED_SPEED_RAD_S;
+    pm.para.rated_torque = PR60_RATED_TORQUE_NM;
+    pm.para.rated_power = PR60_RATED_POWER_W;
+    pm.para.peak_current = PR60_PEAK_CURRENT_A;
+    pm.para.peak_torque = PR60_PEAK_TORQUE_NM;
+    pm.para.peak_speed = PR60_PEAK_SPEED_RAD_S;
 
-    pm.para.pn = 10;
-    pm.para.Rs = 0.162977806f;
-    pm.para.Ld = 0.000108778855f;
-    pm.para.Lq = 0.000112416135f;
-    pm.para.Ls = 0.000110597495f;
-    pm.para.Ldif = 3.63728032e-06f;
-    pm.para.flux = 0.00498822471f;
-    pm.para.B  = 0.000188353f;
-    pm.para.Js = 7.32527915e-05f;
+    pm.para.pn = PR60_POLE_PAIRS;
+    pm.para.Rs = PR60_PHASE_RESISTANCE_OHM;
+    pm.para.Ld = PR60_D_AXIS_INDUCTANCE_H;
+    pm.para.Lq = PR60_Q_AXIS_INDUCTANCE_H;
+    pm.para.Ls = PR60_AVERAGE_INDUCTANCE_H;
+    pm.para.Ldif = PR60_DIFFERENTIAL_INDUCTANCE_H;
+    pm.para.flux = PR60_FLUX_LINKAGE_WB;
+    pm.para.B = PR60_VISCOUS_FRICTION_NM_S;
+    pm.para.Js = PR60_INERTIA_KG_M2;
 
-    pm.para.Gr = 1.0f;
-    pm.para.ibw = 500.0f;
-    pm.para.delta = 4.0f;
+    pm.para.Gr = PR60_GEAR_RATIO;
+    pm.para.ibw = PR60_CURRENT_BANDWIDTH_RAD_S;
+    pm.para.delta = PR60_DAMPING_RATIO;
 
     pm.para.div_pn = 1.0f / pm.para.pn;
     pm.para.pnd_2pi = pm.para.pn / M_2PI;
@@ -123,20 +121,22 @@ void pmsm_pr60_init(void)
     pm.para.Kt = 1.5f * pm.para.pn * pm.para.flux;
     pm.para.div_Kt = 1.0f / pm.para.Kt;
 
-    pm.ctrl.wm_acc = 20.0f;
-    pm.ctrl.wm_dec = 20.0f;
+    pm.ctrl.wm_acc = PR60_ACCELERATION_RAD_S2;
+    pm.ctrl.wm_dec = PR60_DECELERATION_RAD_S2;
 
-    pm.para.phase_order = ABC_PHASE;
-    pm.para.e_off = 1.33748674f;
-    pm.para.r_off = -0.494569868f;
-    pm.para.m_off = 0.0f;
+    pm.para.phase_order = PR60_PHASE_ORDER;
+    pm.para.e_off = PR60_ELECTRICAL_OFFSET_RAD;
+    pm.para.r_off = PR60_ROTOR_OFFSET_RAD;
+    pm.para.m_off = PR60_MECHANICAL_OFFSET_RAD;
 
-    pm.app_ctrl.pmax_torm =  pm.para.peak_torque*0.8f;
-    pm.app_ctrl.nmax_torm = -1.0f*pm.para.peak_torque*0.8f;
-    pm.app_ctrl.pmax_velm =  pm.para.peak_speed*0.8f;
-    pm.app_ctrl.nmax_velm = -1.0f*pm.para.peak_speed*0.8f;
-    pm.app_ctrl.pmax_posm =  20000.0f;
-    pm.app_ctrl.nmax_posm = -1.0f*20000.0f;
+    pm.app_ctrl.pmax_torm =
+        pm.para.peak_torque * MOTOR_COMMAND_USAGE_RATIO;
+    pm.app_ctrl.nmax_torm = -pm.app_ctrl.pmax_torm;
+    pm.app_ctrl.pmax_velm =
+        pm.para.peak_speed * MOTOR_COMMAND_USAGE_RATIO;
+    pm.app_ctrl.nmax_velm = -pm.app_ctrl.pmax_velm;
+    pm.app_ctrl.pmax_posm = MOTOR_MAX_POSITION_RAD;
+    pm.app_ctrl.nmax_posm = -MOTOR_MAX_POSITION_RAD;
 
     pm.ctrl.pmax_tor =  pm.app_ctrl.pmax_torm*pm.para.div_Gr;
     pm.ctrl.nmax_tor =  pm.app_ctrl.nmax_torm*pm.para.div_Gr;
@@ -151,28 +151,28 @@ void pmsm_pr60_init(void)
 
 void pmsm_2312s_init(void)
 {
-	pm.para.rated_voltage = 24.0f;
-    pm.para.rated_current = 0.0f;
-    pm.para.rated_speed   = 10000.0f/9.55f;
-    pm.para.rated_torque  = 0.8f;
-    pm.para.rated_power   = 0.0f;
-    pm.para.peak_current  = 0.0f;
-    pm.para.peak_torque   = 2.0f;
-    pm.para.peak_speed    = 10000.0f/9.55f;
-	
-    pm.para.pn = 7;
-    pm.para.Rs = 0.108945489f;
-    pm.para.Ld = 1.97248246e-05f;
-    pm.para.Lq = 2.02818483e-05f;
-    pm.para.Ls = 2.00033355e-07f;
-    pm.para.Ldif = 5.57023668e-07f;
-    pm.para.flux = 0.000884152076f;
-    pm.para.B  = 0.000188353f;
-    pm.para.Js = 2.19904655e-06f;
+    pm.para.rated_voltage = MOTOR_2312S_RATED_VOLTAGE_V;
+    pm.para.rated_current = MOTOR_2312S_RATED_CURRENT_A;
+    pm.para.rated_speed = MOTOR_2312S_RATED_SPEED_RAD_S;
+    pm.para.rated_torque = MOTOR_2312S_RATED_TORQUE_NM;
+    pm.para.rated_power = MOTOR_2312S_RATED_POWER_W;
+    pm.para.peak_current = MOTOR_2312S_PEAK_CURRENT_A;
+    pm.para.peak_torque = MOTOR_2312S_PEAK_TORQUE_NM;
+    pm.para.peak_speed = MOTOR_2312S_PEAK_SPEED_RAD_S;
 
-    pm.para.Gr = 1.0f;
-    pm.para.ibw = 500.0f;
-    pm.para.delta = 4.0f;
+    pm.para.pn = MOTOR_2312S_POLE_PAIRS;
+    pm.para.Rs = MOTOR_2312S_PHASE_RESISTANCE_OHM;
+    pm.para.Ld = MOTOR_2312S_D_AXIS_INDUCTANCE_H;
+    pm.para.Lq = MOTOR_2312S_Q_AXIS_INDUCTANCE_H;
+    pm.para.Ls = MOTOR_2312S_AVERAGE_INDUCTANCE_H;
+    pm.para.Ldif = MOTOR_2312S_DIFFERENTIAL_INDUCTANCE_H;
+    pm.para.flux = MOTOR_2312S_FLUX_LINKAGE_WB;
+    pm.para.B = MOTOR_2312S_VISCOUS_FRICTION_NM_S;
+    pm.para.Js = MOTOR_2312S_INERTIA_KG_M2;
+
+    pm.para.Gr = MOTOR_2312S_GEAR_RATIO;
+    pm.para.ibw = MOTOR_2312S_CURRENT_BANDWIDTH_RAD_S;
+    pm.para.delta = MOTOR_2312S_DAMPING_RATIO;
 
     pm.para.div_pn = 1.0f / pm.para.pn;
     pm.para.pnd_2pi = pm.para.pn / M_2PI;
@@ -182,20 +182,22 @@ void pmsm_2312s_init(void)
     pm.para.Kt = 1.5f * pm.para.pn * pm.para.flux;
     pm.para.div_Kt = 1.0f / pm.para.Kt;
 
-    pm.ctrl.wm_acc = 200.0f;
-    pm.ctrl.wm_dec = 200.0f;
+    pm.ctrl.wm_acc = MOTOR_2312S_ACCELERATION_RAD_S2;
+    pm.ctrl.wm_dec = MOTOR_2312S_DECELERATION_RAD_S2;
 
-    pm.para.phase_order = ACB_PHASE;
-    pm.para.e_off = 2.34354496f;
-    pm.para.r_off = 2.12998796f;
-    pm.para.m_off = 0.0f;
-	
-	pm.app_ctrl.pmax_torm =  pm.para.peak_torque*0.8f;
-    pm.app_ctrl.nmax_torm = -1.0f*pm.para.peak_torque*0.8f;
-    pm.app_ctrl.pmax_velm =  pm.para.peak_speed*0.8f;
-    pm.app_ctrl.nmax_velm = -1.0f*pm.para.peak_speed*0.8f;
-    pm.app_ctrl.pmax_posm =  20000.0f;
-    pm.app_ctrl.nmax_posm = -1.0f*20000.0f;
+    pm.para.phase_order = MOTOR_2312S_PHASE_ORDER;
+    pm.para.e_off = MOTOR_2312S_ELECTRICAL_OFFSET_RAD;
+    pm.para.r_off = MOTOR_2312S_ROTOR_OFFSET_RAD;
+    pm.para.m_off = MOTOR_2312S_MECHANICAL_OFFSET_RAD;
+
+    pm.app_ctrl.pmax_torm =
+        pm.para.peak_torque * MOTOR_COMMAND_USAGE_RATIO;
+    pm.app_ctrl.nmax_torm = -pm.app_ctrl.pmax_torm;
+    pm.app_ctrl.pmax_velm =
+        pm.para.peak_speed * MOTOR_COMMAND_USAGE_RATIO;
+    pm.app_ctrl.nmax_velm = -pm.app_ctrl.pmax_velm;
+    pm.app_ctrl.pmax_posm = MOTOR_MAX_POSITION_RAD;
+    pm.app_ctrl.nmax_posm = -MOTOR_MAX_POSITION_RAD;
 
     pm.ctrl.pmax_tor =  pm.app_ctrl.pmax_torm*pm.para.div_Gr;
     pm.ctrl.nmax_tor =  pm.app_ctrl.nmax_torm*pm.para.div_Gr;
@@ -218,23 +220,23 @@ void pmsm_2312s_init(void)
 **/
 void pmsm_peroid_init(void)
 {
-    pm.period.foc_fs = FOC_FS_HZ;
-    pm.period.foc_ts = 0.00005f;
+    pm.period.foc_fs = DRIVE_FOC_FREQ_HZ;
+    pm.period.foc_ts = 1.0f / pm.period.foc_fs;
 
-    pm.period.cur_pid_fs = 20000.0f;
-    pm.period.cur_pid_ts = 1.0f/pm.period.cur_pid_fs;
+    pm.period.cur_pid_fs = DRIVE_CURRENT_LOOP_FREQ_HZ;
+    pm.period.cur_pid_ts = 1.0f / pm.period.cur_pid_fs;
     pm.period.cur_pid_cnt_val = pm.period.foc_fs * pm.period.cur_pid_ts;
 
-    pm.period.spd_pid_fs = 10000.0f;
-    pm.period.spd_pid_ts = 1.0f/pm.period.spd_pid_fs;
+    pm.period.spd_pid_fs = DRIVE_SPEED_LOOP_FREQ_HZ;
+    pm.period.spd_pid_ts = 1.0f / pm.period.spd_pid_fs;
     pm.period.spd_pid_cnt_val = pm.period.foc_fs * pm.period.spd_pid_ts;
 
-    pm.period.pos_pid_fs = 5000.0f;
-    pm.period.pos_pid_ts = 1.0f/pm.period.pos_pid_fs;
+    pm.period.pos_pid_fs = DRIVE_POSITION_LOOP_FREQ_HZ;
+    pm.period.pos_pid_ts = 1.0f / pm.period.pos_pid_fs;
     pm.period.pos_pid_cnt_val = pm.period.foc_fs * pm.period.pos_pid_ts;
 
-    pm.period.spd_mea_fs = 1000.0f;
-    pm.period.spd_mea_ts = 0.001f;
+    pm.period.spd_mea_fs = DRIVE_SPEED_MEASURE_FREQ_HZ;
+    pm.period.spd_mea_ts = 1.0f / pm.period.spd_mea_fs;
     pm.period.spd_mea_cnt_val = pm.period.foc_fs * pm.period.spd_mea_ts;
 }
 
@@ -248,25 +250,25 @@ void pmsm_peroid_init(void)
 **/
 void pmsm_lpf_init(void)
 {
-    pm.id_lpf.fc = 200.0f; // Hz
-    pm.id_lpf.fs = 20000.0f;
-    pm.iq_lpf.fc = 200.0f; // Hz
-    pm.iq_lpf.fs = 20000.0f;
-    pm.vd_lpf.fc = 200.0f; // Hz
-    pm.vd_lpf.fs = 20000.0f;
-    pm.vq_lpf.fc = 200.0f; // Hz
-    pm.vq_lpf.fs = 20000.0f;
+    pm.id_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.id_lpf.fs = DRIVE_FOC_FREQ_HZ;
+    pm.iq_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.iq_lpf.fs = DRIVE_FOC_FREQ_HZ;
+    pm.vd_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.vd_lpf.fs = DRIVE_FOC_FREQ_HZ;
+    pm.vq_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.vq_lpf.fs = DRIVE_FOC_FREQ_HZ;
 
-    pm.ibus_lpf.fc = 200.0f; // Hz
-    pm.ibus_lpf.fs = 20000.0f; // Hz
-    pm.vbus_lpf.fc = 200.0f;
-    pm.vbus_lpf.fs = 20000.0f;
+    pm.ibus_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.ibus_lpf.fs = DRIVE_FOC_FREQ_HZ;
+    pm.vbus_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.vbus_lpf.fs = DRIVE_FOC_FREQ_HZ;
 
-    pm.iabs_lpf.fc = 200.0f; // Hz
-    pm.iabs_lpf.fs = 20000.0f; // Hz
+    pm.iabs_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.iabs_lpf.fs = DRIVE_FOC_FREQ_HZ;
 
-    pm.wr_lpf.fc = 200.0f; // Hz
-    pm.wr_lpf.fs = 20000.0f; // Hz
+    pm.wr_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.wr_lpf.fs = DRIVE_FOC_FREQ_HZ;
 
     control_lpf_init(&pm.id_lpf);
     control_lpf_init(&pm.iq_lpf);
@@ -289,7 +291,14 @@ void pmsm_lpf_init(void)
 void pmsm_init(void)
 {
     memset(&pm, 0, sizeof(pm));
+
+#if MOTOR_SELECTED_MODEL == MOTOR_MODEL_PR60
     pmsm_pr60_init();
+#elif MOTOR_SELECTED_MODEL == MOTOR_MODEL_2312S
+    pmsm_2312s_init();
+#else
+#error "Unsupported MOTOR_SELECTED_MODEL"
+#endif
 
     pmsm_board_init();
     pmsm_peroid_init();
@@ -595,7 +604,7 @@ _RAM_FUNC void foc_feedback_update(pmsm_t *pm, float bus_voltage_v)
     /* 第 4 步：由电角度差得到电角速度，再换算转子速度和输出轴速度。 */
     pm->foc.we = control_angle_speed_step(&pm->elec_speed_diff,
                                            pm->foc.p_e,
-                                           FOC_FS_HZ);
+                                           DRIVE_FOC_FREQ_HZ);
     pm->foc.wr = pm->foc.we * pm->para.div_pn; // rad/s;
 
     pm->foc.wr_f = control_lpf_step(&pm->wr_lpf, pm->foc.wr);

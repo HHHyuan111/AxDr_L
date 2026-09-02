@@ -11,6 +11,7 @@
 #include "common.h"
 #include "diag_runtime.h"
 #include "drive_diag.h"
+#include "motor_drive_config.h"
 
 static mc_status_t fake_start_status;
 static mc_status_t fake_step_status;
@@ -180,6 +181,12 @@ static bool test_init_builds_independent_profile(void)
                        "诊断对象应取得当前电机极对数。")
         && expect_true(g_diag.profile.encoder_full_scale == 16384U,
                        "诊断对象应取得 MA732 满量程。")
+        && expect_true(nearly_equal(g_diag.profile.current_limit_a,
+                                    DRIVE_DIAG_CURRENT_LIMIT_A),
+                       "诊断电流硬上限应来自电机驱动配置。")
+        && expect_true(nearly_equal(g_diag.profile.voltage_limit_v,
+                                    DRIVE_DIAG_VOLTAGE_LIMIT_V),
+                       "诊断电压硬上限应来自电机驱动配置。")
         && expect_true(nearly_equal(g_diag.profile.minimum_vbus_v, 15.0f),
                        "诊断对象应复用 Drive 欠压门槛。");
 }

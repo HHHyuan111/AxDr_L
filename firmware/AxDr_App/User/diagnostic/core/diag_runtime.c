@@ -8,6 +8,8 @@
 #include <math.h>
 #include <string.h>
 
+#include "diag_algorithm_config.h"
+
 static mc_diag_owner_t diag_owner_from_job(diag_job_e job)
 {
     switch (job)
@@ -75,52 +77,138 @@ static void diag_profile_init(diag_profile_t *profile,
     profile->encoder_full_scale = seed->encoder_full_scale;
     profile->encoder_direction = seed->encoder_direction;
 
+    /* 算法核心提供通用初值，本项目参数统一由配置头覆盖。 */
     mc_current_sweep_default_config(&profile->sweep);
-    profile->sweep.single_point = true;
-    profile->sweep.single_frequency_hz = 100.0f;
-    profile->sweep.amplitude_a = 0.2f;
-    profile->sweep.offset_a = 0.0f;
+    profile->sweep.axis = DIAG_SWEEP_AXIS;
+    profile->sweep.single_point = DIAG_SWEEP_SINGLE_POINT;
+    profile->sweep.single_frequency_hz = DIAG_SWEEP_SINGLE_FREQ_HZ;
+    profile->sweep.start_frequency_hz = DIAG_SWEEP_START_FREQ_HZ;
+    profile->sweep.end_frequency_hz = DIAG_SWEEP_END_FREQ_HZ;
+    profile->sweep.amplitude_a = DIAG_SWEEP_AMPLITUDE_A;
+    profile->sweep.offset_a = DIAG_SWEEP_OFFSET_A;
+    profile->sweep.requested_points = DIAG_SWEEP_POINT_COUNT;
+    profile->sweep.settle_cycles = DIAG_SWEEP_SETTLE_CYCLES;
+    profile->sweep.measure_cycles = DIAG_SWEEP_MEASURE_CYCLES;
+    profile->sweep.minimum_settle_time_s =
+        DIAG_SWEEP_MIN_SETTLE_TIME_S;
+    profile->sweep.minimum_measure_time_s =
+        DIAG_SWEEP_MIN_MEASURE_TIME_S;
+    profile->sweep.minimum_measure_samples =
+        DIAG_SWEEP_MIN_MEASURE_SAMPLES;
+    profile->sweep.feedback_filter_alpha =
+        DIAG_SWEEP_FEEDBACK_FILTER_ALPHA;
+    profile->sweep.reject_saturated_points =
+        DIAG_SWEEP_REJECT_SATURATED_POINTS;
 
     mc_rs_ident_default_config(&profile->rs);
-    profile->rs.current_min_a = 0.0f;
-    profile->rs.current_max_a = 0.0f;
+    profile->rs.current_min_a = DIAG_RS_CURRENT_MIN_A;
+    profile->rs.current_max_a = DIAG_RS_CURRENT_MAX_A;
+    profile->rs.point_count = DIAG_RS_POINT_COUNT;
+    profile->rs.total_duration_s = DIAG_RS_TOTAL_DURATION_S;
+    profile->rs.settling_fraction = DIAG_RS_SETTLING_FRACTION;
+    profile->rs.integral_gain_v_per_a_s =
+        DIAG_RS_INTEGRAL_GAIN_V_PER_A_S;
     profile->rs.control_period_s = seed->control_period_s;
+    profile->rs.denominator_epsilon = DIAG_RS_DENOMINATOR_EPSILON;
 
     mc_biased_l_ident_default_config(&profile->inductance);
     profile->inductance.control_period_s = seed->control_period_s;
+    profile->inductance.auto_tune = DIAG_L_AUTO_TUNE;
+    profile->inductance.bias_ratio = DIAG_L_BIAS_RATIO;
+    profile->inductance.ripple_ratio = DIAG_L_RIPPLE_RATIO;
+    profile->inductance.manual_bias_current_a =
+        DIAG_L_MANUAL_BIAS_CURRENT_A;
+    profile->inductance.initial_injection_voltage_v =
+        DIAG_L_INITIAL_INJECTION_VOLTAGE_V;
+    profile->inductance.level_ticks = DIAG_L_LEVEL_TICKS;
+    profile->inductance.edge_skip_ticks = DIAG_L_EDGE_SKIP_TICKS;
+    profile->inductance.bias_settle_ticks = DIAG_L_BIAS_SETTLE_TICKS;
+    profile->inductance.bias_stable_ticks = DIAG_L_BIAS_STABLE_TICKS;
+    profile->inductance.bias_timeout_ticks = DIAG_L_BIAS_TIMEOUT_TICKS;
+    profile->inductance.bias_tolerance_ratio =
+        DIAG_L_BIAS_TOLERANCE_RATIO;
+    profile->inductance.bias_integral_gain_v_per_a_s =
+        DIAG_L_BIAS_INTEGRAL_GAIN_V_PER_A_S;
+    profile->inductance.tune_pairs = DIAG_L_TUNE_PAIRS;
+    profile->inductance.target_accepted_pairs =
+        DIAG_L_TARGET_ACCEPTED_PAIRS;
+    profile->inductance.max_measure_pair_multiplier =
+        DIAG_L_MAX_MEASURE_PAIR_MULTIPLIER;
+    profile->inductance.min_bias_current_a = DIAG_L_MIN_BIAS_CURRENT_A;
+    profile->inductance.max_bias_current_limit_ratio =
+        DIAG_L_MAX_BIAS_CURRENT_LIMIT_RATIO;
+    profile->inductance.min_target_ripple_a =
+        DIAG_L_MIN_TARGET_RIPPLE_A;
+    profile->inductance.min_current_delta_a =
+        DIAG_L_MIN_CURRENT_DELTA_A;
+    profile->inductance.min_positive_current_ratio =
+        DIAG_L_MIN_POSITIVE_CURRENT_RATIO;
+    profile->inductance.min_injection_voltage_v =
+        DIAG_L_MIN_INJECTION_VOLTAGE_V;
+    profile->inductance.max_injection_vbus_ratio =
+        DIAG_L_MAX_INJECTION_VBUS_RATIO;
+    profile->inductance.tune_scale_min = DIAG_L_TUNE_SCALE_MIN;
+    profile->inductance.tune_scale_max = DIAG_L_TUNE_SCALE_MAX;
+    profile->inductance.tune_ripple_floor_a =
+        DIAG_L_TUNE_RIPPLE_FLOOR_A;
+    profile->inductance.min_slope_difference_a_s =
+        DIAG_L_MIN_SLOPE_DIFFERENCE_A_S;
+    profile->inductance.min_valid_inductance_h =
+        DIAG_L_MIN_VALID_INDUCTANCE_H;
+    profile->inductance.max_valid_inductance_h =
+        DIAG_L_MAX_VALID_INDUCTANCE_H;
+    profile->inductance.request_deadtime_compensation =
+        DIAG_L_REQUEST_DEADTIME_COMPENSATION;
 
     mc_pole_pair_ident_default_config(&profile->pole_pair);
     profile->pole_pair.control_period_s = seed->control_period_s;
     profile->pole_pair.phase_resistance_ohm = seed->phase_resistance_ohm;
-    profile->pole_pair.drive_current_a = 0.0f;
+    profile->pole_pair.drive_current_a = DIAG_POLE_PAIR_DRIVE_CURRENT_A;
+    profile->pole_pair.electrical_turns =
+        DIAG_POLE_PAIR_ELECTRICAL_TURNS;
+    profile->pole_pair.electrical_velocity_rad_s =
+        DIAG_POLE_PAIR_ELECTRICAL_SPEED_RAD_S;
+    profile->pole_pair.ramp_duration_s =
+        DIAG_POLE_PAIR_RAMP_DURATION_S;
     profile->pole_pair.encoder_full_scale = seed->encoder_full_scale;
+    profile->pole_pair.min_pole_pairs = DIAG_POLE_PAIR_MIN_COUNT;
+    profile->pole_pair.max_pole_pairs = DIAG_POLE_PAIR_MAX_COUNT;
 
-    profile->encoder_align.align_current_a = 0.0f;
-    profile->encoder_align.ramp_duration_s = 1.0f;
-    profile->encoder_align.hold_duration_s = 1.0f;
-    profile->encoder_align.target_electrical_angle_rad = 0.0f;
-    profile->encoder_align.sample_count = 128U;
-    profile->encoder_align.sample_interval_ticks = 20U;
+    profile->encoder_align.align_current_a = DIAG_ALIGN_CURRENT_A;
+    profile->encoder_align.ramp_duration_s = DIAG_ALIGN_RAMP_DURATION_S;
+    profile->encoder_align.hold_duration_s = DIAG_ALIGN_HOLD_DURATION_S;
+    profile->encoder_align.target_electrical_angle_rad =
+        DIAG_ALIGN_TARGET_ELEC_ANGLE_RAD;
+    profile->encoder_align.sample_count = DIAG_ALIGN_SAMPLE_COUNT;
+    profile->encoder_align.sample_interval_ticks =
+        DIAG_ALIGN_SAMPLE_INTERVAL_TICKS;
     profile->encoder_align.encoder_direction = seed->encoder_direction;
-    profile->encoder_align.method = MC_ENCODER_ALIGN_CIRCULAR_ELECTRICAL;
-    profile->encoder_align.minimum_resultant_ratio = 0.9f;
+    profile->encoder_align.method = DIAG_ALIGN_METHOD;
+    profile->encoder_align.minimum_resultant_ratio =
+        DIAG_ALIGN_MIN_RESULTANT_RATIO;
 
     mc_deadtime_test_default_config(&profile->deadtime_test);
+    profile->deadtime_test.target_line_voltage_v =
+        DIAG_DEADTIME_TARGET_LINE_VOLTAGE_V;
 
-    profile->decoupling_mode = MC_DECOUPLING_NONE;
+    profile->decoupling_mode = DIAG_DECOUPLING_MODE;
     profile->decoupling.rs_ohm = seed->phase_resistance_ohm;
     profile->decoupling.ld_h = seed->d_axis_inductance_h;
     profile->decoupling.lq_h = seed->q_axis_inductance_h;
     profile->decoupling.flux_wb = seed->flux_linkage_wb;
     profile->decoupling.pole_pairs = (float)seed->pole_pairs;
     profile->decoupling.dt_s = seed->control_period_s;
+    profile->decoupling.include_resistive_feedforward =
+        DIAG_DECOUPLING_INCLUDE_RESISTIVE_FF;
 
     profile->flux.rs_ohm = seed->phase_resistance_ohm;
     profile->flux.pole_pairs = (float)seed->pole_pairs;
     profile->flux.sample_time_s = seed->control_period_s;
-    profile->flux.filter_cutoff_hz = 10.0f;
-    profile->flux.minimum_electrical_speed_rad_s = 5.0f;
-    profile->flux.reject_voltage_saturation = true;
+    profile->flux.filter_cutoff_hz = DIAG_FLUX_FILTER_CUTOFF_HZ;
+    profile->flux.minimum_electrical_speed_rad_s =
+        DIAG_FLUX_MIN_ELEC_SPEED_RAD_S;
+    profile->flux.reject_voltage_saturation =
+        DIAG_FLUX_REJECT_VOLTAGE_SATURATION;
 }
 
 void diag_runtime_init(diag_runtime_t *runtime,

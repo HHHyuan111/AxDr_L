@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "diag_algorithm_config.h"
 #include "diag_runtime.h"
 
 static bool near_value(float actual, float expected, float tolerance)
@@ -42,6 +43,17 @@ static void test_default_profile_cannot_start_power(void)
     runtime.requested_job = DIAG_JOB_CURRENT_SWEEP;
     assert(runtime.profile.current_limit_a == 0.0f);
     assert(runtime.profile.voltage_limit_v == 0.0f);
+    assert(runtime.profile.sweep.axis == DIAG_SWEEP_AXIS);
+    assert(runtime.profile.sweep.single_point == DIAG_SWEEP_SINGLE_POINT);
+    assert(runtime.profile.sweep.single_frequency_hz
+           == DIAG_SWEEP_SINGLE_FREQ_HZ);
+    assert(runtime.profile.sweep.start_frequency_hz
+           == DIAG_SWEEP_START_FREQ_HZ);
+    assert(runtime.profile.sweep.end_frequency_hz
+           == DIAG_SWEEP_END_FREQ_HZ);
+    assert(runtime.profile.sweep.amplitude_a == DIAG_SWEEP_AMPLITUDE_A);
+    assert(runtime.profile.sweep.feedback_filter_alpha
+           == DIAG_SWEEP_FEEDBACK_FILTER_ALPHA);
     assert(diag_runtime_start(&runtime, 24.0f, true)
            == MC_INVALID_ARGUMENT);
     assert(!runtime.active);

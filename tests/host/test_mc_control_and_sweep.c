@@ -208,10 +208,20 @@ static void test_sweep(void)
     cfg.minimum_measure_time_s = 0.0f;
     cfg.minimum_measure_samples = 100u;
     cfg.feedback_filter_alpha = 0.0f;
+
+    /* 频率范围由项目配置决定，通用算法只检查正频率和奈奎斯特边界。 */
+    cfg.single_frequency_hz = 10.0f;
+    assert(mc_current_sweep_start(&sweep, &cfg, 50e-6f, &command) == MC_OK);
+    assert(mc_current_sweep_abort(&sweep, &command) == MC_ABORTED);
+    cfg.single_frequency_hz = 10000.0f;
+    assert(mc_current_sweep_start(&sweep, &cfg, 50e-6f, &command)
+           == MC_OUT_OF_RANGE);
+
+    cfg.single_frequency_hz = 100.0f;
     assert(mc_current_sweep_start(&sweep, &cfg, 50e-6f, &command) == MC_OK);
 
     memset(&sample, 0, sizeof(sample));
-    /* The reference 100..350 Hz window enforces 0.4 s settle + 0.5 s measure. */
+    /* 理想反馈应在一个完整测量窗口后得到 0 dB、0°。 */
     for (guard = 0u; guard < 30000u && sweep.result.completed_points == 0u; ++guard) {
         sample.i_alpha_a = command.id_ref_a;
         assert(mc_current_sweep_step(&sweep, &sample, &command) == MC_BUSY);
@@ -258,7 +268,5 @@ int main(void)
     puts("portable control and sweep tests: PASS");
     return 0;
 }
-
-
 
 
