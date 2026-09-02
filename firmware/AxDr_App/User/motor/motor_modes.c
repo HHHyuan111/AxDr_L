@@ -4,6 +4,7 @@
  */
 
 #include "common.h"
+#include "algorithm_config.h"
 #include "drive_pwm.h"
 
 /**
@@ -140,7 +141,7 @@ _RAM_FUNC void pmsm_slow_down(pmsm_t *pm, float deceleration_rad_s2)
 _RAM_FUNC void pmsm_quick_stop_mode(pmsm_t *pm)
 {
     pmsm_slow_down(pm, pm->app_ctrl.quick_stop_dec);
-    if (fabsf(pm->foc.wr_f) < 0.5f)
+    if (fabsf(pm->foc.wr_f) < CTRL_QUICK_STOP_SPEED_THRESHOLD_RAD_S)
     {
         pm->req = DRIVE_REQ_STOP;
         pm->mode.sys = release_mode;

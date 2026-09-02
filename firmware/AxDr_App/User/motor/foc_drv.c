@@ -1,4 +1,5 @@
 #include "common.h"
+#include "algorithm_config.h"
 #include "control_filter.h"
 #include "control_loop.h"
 #include "drive_diag.h"
@@ -110,9 +111,6 @@ void pmsm_pr60_init(void)
     pm.para.Js = PR60_INERTIA_KG_M2;
 
     pm.para.Gr = PR60_GEAR_RATIO;
-    pm.para.ibw = PR60_CURRENT_BANDWIDTH_RAD_S;
-    pm.para.delta = PR60_DAMPING_RATIO;
-
     pm.para.div_pn = 1.0f / pm.para.pn;
     pm.para.pnd_2pi = pm.para.pn / M_2PI;
     pm.para.div_Gr = 1.0f / pm.para.Gr;
@@ -171,9 +169,6 @@ void pmsm_2312s_init(void)
     pm.para.Js = MOTOR_2312S_INERTIA_KG_M2;
 
     pm.para.Gr = MOTOR_2312S_GEAR_RATIO;
-    pm.para.ibw = MOTOR_2312S_CURRENT_BANDWIDTH_RAD_S;
-    pm.para.delta = MOTOR_2312S_DAMPING_RATIO;
-
     pm.para.div_pn = 1.0f / pm.para.pn;
     pm.para.pnd_2pi = pm.para.pn / M_2PI;
     pm.para.div_Gr = 1.0f / pm.para.Gr;
@@ -223,19 +218,19 @@ void pmsm_peroid_init(void)
     pm.period.foc_fs = DRIVE_FOC_FREQ_HZ;
     pm.period.foc_ts = 1.0f / pm.period.foc_fs;
 
-    pm.period.cur_pid_fs = DRIVE_CURRENT_LOOP_FREQ_HZ;
+    pm.period.cur_pid_fs = pm.period.foc_fs;
     pm.period.cur_pid_ts = 1.0f / pm.period.cur_pid_fs;
     pm.period.cur_pid_cnt_val = pm.period.foc_fs * pm.period.cur_pid_ts;
 
-    pm.period.spd_pid_fs = DRIVE_SPEED_LOOP_FREQ_HZ;
+    pm.period.spd_pid_fs = CTRL_SPEED_LOOP_FREQ_HZ;
     pm.period.spd_pid_ts = 1.0f / pm.period.spd_pid_fs;
     pm.period.spd_pid_cnt_val = pm.period.foc_fs * pm.period.spd_pid_ts;
 
-    pm.period.pos_pid_fs = DRIVE_POSITION_LOOP_FREQ_HZ;
+    pm.period.pos_pid_fs = CTRL_POSITION_LOOP_FREQ_HZ;
     pm.period.pos_pid_ts = 1.0f / pm.period.pos_pid_fs;
     pm.period.pos_pid_cnt_val = pm.period.foc_fs * pm.period.pos_pid_ts;
 
-    pm.period.spd_mea_fs = DRIVE_SPEED_MEASURE_FREQ_HZ;
+    pm.period.spd_mea_fs = CTRL_SPEED_MEASURE_FREQ_HZ;
     pm.period.spd_mea_ts = 1.0f / pm.period.spd_mea_fs;
     pm.period.spd_mea_cnt_val = pm.period.foc_fs * pm.period.spd_mea_ts;
 }
@@ -250,24 +245,24 @@ void pmsm_peroid_init(void)
 **/
 void pmsm_lpf_init(void)
 {
-    pm.id_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.id_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
     pm.id_lpf.fs = DRIVE_FOC_FREQ_HZ;
-    pm.iq_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.iq_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
     pm.iq_lpf.fs = DRIVE_FOC_FREQ_HZ;
-    pm.vd_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.vd_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
     pm.vd_lpf.fs = DRIVE_FOC_FREQ_HZ;
-    pm.vq_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.vq_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
     pm.vq_lpf.fs = DRIVE_FOC_FREQ_HZ;
 
-    pm.ibus_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.ibus_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
     pm.ibus_lpf.fs = DRIVE_FOC_FREQ_HZ;
-    pm.vbus_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.vbus_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
     pm.vbus_lpf.fs = DRIVE_FOC_FREQ_HZ;
 
-    pm.iabs_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.iabs_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
     pm.iabs_lpf.fs = DRIVE_FOC_FREQ_HZ;
 
-    pm.wr_lpf.fc = DRIVE_SIGNAL_FILTER_CUTOFF_HZ;
+    pm.wr_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
     pm.wr_lpf.fs = DRIVE_FOC_FREQ_HZ;
 
     control_lpf_init(&pm.id_lpf);
@@ -306,20 +301,51 @@ void pmsm_init(void)
 
     pmsm_protect_init();
 
+#if MOTOR_SELECTED_MODEL == MOTOR_MODEL_PR60
+    pm.para.ibw = CTRL_PR60_CURRENT_BANDWIDTH_RAD_S;
+    pm.para.delta = CTRL_PR60_SPEED_DAMPING_RATIO;
+    pm.spd_pi.kfp = CTRL_PR60_SPEED_REFERENCE_WEIGHT;
+    pm.spd_pi.kf_damp = CTRL_PR60_SPEED_FEEDBACK_DAMPING;
+    pm.pos_pi.kp = CTRL_PR60_POSITION_KP;
+    pm.pos_pi.ki = CTRL_PR60_POSITION_KI;
+    pm.pos_pi.kd = CTRL_PR60_POSITION_KD;
+#elif MOTOR_SELECTED_MODEL == MOTOR_MODEL_2312S
+    pm.para.ibw = CTRL_2312S_CURRENT_BANDWIDTH_RAD_S;
+    pm.para.delta = CTRL_2312S_SPEED_DAMPING_RATIO;
+    pm.spd_pi.kfp = CTRL_2312S_SPEED_REFERENCE_WEIGHT;
+    pm.spd_pi.kf_damp = CTRL_2312S_SPEED_FEEDBACK_DAMPING;
+    pm.pos_pi.kp = CTRL_2312S_POSITION_KP;
+    pm.pos_pi.ki = CTRL_2312S_POSITION_KI;
+    pm.pos_pi.kd = CTRL_2312S_POSITION_KD;
+#endif
+
     foc_cur_pi_calc(&pm);
     foc_spd_pi_calc(&pm);
-	
-//	pm.iq_pi.kp = 0;
-//	pm.iq_pi.ki = 0;
-//	pm.spd_pi.kp = 0;
-//	pm.spd_pi.ki = 0;
 
-    pm.pos_pi.kp = 12.0f;//pm.spd_pi.kp * 1.4f * pm.period.pos_pid_fs;//24.0f;
-
-    control_pid_set_limits(&pm.id_pi, 11.0f, -11.0f, 11.0f, -11.0f);
-    control_pid_set_limits(&pm.iq_pi, 11.0f, -11.0f, 11.0f, -11.0f);
-    control_pid_set_limits(&pm.spd_pi, 20.0f, -20.0f, 20.0f, -20.0f);
-    control_pid_set_limits(&pm.pos_pi, 200.0f, -200.0f, 200.0f, -200.0f);
+    control_pid_set_limits(
+        &pm.id_pi,
+        CTRL_CURRENT_PI_INITIAL_LIMIT_V,
+        -CTRL_CURRENT_PI_INITIAL_LIMIT_V,
+        CTRL_CURRENT_PI_INITIAL_LIMIT_V,
+        -CTRL_CURRENT_PI_INITIAL_LIMIT_V);
+    control_pid_set_limits(
+        &pm.iq_pi,
+        CTRL_CURRENT_PI_INITIAL_LIMIT_V,
+        -CTRL_CURRENT_PI_INITIAL_LIMIT_V,
+        CTRL_CURRENT_PI_INITIAL_LIMIT_V,
+        -CTRL_CURRENT_PI_INITIAL_LIMIT_V);
+    control_pid_set_limits(
+        &pm.spd_pi,
+        CTRL_SPEED_PI_INITIAL_LIMIT_A,
+        -CTRL_SPEED_PI_INITIAL_LIMIT_A,
+        CTRL_SPEED_PI_INITIAL_LIMIT_A,
+        -CTRL_SPEED_PI_INITIAL_LIMIT_A);
+    control_pid_set_limits(
+        &pm.pos_pi,
+        CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S,
+        -CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S,
+        CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S,
+        -CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S);
     
     encoder_init(&pm.pos_box);
     drive_diag_init(&pm);
@@ -380,9 +406,6 @@ _RAM_FUNC void foc_cur_pi_calc(pmsm_t* pm)
 **/
 _RAM_FUNC void foc_spd_pi_calc(pmsm_t* pm)
 {
-    pm->spd_pi.kfp = 1.1f;
-    pm->spd_pi.kf_damp = 0.25f;
-
     float K = (3.0f * pm->para.pn * pm->para.flux) / (4.0f * pm->para.Js);
 
     pm->spd_pi.kp = (pm->iq_pi.kp/pm->para.Ls)/(pm->para.delta*K);
@@ -580,7 +603,7 @@ _RAM_FUNC void foc_feedback_update(pmsm_t *pm, float bus_voltage_v)
         pm->foc.inv_vbus = 0.0f;
     }
 
-    pm->foc.vs = pm->foc.vbus*0.5f*0.96f;
+    pm->foc.vs = pm->foc.vbus * 0.5f * CTRL_VOLTAGE_UTILIZATION_RATIO;
 
     /* 第 2 步：把本周期允许的电压、电流和速度范围交给各级 PI 控制器。 */
     pm->id_pi.out_max    =  pm->foc.vs;

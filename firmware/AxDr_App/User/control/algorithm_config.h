@@ -1,22 +1,60 @@
 /**
- * @file diag_algorithm_config.h
- * @brief 本项目诊断与参数辨识算法的默认实验参数。
+ * @file algorithm_config.h
+ * @brief 本项目控制、诊断与参数辨识算法的统一配置。
  *
- * 本文件只保存“怎么做实验”的参数。电机参数、编码器参数、驱动板能力和
- * 保护限值由 motor_drive_config.h 与当前电机对象提供。
+ * 本文件保存“控制器怎么调、实验怎么做”的参数。电机物理参数、编码器参数、
+ * 驱动板能力和保护限值由 motor_drive_config.h 与当前电机对象提供。
  *
- * 新增诊断算法时，在本文件增加一个独立参数分组，再由 diag_runtime.c
- * 装入对应算法的配置结构体。算法核心不直接依赖本文件。
+ * 新增算法时，在本文件增加一个独立参数分组，再由对应初始化代码装入有类型
+ * 的配置结构体。算法核心不直接依赖本文件。
  */
 
-#ifndef DIAG_ALGORITHM_CONFIG_H
-#define DIAG_ALGORITHM_CONFIG_H
+#ifndef ALGORITHM_CONFIG_H
+#define ALGORITHM_CONFIG_H
 
 #include <stdbool.h>
 
 #include "mc_common.h"
 #include "mc_decoupling.h"
 #include "mc_encoder_alignment.h"
+
+/* 三闭环执行频率。电流环直接与 FOC 同频，不重复配置。 */
+#define CTRL_SPEED_LOOP_FREQ_HZ                  (10000.0f)
+#define CTRL_POSITION_LOOP_FREQ_HZ               (5000.0f)
+#define CTRL_SPEED_MEASURE_FREQ_HZ               (1000.0f)
+#define CTRL_SIGNAL_FILTER_CUTOFF_HZ             (200.0f)
+
+/* PR60 三闭环整定参数。电流、速度 PI 根据这些目标和电机模型自动计算。 */
+#define CTRL_PR60_CURRENT_BANDWIDTH_RAD_S         (500.0f)
+#define CTRL_PR60_SPEED_DAMPING_RATIO             (4.0f)
+#define CTRL_PR60_SPEED_REFERENCE_WEIGHT          (1.1f)
+#define CTRL_PR60_SPEED_FEEDBACK_DAMPING          (0.25f)
+#define CTRL_PR60_POSITION_KP                     (12.0f)
+#define CTRL_PR60_POSITION_KI                     (0.0f)
+#define CTRL_PR60_POSITION_KD                     (0.0f)
+
+/* 2312S 三闭环整定参数；上电测试前应针对该电机重新确认。 */
+#define CTRL_2312S_CURRENT_BANDWIDTH_RAD_S        (500.0f)
+#define CTRL_2312S_SPEED_DAMPING_RATIO            (4.0f)
+#define CTRL_2312S_SPEED_REFERENCE_WEIGHT         (1.1f)
+#define CTRL_2312S_SPEED_FEEDBACK_DAMPING          (0.25f)
+#define CTRL_2312S_POSITION_KP                     (12.0f)
+#define CTRL_2312S_POSITION_KI                     (0.0f)
+#define CTRL_2312S_POSITION_KD                     (0.0f)
+
+/* 三闭环上电初始限幅；进入 FOC 后会根据实时母线电压和电机能力刷新。 */
+#define CTRL_CURRENT_PI_INITIAL_LIMIT_V           (11.0f)
+#define CTRL_SPEED_PI_INITIAL_LIMIT_A             (20.0f)
+#define CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S      (200.0f)
+
+/* FOC 和停机过程中的可调控制参数。 */
+#define CTRL_VOLTAGE_UTILIZATION_RATIO            (0.96f)
+#define CTRL_QUICK_STOP_SPEED_THRESHOLD_RAD_S     (0.5f)
+
+/* MIT 默认值；正式命令可在运行前覆盖，当前固件尚未开放 MIT 模式路由。 */
+#define CTRL_MIT_POSITION_GAIN_NM_PER_RAD          (0.0f)
+#define CTRL_MIT_SPEED_GAIN_NM_S_PER_RAD           (0.0f)
+#define CTRL_MIT_TORQUE_FEEDFORWARD_NM             (0.0f)
 
 /* 电流环扫频：默认先做 100 Hz 单频验证，确认后再切换为自动扫频。 */
 #define DIAG_SWEEP_AXIS                         (MC_AXIS_D)
@@ -104,4 +142,4 @@
 #define DIAG_FLUX_MIN_ELEC_SPEED_RAD_S           (5.0f)
 #define DIAG_FLUX_REJECT_VOLTAGE_SATURATION      (true)
 
-#endif /* DIAG_ALGORITHM_CONFIG_H */
+#endif /* ALGORITHM_CONFIG_H */

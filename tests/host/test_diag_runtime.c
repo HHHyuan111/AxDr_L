@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "diag_algorithm_config.h"
+#include "algorithm_config.h"
 #include "diag_runtime.h"
 
 static bool near_value(float actual, float expected, float tolerance)

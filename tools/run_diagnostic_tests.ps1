@@ -8,6 +8,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $diagRoot = Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic"
 $diagCore = Join-Path $diagRoot "core"
 $diagInclude = Join-Path $diagRoot "include"
+$controlInclude = Join-Path $repoRoot "firmware/AxDr_App/User/control"
 $testRoot = Join-Path $repoRoot "tests/host"
 $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
 $controlTest = Join-Path $testRoot "test_mc_control_and_sweep.c"
@@ -96,7 +97,7 @@ $runtimeSources = @(
 )
 
 & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-    "-I$diagInclude" $runtimeSources -o $runtimeExe -lm
+    "-I$diagInclude" "-I$controlInclude" $runtimeSources -o $runtimeExe -lm
 if ($LASTEXITCODE -ne 0)
 {
     throw "诊断任务状态机测试编译失败，退出码：$LASTEXITCODE"

@@ -8,7 +8,7 @@
 #include <math.h>
 #include <string.h>
 
-#include "diag_algorithm_config.h"
+#include "algorithm_config.h"
 
 static mc_diag_owner_t diag_owner_from_job(diag_job_e job)
 {

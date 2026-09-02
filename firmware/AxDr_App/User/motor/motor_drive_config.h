@@ -1,6 +1,6 @@
 /**
  * @file motor_drive_config.h
- * @brief 当前电机、编码器、驱动板和控制周期的工程配置。
+ * @brief 当前电机、编码器和驱动板的工程配置。
  *
  * 更换电机或驱动板时优先修改本文件，不修改通用 FOC、诊断算法和 Target
  * 适配代码。值为 0 的诊断限值表示尚未完成实物确认，主动诊断任务禁止启动。
@@ -16,13 +16,8 @@
 #define MOTOR_MODEL_2312S                      (2U)
 #define MOTOR_SELECTED_MODEL                  (MOTOR_MODEL_PR60)
 
-/* 控制周期与低通滤波。 */
+/* PWM 与 FOC 的硬件执行频率。 */
 #define DRIVE_FOC_FREQ_HZ                     (20000.0f)
-#define DRIVE_CURRENT_LOOP_FREQ_HZ            (20000.0f)
-#define DRIVE_SPEED_LOOP_FREQ_HZ              (10000.0f)
-#define DRIVE_POSITION_LOOP_FREQ_HZ           (5000.0f)
-#define DRIVE_SPEED_MEASURE_FREQ_HZ           (1000.0f)
-#define DRIVE_SIGNAL_FILTER_CUTOFF_HZ         (200.0f)
 
 /* 驱动板采样和功率器件参数。 */
 #define DRIVE_ADC_REFERENCE_V                 (3.3f)
@@ -75,8 +70,6 @@
 #define PR60_VISCOUS_FRICTION_NM_S            (0.000188353f)
 #define PR60_INERTIA_KG_M2                    (7.32527915e-5f)
 #define PR60_GEAR_RATIO                       (1.0f)
-#define PR60_CURRENT_BANDWIDTH_RAD_S          (500.0f)
-#define PR60_DAMPING_RATIO                    (4.0f)
 #define PR60_ACCELERATION_RAD_S2              (20.0f)
 #define PR60_DECELERATION_RAD_S2              (20.0f)
 #define PR60_PHASE_ORDER                      (ABC_PHASE)
@@ -103,8 +96,6 @@
 #define MOTOR_2312S_VISCOUS_FRICTION_NM_S     (0.000188353f)
 #define MOTOR_2312S_INERTIA_KG_M2             (2.19904655e-6f)
 #define MOTOR_2312S_GEAR_RATIO                (1.0f)
-#define MOTOR_2312S_CURRENT_BANDWIDTH_RAD_S   (500.0f)
-#define MOTOR_2312S_DAMPING_RATIO             (4.0f)
 #define MOTOR_2312S_ACCELERATION_RAD_S2        (200.0f)
 #define MOTOR_2312S_DECELERATION_RAD_S2        (200.0f)
 #define MOTOR_2312S_PHASE_ORDER               (ACB_PHASE)
