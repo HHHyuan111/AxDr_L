@@ -481,7 +481,7 @@ static bool test_protection_blocks_power_actions(void)
         .req = DRIVE_REQ_RUN,
         .state = DRIVE_STATE_RUN,
         .pwm_active = true,
-        .sig = {.i_a = 81.0f, .vbus = 24.0f},
+        .sig = {.ia = 81.0f, .vbus = 24.0f},
         .fb_status = {.i_valid = true, .vbus_valid = true, .pos_valid = true},
         .prot_cfg = {
             .over_current_a = 80.0f,
@@ -519,13 +519,13 @@ static bool test_invalid_feedback_blocks_start(void)
 {
     foc_t invalid_current_pm = {
         .req = DRIVE_REQ_START,
-        .sig = {.i_a = NAN, .vbus = 24.0f},
+        .sig = {.ia = NAN, .vbus = 24.0f},
         .fb_status = {.i_valid = true, .vbus_valid = true, .pos_valid = true},
         .prot_cfg = {.invalid_current_samples = 1U}
     };
     foc_t invalid_position_pm = {
         .req = DRIVE_REQ_START,
-        .sig = {.vbus = 24.0f, .p_e = NAN},
+        .sig = {.vbus = 24.0f, .theta_e = NAN},
         .fb_status = {.i_valid = true, .vbus_valid = true, .pos_valid = true},
         .prot_cfg = {.invalid_position_samples = 1U}
     };

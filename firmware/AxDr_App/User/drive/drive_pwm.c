@@ -53,14 +53,14 @@ _RAM_FUNC bool drive_pwm_commit(foc_t *foc)
     foc->pwm_cmd = (drive_pwm_cmd_t){
         .seq = foc->fast_seq,
         .valid = false,
-        .duty_a = foc->sig.dtc_a,
-        .duty_b = foc->sig.dtc_b,
-        .duty_c = foc->sig.dtc_c
+        .duty_a = foc->sig.duty_a,
+        .duty_b = foc->sig.duty_b,
+        .duty_c = foc->sig.duty_c
     };
 
-    if (!drive_pwm_duty_is_valid(foc->sig.dtc_a) ||
-        !drive_pwm_duty_is_valid(foc->sig.dtc_b) ||
-        !drive_pwm_duty_is_valid(foc->sig.dtc_c))
+    if (!drive_pwm_duty_is_valid(foc->sig.duty_a) ||
+        !drive_pwm_duty_is_valid(foc->sig.duty_b) ||
+        !drive_pwm_duty_is_valid(foc->sig.duty_c))
     {
         if (target_pwm_stop_phase_outputs())
         {
@@ -72,15 +72,15 @@ _RAM_FUNC bool drive_pwm_commit(foc_t *foc)
     switch (foc->motor.phase_order)
     {
         case PHASE_ORDER_ABC:
-            target_pwm_set_duty_ratios(foc->sig.dtc_a,
-                                       foc->sig.dtc_b,
-                                       foc->sig.dtc_c);
+            target_pwm_set_duty_ratios(foc->sig.duty_a,
+                                       foc->sig.duty_b,
+                                       foc->sig.duty_c);
             break;
 
         case PHASE_ORDER_ACB:
-            target_pwm_set_duty_ratios(foc->sig.dtc_a,
-                                       foc->sig.dtc_c,
-                                       foc->sig.dtc_b);
+            target_pwm_set_duty_ratios(foc->sig.duty_a,
+                                       foc->sig.duty_c,
+                                       foc->sig.duty_b);
             break;
 
         default:
@@ -97,9 +97,9 @@ _RAM_FUNC bool drive_pwm_commit(foc_t *foc)
     foc->pwm_commit = (drive_pwm_commit_t){
         .seq = foc->fast_seq,
         .valid = true,
-        .duty_a = foc->sig.dtc_a,
-        .duty_b = foc->sig.dtc_b,
-        .duty_c = foc->sig.dtc_c
+        .duty_a = foc->sig.duty_a,
+        .duty_b = foc->sig.duty_b,
+        .duty_c = foc->sig.duty_c
     };
 
     return true;

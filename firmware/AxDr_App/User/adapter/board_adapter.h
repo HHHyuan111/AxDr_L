@@ -29,10 +29,10 @@ typedef struct
     target_adc_abc_raw_t i_raw;
     target_adc_abc_raw_t v_raw;
     uint16_t v_bus_raw;
-    float i_a;
-    float i_b;
-    float i_c;
-    float v_bus;
+    float ia;
+    float ib;
+    float ic;
+    float vbus;
 } board_sample_t;
 
 /**

@@ -13,9 +13,9 @@
  */
 typedef struct
 {
-    float i_a;   /* A 相电流，单位 A。 */
-    float i_b;   /* B 相电流，单位 A。 */
-    float i_c;   /* C 相电流，单位 A。 */
+    float ia;    /* A 相电流。 */
+    float ib;    /* B 相电流。 */
+    float ic;    /* C 相电流。 */
     float theta; /* 电角度，单位 rad。 */
 } foc_sample_t;
 
@@ -25,12 +25,12 @@ typedef struct
 typedef struct
 {
     float theta;
-    float sin_theta;
-    float cos_theta;
-    float i_alpha;
-    float i_beta;
-    float i_d;
-    float i_q;
+    float sin;
+    float cos;
+    float ialpha;
+    float ibeta;
+    float id;
+    float iq;
 } foc_frame_t;
 
 /**
@@ -38,8 +38,8 @@ typedef struct
  */
 typedef struct
 {
-    float v_d;      /* d 轴电压，单位 V。 */
-    float v_q;      /* q 轴电压，单位 V。 */
+    float vd;       /* d 轴电压。 */
+    float vq;       /* q 轴电压。 */
     float inv_vbus; /* 现有 SVPWM 使用的母线电压归一化系数。 */
 } foc_voltage_t;
 
@@ -48,8 +48,8 @@ typedef struct
  */
 typedef struct
 {
-    float v_alpha;
-    float v_beta;
+    float valpha;
+    float vbeta;
     float duty_a;
     float duty_b;
     float duty_c;

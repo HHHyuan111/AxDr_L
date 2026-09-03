@@ -20,13 +20,13 @@ _RAM_FUNC void foc_calc(foc_sig_t *foc)
 {
     foc->sin_val = sin_f32(foc->theta);
     foc->cos_val = cos_f32(foc->theta);
-    foc->i_alph = foc->i_a;
-    foc->i_beta = (foc->i_b - foc->i_c) * ONE_BY_SQRT3;
-    foc->i_d = foc->i_alph * foc->cos_val + foc->i_beta * foc->sin_val;
-    foc->i_q = foc->i_beta * foc->cos_val - foc->i_alph * foc->sin_val;
-    foc->v_alph = (foc->v_d *foc->cos_val - foc->v_q *foc->sin_val);
-    foc->v_beta = (foc->v_d *foc->sin_val + foc->v_q *foc->cos_val);
-    svm(foc->v_alph*(foc->inv_vbus), foc->v_beta*(foc->inv_vbus), &foc->dtc_a, &foc->dtc_b, &foc->dtc_c);
+    foc->ialpha = foc->ia;
+    foc->ibeta = (foc->ib - foc->ic) * ONE_BY_SQRT3;
+    foc->id = foc->ialpha * foc->cos_val + foc->ibeta * foc->sin_val;
+    foc->iq = foc->ibeta * foc->cos_val - foc->ialpha * foc->sin_val;
+    foc->valpha = (foc->vd *foc->cos_val - foc->vq *foc->sin_val);
+    foc->vbeta = (foc->vd *foc->sin_val + foc->vq *foc->cos_val);
+    svm(foc->valpha*(foc->inv_vbus), foc->vbeta*(foc->inv_vbus), &foc->duty_a, &foc->duty_b, &foc->duty_c);
 }
 
 /**
@@ -53,8 +53,8 @@ _RAM_FUNC void sin_cos_val(foc_sig_t *foc)
 **/
 _RAM_FUNC void clarke_transform(foc_sig_t *foc)
 {
-    foc->i_alph = foc->i_a;
-    foc->i_beta = (foc->i_b - foc->i_c) * ONE_BY_SQRT3;
+    foc->ialpha = foc->ia;
+    foc->ibeta = (foc->ib - foc->ic) * ONE_BY_SQRT3;
 }
 
 /**
@@ -67,9 +67,9 @@ _RAM_FUNC void clarke_transform(foc_sig_t *foc)
 **/
 _RAM_FUNC void inverse_clarke(foc_sig_t *foc)
 {
-    foc->v_a = foc->v_alph;
-    foc->v_b = -0.5f * foc->v_alph + SQRT3_BY_2 *foc->v_beta;
-    foc->v_c = -0.5f * foc->v_alph - SQRT3_BY_2 *foc->v_beta;
+    foc->va = foc->valpha;
+    foc->vb = -0.5f * foc->valpha + SQRT3_BY_2 *foc->vbeta;
+    foc->vc = -0.5f * foc->valpha - SQRT3_BY_2 *foc->vbeta;
 }
 
 /**
@@ -82,8 +82,8 @@ _RAM_FUNC void inverse_clarke(foc_sig_t *foc)
 **/
 _RAM_FUNC void park_transform(foc_sig_t *foc)
 {
-    foc->i_d = foc->i_alph * foc->cos_val + foc->i_beta * foc->sin_val;
-    foc->i_q = foc->i_beta * foc->cos_val - foc->i_alph * foc->sin_val;
+    foc->id = foc->ialpha * foc->cos_val + foc->ibeta * foc->sin_val;
+    foc->iq = foc->ibeta * foc->cos_val - foc->ialpha * foc->sin_val;
 }
 
 /**
@@ -96,23 +96,23 @@ _RAM_FUNC void park_transform(foc_sig_t *foc)
 **/
 _RAM_FUNC void inverse_park(foc_sig_t *foc)
 {
-    foc->v_alph = (foc->v_d *foc->cos_val - foc->v_q *foc->sin_val);
-    foc->v_beta = (foc->v_d *foc->sin_val + foc->v_q *foc->cos_val);
+    foc->valpha = (foc->vd *foc->cos_val - foc->vq *foc->sin_val);
+    foc->vbeta = (foc->vd *foc->sin_val + foc->vq *foc->cos_val);
 }
 
 _RAM_FUNC void svpwm_midpoint(foc_sig_t *foc)
 {
-    foc->v_alph = foc->inv_vbus *foc->v_alph;
-    foc->v_beta = foc->inv_vbus *foc->v_beta;
-    float va = foc->v_alph;
-    float vb = -0.5f * foc->v_alph + SQRT3_BY_2 *foc->v_beta;
-    float vc = -0.5f * foc->v_alph - SQRT3_BY_2 *foc->v_beta;
+    foc->valpha = foc->inv_vbus *foc->valpha;
+    foc->vbeta = foc->inv_vbus *foc->vbeta;
+    float va = foc->valpha;
+    float vb = -0.5f * foc->valpha + SQRT3_BY_2 *foc->vbeta;
+    float vc = -0.5f * foc->valpha - SQRT3_BY_2 *foc->vbeta;
     float vmax = LEGACY_MAX(LEGACY_MAX(va, vb), vc);
     float vmin = LEGACY_MIN(LEGACY_MIN(va, vb), vc);
     float vcom = (vmax + vmin) * 0.5f;
-    foc->dtc_a = 1.0f-((va - vcom) + 0.5f);
-    foc->dtc_b = 1.0f-((vb - vcom) + 0.5f);
-    foc->dtc_c = 1.0f-((vc - vcom) + 0.5f);
+    foc->duty_a = 1.0f-((va - vcom) + 0.5f);
+    foc->duty_b = 1.0f-((vb - vcom) + 0.5f);
+    foc->duty_c = 1.0f-((vc - vcom) + 0.5f);
 }
 
 _RAM_FUNC void svpwm_sector(foc_sig_t *foc)
@@ -120,9 +120,9 @@ _RAM_FUNC void svpwm_sector(foc_sig_t *foc)
     float TS = 1.0f;
     float ta = 0.0f, tb = 0.0f, tc = 0.0f;
     float k = (TS *SQRT3) * foc->inv_vbus;
-    float va = foc->v_beta;
-    float vb = (SQRT3 *foc->v_alph - foc->v_beta) * 0.5f;
-    float vc = (-SQRT3 *foc->v_alph - foc->v_beta) * 0.5f;
+    float va = foc->vbeta;
+    float vb = (SQRT3 *foc->valpha - foc->vbeta) * 0.5f;
+    float vc = (-SQRT3 *foc->valpha - foc->vbeta) * 0.5f;
     int a = (va > 0.0f) ? 1 : 0;
     int b = (vb > 0.0f) ? 1 : 0;
     int c = (vc > 0.0f) ? 1 : 0;
@@ -200,9 +200,9 @@ _RAM_FUNC void svpwm_sector(foc_sig_t *foc)
         break;
     }
 
-    foc->dtc_a = 1.0f - ta;
-    foc->dtc_b = 1.0f - tb;
-    foc->dtc_c = 1.0f - tc;
+    foc->duty_a = 1.0f - ta;
+    foc->duty_b = 1.0f - tb;
+    foc->duty_c = 1.0f - tc;
 }
 
 int svm(float alpha, float beta, float *ta, float *tb, float *tc)

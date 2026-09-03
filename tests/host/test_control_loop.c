@@ -76,12 +76,12 @@ static foc_fb_t test_feedback(void)
 {
     return (foc_fb_t){
         .sample = {
-            .i_a = 0.2f,
-            .i_b = -0.1f,
-            .i_c = -0.1f,
+            .ia = 0.2f,
+            .ib = -0.1f,
+            .ic = -0.1f,
             .theta = 0.25f,
         },
-        .inv_v_bus = 0.05f,
+        .inv_vbus = 0.05f,
         .spd = 0.4f,
         .pos = 0.3f,
     };
@@ -93,8 +93,8 @@ static bool test_voltage_mode(void)
     const foc_fb_t fb = test_feedback();
     const foc_ref_t ref = {
         .mode = FOC_CTRL_MODE_VOLT,
-        .v_d = 0.5f,
-        .v_q = -0.25f,
+        .vd = 0.5f,
+        .vq = -0.25f,
     };
     foc_out_t out;
 
@@ -102,9 +102,9 @@ static bool test_voltage_mode(void)
 
     return expect_true(foc_ctrl_step(&loop.ctrl, &fb, &ref, &out),
                        "电压模式应生成有效占空比。") &&
-           expect_close(out.v_d, 0.5f,
+           expect_close(out.vd, 0.5f,
                         "电压模式 d 轴给定错误。") &&
-           expect_close(out.v_q, -0.25f,
+           expect_close(out.vq, -0.25f,
                         "电压模式 q 轴给定错误。") &&
            expect_true(loop.ctrl.cur_rate.count == 0U,
                        "电压模式不应运行电流环。");
@@ -116,8 +116,8 @@ static bool test_current_mode(void)
     const foc_fb_t fb = test_feedback();
     const foc_ref_t ref = {
         .mode = FOC_CTRL_MODE_CUR,
-        .i_d_ref = 0.1f,
-        .i_q_ref = 0.2f,
+        .id_ref = 0.1f,
+        .iq_ref = 0.2f,
     };
     foc_out_t out;
 
@@ -141,7 +141,7 @@ static bool test_speed_mode(void)
     const foc_fb_t fb = test_feedback();
     const foc_ref_t ref = {
         .mode = FOC_CTRL_MODE_SPD,
-        .i_d_ref = 0.0f,
+        .id_ref = 0.0f,
         .spd_ref = 1.0f,
         .cur_lim = 2.0f,
     };
@@ -154,7 +154,7 @@ static bool test_speed_mode(void)
            expect_close(loop.spd_pi.ref_value, 1.0f,
                         "速度参考没有进入速度环。") &&
            expect_close(loop.iq_pi.ref_value,
-                        loop.ctrl.i_q_ref,
+                        loop.ctrl.iq_ref,
                         "速度环输出没有进入 q 轴电流环。") &&
            expect_true((loop.ctrl.spd_rate.count == 0U) &&
                        (loop.ctrl.cur_rate.count == 1U),
@@ -167,7 +167,7 @@ static bool test_position_mode(void)
     const foc_fb_t fb = test_feedback();
     const foc_ref_t ref = {
         .mode = FOC_CTRL_MODE_POS,
-        .i_d_ref = 0.0f,
+        .id_ref = 0.0f,
         .pos_ref = 0.8f,
         .cur_lim = 2.0f,
         .spd_lim = 3.0f,
@@ -184,7 +184,7 @@ static bool test_position_mode(void)
                         loop.ctrl.spd_ref,
                         "位置环输出没有进入速度环。") &&
            expect_close(loop.iq_pi.ref_value,
-                        loop.ctrl.i_q_ref,
+                        loop.ctrl.iq_ref,
                         "速度环输出没有进入 q 轴电流环。") &&
            expect_true((loop.ctrl.pos_rate.count == 0U) &&
                        (loop.ctrl.spd_rate.count == 0U) &&
@@ -216,10 +216,10 @@ static bool test_legacy_equivalence(foc_ctrl_mode_t mode)
     const foc_fb_t fb = test_feedback();
     const foc_ref_t ref = {
         .mode = mode,
-        .v_d = 0.5f,
-        .v_q = -0.25f,
-        .i_d_ref = 0.1f,
-        .i_q_ref = 0.2f,
+        .vd = 0.5f,
+        .vq = -0.25f,
+        .id_ref = 0.1f,
+        .iq_ref = 0.2f,
         .spd_ref = 1.0f,
         .pos_ref = 0.8f,
         .cur_lim = 2.0f,

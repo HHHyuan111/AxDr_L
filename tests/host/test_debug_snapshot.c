@@ -87,27 +87,27 @@ static void fill_source(foc_t *motor)
     motor->pwm_commit.duty_c = 0.30f;
 
     motor->sig.vbus = 24.25f;
-    motor->sig.i_a = 1.1f;
-    motor->sig.i_b = -2.2f;
-    motor->sig.i_c = 3.3f;
-    motor->sig.p_e = 0.45f;
+    motor->sig.ia = 1.1f;
+    motor->sig.ib = -2.2f;
+    motor->sig.ic = 3.3f;
+    motor->sig.theta_e = 0.45f;
 
     motor->ctrl.posr_set = 5.1f;
-    motor->sig.mp_r = 5.2f;
+    motor->sig.pos_r = 5.2f;
     motor->ctrl.wr_set = 6.1f;
-    motor->sig.wr_f = 6.2f;
+    motor->sig.spd_r = 6.2f;
 
     motor->ctrl.id_set = 7.1f;
-    motor->sig.i_d = 7.2f;
+    motor->sig.id = 7.2f;
     motor->ctrl.iq_set = 8.1f;
     motor->ctrl.iq_lim = 8.2f;
-    motor->sig.i_q = 8.3f;
+    motor->sig.iq = 8.3f;
 
-    motor->sig.v_d = 9.1f;
-    motor->sig.v_q = 9.2f;
-    motor->sig.dtc_a = 0.11f;
-    motor->sig.dtc_b = 0.22f;
-    motor->sig.dtc_c = 0.33f;
+    motor->sig.vd = 9.1f;
+    motor->sig.vq = 9.2f;
+    motor->sig.duty_a = 0.11f;
+    motor->sig.duty_b = 0.22f;
+    motor->sig.duty_c = 0.33f;
 }
 
 static int expect_snapshot_fields(const foc_t *motor,
@@ -156,22 +156,22 @@ static int expect_snapshot_fields(const foc_t *motor,
            expect_u32("obs_samples",
                       g_debug_snapshot.obs_samples,
                       g_obs.flux.accepted_samples) &&
-           expect_float_bits("v_bus", g_debug_snapshot.v_bus, motor->sig.vbus) &&
-           expect_float_bits("i_a", g_debug_snapshot.i_a, motor->sig.i_a) &&
-           expect_float_bits("i_b", g_debug_snapshot.i_b, motor->sig.i_b) &&
-           expect_float_bits("i_c", g_debug_snapshot.i_c, motor->sig.i_c) &&
-           expect_float_bits("theta_e", g_debug_snapshot.theta_e, motor->sig.p_e) &&
+           expect_float_bits("vbus", g_debug_snapshot.vbus, motor->sig.vbus) &&
+           expect_float_bits("ia", g_debug_snapshot.ia, motor->sig.ia) &&
+           expect_float_bits("ib", g_debug_snapshot.ib, motor->sig.ib) &&
+           expect_float_bits("ic", g_debug_snapshot.ic, motor->sig.ic) &&
+           expect_float_bits("theta_e", g_debug_snapshot.theta_e, motor->sig.theta_e) &&
            expect_float_bits("pos_r_ref", g_debug_snapshot.pos_r_ref, motor->ctrl.posr_set) &&
-           expect_float_bits("pos_r_fbk", g_debug_snapshot.pos_r_fbk, motor->sig.mp_r) &&
-           expect_float_bits("vel_r_ref", g_debug_snapshot.vel_r_ref, motor->ctrl.wr_set) &&
-           expect_float_bits("vel_r_fbk", g_debug_snapshot.vel_r_fbk, motor->sig.wr_f) &&
-           expect_float_bits("i_d_ref", g_debug_snapshot.i_d_ref, motor->ctrl.id_set) &&
-           expect_float_bits("i_d_fbk", g_debug_snapshot.i_d_fbk, motor->sig.i_d) &&
-           expect_float_bits("i_q_ref", g_debug_snapshot.i_q_ref, motor->ctrl.iq_set) &&
-           expect_float_bits("i_q_lim", g_debug_snapshot.i_q_lim, motor->ctrl.iq_lim) &&
-           expect_float_bits("i_q_fbk", g_debug_snapshot.i_q_fbk, motor->sig.i_q) &&
-           expect_float_bits("v_d_cmd", g_debug_snapshot.v_d_cmd, motor->sig.v_d) &&
-           expect_float_bits("v_q_cmd", g_debug_snapshot.v_q_cmd, motor->sig.v_q) &&
+           expect_float_bits("pos_r_fbk", g_debug_snapshot.pos_r_fbk, motor->sig.pos_r) &&
+           expect_float_bits("spd_r_ref", g_debug_snapshot.spd_r_ref, motor->ctrl.wr_set) &&
+           expect_float_bits("spd_r_fbk", g_debug_snapshot.spd_r_fbk, motor->sig.spd_r) &&
+           expect_float_bits("id_ref", g_debug_snapshot.id_ref, motor->ctrl.id_set) &&
+           expect_float_bits("id_fbk", g_debug_snapshot.id_fbk, motor->sig.id) &&
+           expect_float_bits("iq_ref", g_debug_snapshot.iq_ref, motor->ctrl.iq_set) &&
+           expect_float_bits("iq_lim", g_debug_snapshot.iq_lim, motor->ctrl.iq_lim) &&
+           expect_float_bits("iq_fbk", g_debug_snapshot.iq_fbk, motor->sig.iq) &&
+           expect_float_bits("vd", g_debug_snapshot.vd, motor->sig.vd) &&
+           expect_float_bits("vq", g_debug_snapshot.vq, motor->sig.vq) &&
            expect_float_bits("diag_id_ref",
                              g_debug_snapshot.diag_id_ref,
                              g_diag.command.id_ref_a) &&
@@ -190,9 +190,9 @@ static int expect_snapshot_fields(const foc_t *motor,
            expect_float_bits("flux_wb",
                              g_debug_snapshot.flux_wb,
                              g_obs.flux.psi_magnitude_filtered_wb) &&
-           expect_float_bits("duty_a", g_debug_snapshot.duty_a, motor->sig.dtc_a) &&
-           expect_float_bits("duty_b", g_debug_snapshot.duty_b, motor->sig.dtc_b) &&
-           expect_float_bits("duty_c", g_debug_snapshot.duty_c, motor->sig.dtc_c) &&
+           expect_float_bits("duty_a", g_debug_snapshot.duty_a, motor->sig.duty_a) &&
+           expect_float_bits("duty_b", g_debug_snapshot.duty_b, motor->sig.duty_b) &&
+           expect_float_bits("duty_c", g_debug_snapshot.duty_c, motor->sig.duty_c) &&
            expect_float_bits("duty_cmd_a", g_debug_snapshot.duty_cmd_a, motor->pwm_cmd.duty_a) &&
            expect_float_bits("duty_cmd_b", g_debug_snapshot.duty_cmd_b, motor->pwm_cmd.duty_b) &&
            expect_float_bits("duty_cmd_c", g_debug_snapshot.duty_cmd_c, motor->pwm_cmd.duty_c) &&
@@ -246,7 +246,7 @@ static int test_snapshot_cannot_change_source(foc_t *motor)
 
     g_debug_snapshot.req = UINT32_MAX;
     g_debug_snapshot.state = UINT32_MAX;
-    g_debug_snapshot.i_a = -99.0f;
+    g_debug_snapshot.ia = -99.0f;
     g_debug_snapshot.duty_a = 0.99f;
 
     if (memcmp(motor, &before, sizeof(*motor)) == 0)
@@ -281,8 +281,8 @@ int main(void)
         return 2;
     }
 
-    motor.sig.i_a = 12.5f;
-    motor.sig.dtc_c = 0.77f;
+    motor.sig.ia = 12.5f;
+    motor.sig.duty_c = 0.77f;
     motor.req = DRIVE_REQ_STOP;
     motor.state = DRIVE_STATE_STOP;
     motor.pwm_active = false;

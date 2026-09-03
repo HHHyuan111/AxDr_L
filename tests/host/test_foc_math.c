@@ -370,13 +370,13 @@ static int test_transform_migration_equivalence(void)
         float v_alpha = 0.0f;
         float v_beta = 0.0f;
 
-        legacy.i_a = cases[index].i_a;
-        legacy.i_b = cases[index].i_b;
-        legacy.i_c = cases[index].i_c;
+        legacy.ia = cases[index].i_a;
+        legacy.ib = cases[index].i_b;
+        legacy.ic = cases[index].i_c;
         legacy.sin_val = cases[index].sin_theta;
         legacy.cos_val = cases[index].cos_theta;
-        legacy.v_d = cases[index].v_d;
-        legacy.v_q = cases[index].v_q;
+        legacy.vd = cases[index].v_d;
+        legacy.vq = cases[index].v_q;
 
         clarke_transform(&legacy);
         park_transform(&legacy);
@@ -400,12 +400,12 @@ static int test_transform_migration_equivalence(void)
                      &v_alpha,
                      &v_beta);
 
-        if (!expect_same_float_bits("Clarke i_alpha", i_alpha, legacy.i_alph) ||
-            !expect_same_float_bits("Clarke i_beta", i_beta, legacy.i_beta) ||
-            !expect_same_float_bits("Park i_d", i_d, legacy.i_d) ||
-            !expect_same_float_bits("Park i_q", i_q, legacy.i_q) ||
-            !expect_same_float_bits("逆 Park v_alpha", v_alpha, legacy.v_alph) ||
-            !expect_same_float_bits("逆 Park v_beta", v_beta, legacy.v_beta)) {
+        if (!expect_same_float_bits("Clarke i_alpha", i_alpha, legacy.ialpha) ||
+            !expect_same_float_bits("Clarke i_beta", i_beta, legacy.ibeta) ||
+            !expect_same_float_bits("Park i_d", i_d, legacy.id) ||
+            !expect_same_float_bits("Park i_q", i_q, legacy.iq) ||
+            !expect_same_float_bits("逆 Park v_alpha", v_alpha, legacy.valpha) ||
+            !expect_same_float_bits("逆 Park v_beta", v_beta, legacy.vbeta)) {
             fprintf(stderr, "坐标变换等价用例 %zu 失败。\n", index);
             return 0;
         }
@@ -418,13 +418,13 @@ static int test_coordinate_transforms(void)
 {
     foc_sig_t foc = {0};
 
-    foc.i_a = 1.0f;
-    foc.i_b = -0.5f;
-    foc.i_c = -0.5f;
+    foc.ia = 1.0f;
+    foc.ib = -0.5f;
+    foc.ic = -0.5f;
     clarke_transform(&foc);
 
-    if (!expect_close("Clarke i_alpha", foc.i_alph, 1.0f) ||
-        !expect_close("Clarke i_beta", foc.i_beta, 0.0f)) {
+    if (!expect_close("Clarke i_alpha", foc.ialpha, 1.0f) ||
+        !expect_close("Clarke i_beta", foc.ibeta, 0.0f)) {
         return 0;
     }
 
@@ -432,24 +432,24 @@ static int test_coordinate_transforms(void)
     foc.cos_val = 1.0f;
     park_transform(&foc);
 
-    if (!expect_close("Park i_d", foc.i_d, 1.0f) ||
-        !expect_close("Park i_q", foc.i_q, 0.0f)) {
+    if (!expect_close("Park i_d", foc.id, 1.0f) ||
+        !expect_close("Park i_q", foc.iq, 0.0f)) {
         return 0;
     }
 
-    foc.v_d = 0.25f;
-    foc.v_q = -0.5f;
+    foc.vd = 0.25f;
+    foc.vq = -0.5f;
     inverse_park(&foc);
 
-    if (!expect_close("逆 Park v_alpha", foc.v_alph, 0.25f) ||
-        !expect_close("逆 Park v_beta", foc.v_beta, -0.5f)) {
+    if (!expect_close("逆 Park v_alpha", foc.valpha, 0.25f) ||
+        !expect_close("逆 Park v_beta", foc.vbeta, -0.5f)) {
         return 0;
     }
 
     inverse_clarke(&foc);
-    return expect_close("逆 Clarke v_a", foc.v_a, 0.25f) &&
-           expect_close("逆 Clarke v_b", foc.v_b, -0.55801270f) &&
-           expect_close("逆 Clarke v_c", foc.v_c, 0.30801270f);
+    return expect_close("逆 Clarke v_a", foc.va, 0.25f) &&
+           expect_close("逆 Clarke v_b", foc.vb, -0.55801270f) &&
+           expect_close("逆 Clarke v_c", foc.vc, 0.30801270f);
 }
 
 static int test_svm_migration_equivalence(void)
@@ -530,9 +530,9 @@ static int test_foc_zero_angle_pipeline(void)
 {
     foc_sig_t foc = {0};
 
-    foc.i_a = 1.0f;
-    foc.i_b = -0.5f;
-    foc.i_c = -0.5f;
+    foc.ia = 1.0f;
+    foc.ib = -0.5f;
+    foc.ic = -0.5f;
     foc.theta = 0.0f;
     foc.inv_vbus = 1.0f;
 
@@ -540,11 +540,11 @@ static int test_foc_zero_angle_pipeline(void)
 
     return expect_close("FOC sin", foc.sin_val, 0.0f) &&
            expect_close("FOC cos", foc.cos_val, 1.0f) &&
-           expect_close("FOC i_d", foc.i_d, 1.0f) &&
-           expect_close("FOC i_q", foc.i_q, 0.0f) &&
-           expect_close("FOC duty_a", foc.dtc_a, 0.5f) &&
-           expect_close("FOC duty_b", foc.dtc_b, 0.5f) &&
-           expect_close("FOC duty_c", foc.dtc_c, 0.5f);
+           expect_close("FOC i_d", foc.id, 1.0f) &&
+           expect_close("FOC i_q", foc.iq, 0.0f) &&
+           expect_close("FOC duty_a", foc.duty_a, 0.5f) &&
+           expect_close("FOC duty_b", foc.duty_b, 0.5f) &&
+           expect_close("FOC duty_c", foc.duty_c, 0.5f);
 }
 
 int main(void)

@@ -21,15 +21,15 @@ _RAM_FUNC void vofa_start(void)
 {
 	
 //	vofa_send_data(0, g_foc.ctrl.drag_pe);
-//	vofa_send_data(1, g_foc.sig.p_e);
-	vofa_send_data(1, g_foc.adc.ia);
-	vofa_send_data(2, g_foc.adc.ib);
-	vofa_send_data(3, g_foc.adc.ic);
+//	vofa_send_data(1, g_foc.sig.theta_e);
+	vofa_send_data(1, g_foc.adc.raw.ia);
+	vofa_send_data(2, g_foc.adc.raw.ib);
+	vofa_send_data(3, g_foc.adc.raw.ic);
 	
-//	vofa_send_data(1, g_foc.sig.wr_f);
-//	vofa_send_data(2, g_foc.sig.i_q);
-//	vofa_send_data(2, g_foc.sig.i_b);
-//	vofa_send_data(3, g_foc.sig.i_c);
+//	vofa_send_data(1, g_foc.sig.spd_r);
+//	vofa_send_data(2, g_foc.sig.iq);
+//	vofa_send_data(2, g_foc.sig.ib);
+//	vofa_send_data(3, g_foc.sig.ic);
 
 	// calibr
 //	vofa_send_data(0, g_foc.calibr.pos);
@@ -47,8 +47,8 @@ _RAM_FUNC void vofa_start(void)
 //	vofa_send_data(3, g_foc.idpm.Lq);
 //	vofa_send_data(5, g_foc.idpm.flux);
 //	vofa_send_data(6, g_foc.idpm.Js);
-//	vofa_send_data(7, g_foc.sig.i_q);
-//	vofa_send_data(8, g_foc.sig.wr_f);
+//	vofa_send_data(7, g_foc.sig.iq);
+//	vofa_send_data(8, g_foc.sig.spd_r);
 //	vofa_send_data(9,  g_foc.id_pi.kp);
 //	vofa_send_data(10, g_foc.id_pi.ki);
 //	vofa_send_data(11, g_foc.iq_pi.kp);
@@ -56,19 +56,19 @@ _RAM_FUNC void vofa_start(void)
 //	vofa_send_data(13, g_foc.spd_pi.kp);
 //	vofa_send_data(14, g_foc.spd_pi.ki);
 
-//	vofa_send_data(0, g_foc.sig.i_d);
+//	vofa_send_data(0, g_foc.sig.id);
 //	vofa_send_data(1, g_foc.ctrl.id_set);
-//	vofa_send_data(2, g_foc.sig.i_q);
+//	vofa_send_data(2, g_foc.sig.iq);
 //	vofa_send_data(3, g_foc.ctrl.iq_set);
-//	vofa_send_data(4, g_foc.sig.wr_f);
+//	vofa_send_data(4, g_foc.sig.spd_r);
 
 	
-//	vofa_send_data(4, g_foc.sig.wr_f);
+//	vofa_send_data(4, g_foc.sig.spd_r);
 //	vofa_send_data(4, g_foc.ctrl.wm_set);
 //	vofa_send_data(4, g_foc.traj.spd_step);
-//	vofa_send_data(4, g_foc.sig.sp_m);
+//	vofa_send_data(4, g_foc.sig.pos_m_1t);
 //	
-//	vofa_send_data(4, g_foc.sig.mp_m);
+//	vofa_send_data(4, g_foc.sig.pos_m);
 //	vofa_send_data(4, g_foc.ctrl.posm_set);
 //	vofa_send_data(4, g_foc.ctrl.posr_set);
 //	
@@ -166,8 +166,6 @@ void vofa_demo(void)
 	// Call the function to send the frame tail
 	vofa_sendframetail();
 }
-
-
 
 
 

@@ -57,9 +57,9 @@ _RAM_FUNC void mit_step(foc_t *foc)
 {
     const control_mit_input_t input = {
         .position_ref_rad = foc->ctrl.posm_set,
-        .position_feedback_rad = foc->sig.mp_m,
+        .position_feedback_rad = foc->sig.pos_m,
         .speed_ref_rad_s = foc->ctrl.wm_set,
-        .speed_feedback_rad_s = foc->sig.wm,
+        .speed_feedback_rad_s = foc->sig.spd_m,
         .torque_feedforward_nm = foc->ctrl.mit_tor_set,
         .position_gain_nm_per_rad = foc->ctrl.kp,
         .speed_gain_nm_s_per_rad = foc->ctrl.kd,
@@ -76,7 +76,7 @@ _RAM_FUNC void mit_step(foc_t *foc)
     if (foc_cur_step(foc,
                      foc->ctrl.id_set,
                      foc->ctrl.iq_set,
-                     foc->sig.p_e))
+                     foc->sig.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -100,7 +100,7 @@ _RAM_FUNC void pv_step(foc_t *foc)
     if (foc_spd_step(foc,
                      foc->ctrl.wr_set,
                      foc->ctrl.iq_set,
-                     foc->sig.p_e))
+                     foc->sig.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -134,7 +134,7 @@ _RAM_FUNC void pp_step(foc_t *foc)
 
         if (new_command)
         {
-            foc->app.rel_pos_ref = foc->sig.mp_m + foc->ctrl.posm_set;
+            foc->app.rel_pos_ref = foc->sig.pos_m + foc->ctrl.posm_set;
             foc->ctrl.posm_lst = foc->ctrl.posm_set;
             foc->app.pos_set_by_flag = false;
         }
@@ -168,7 +168,7 @@ _RAM_FUNC void pp_step(foc_t *foc)
                      foc->ctrl.posr_set,
                      foc->ctrl.wr_set,
                      foc->ctrl.iq_set,
-                     foc->sig.p_e))
+                     foc->sig.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -185,7 +185,7 @@ _RAM_FUNC void cst_step(foc_t *foc)
     if (foc_cur_step(foc,
                  foc->ctrl.id_set,
                  foc->ctrl.iq_set,
-                 foc->sig.p_e))
+                 foc->sig.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -204,7 +204,7 @@ _RAM_FUNC void csv_step(foc_t *foc)
     if (foc_spd_step(foc,
                 foc->ctrl.wr_set,
                 foc->ctrl.iq_set,
-                foc->sig.p_e))
+                foc->sig.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -225,7 +225,7 @@ _RAM_FUNC void csp_step(foc_t *foc)
                 foc->ctrl.posr_set,
                 foc->ctrl.wr_set,
                 foc->ctrl.iq_set,
-                foc->sig.p_e))
+                foc->sig.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -258,7 +258,7 @@ _RAM_FUNC void stop_ramp_step(foc_t *foc, float deceleration_rad_s2)
     if (foc_spd_step(foc,
                 foc->ctrl.wr_set,
                 foc->ctrl.iq_set,
-                foc->sig.p_e))
+                foc->sig.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -270,7 +270,7 @@ _RAM_FUNC void stop_ramp_step(foc_t *foc, float deceleration_rad_s2)
 _RAM_FUNC void quick_stop_step(foc_t *foc)
 {
     stop_ramp_step(foc, foc->app.quick_stop_dec);
-    if (fabsf(foc->sig.wr_f) < CTRL_QUICK_STOP_SPEED_THRESHOLD_RAD_S)
+    if (fabsf(foc->sig.spd_r) < CTRL_QUICK_STOP_SPEED_THRESHOLD_RAD_S)
     {
         foc->req = DRIVE_REQ_STOP;
         foc->mode.sys = release_mode;

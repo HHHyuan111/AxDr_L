@@ -36,10 +36,10 @@ void target_pwm_set_duty_ratios(float duty_a, float duty_b, float duty_c)
     target_duty_c = duty_c;
 }
 
-void ctrl_fb_update(foc_t *motor, float bus_voltage_v)
+void ctrl_fb_update(foc_t *motor, float vbus)
 {
-    motor->sig.vbus = bus_voltage_v;
-    motor->sig.wr_f = 0.0f;
+    motor->sig.vbus = vbus;
+    motor->sig.spd_r = 0.0f;
 }
 
 void drive_control_reset(foc_t *motor)
@@ -144,9 +144,9 @@ bool foc_cur_step(foc_t *motor, float current_d_a, float current_q_a, float angl
     (void)current_q_a;
     (void)angle_rad;
 
-    motor->sig.dtc_a = 0.2f;
-    motor->sig.dtc_b = 0.4f;
-    motor->sig.dtc_c = 0.6f;
+    motor->sig.duty_a = 0.2f;
+    motor->sig.duty_b = 0.4f;
+    motor->sig.duty_c = 0.6f;
     return true;
 }
 
@@ -191,13 +191,13 @@ static control_cycle_input_t replay_sample(uint32_t seq)
         .i_valid = true,
         .vbus_valid = true,
         .pos_valid = true,
-        .current_a_a = 0.1f,
-        .current_b_a = -0.1f,
-        .current_c_a = 0.0f,
-        .bus_voltage_v = 24.0f,
-        .electrical_angle_rad = 0.3f,
-        .rotor_position_rad = 1.0f,
-        .output_position_rad = 1.0f,
+        .ia = 0.1f,
+        .ib = -0.1f,
+        .ic = 0.0f,
+        .vbus = 24.0f,
+        .theta_e = 0.3f,
+        .pos_r = 1.0f,
+        .pos_m = 1.0f,
     };
 }
 
@@ -214,7 +214,7 @@ int main(void)
     control_cycle_output_t output = {0};
 
     control_cycle_step(&motor, &input, &output);
-    if (!expect_true(output.drive_state == (uint32_t)DRIVE_STATE_STOP,
+    if (!expect_true(output.state == (uint32_t)DRIVE_STATE_STOP,
                      "第 1 拍 STOP 样本必须保持功率输出关闭。") ||
         !expect_true(pwm_start_count == 0U,
                      "STOP 样本不能启动 PWM。"))
@@ -225,9 +225,9 @@ int main(void)
     motor.req = DRIVE_REQ_START;
     input = replay_sample(2U);
     control_cycle_step(&motor, &input, &output);
-    if (!expect_true(output.drive_state == (uint32_t)DRIVE_STATE_STARTING,
+    if (!expect_true(output.state == (uint32_t)DRIVE_STATE_STARTING,
                      "第 2 拍 START 样本必须进入 STARTING。") ||
-        !expect_true(output.pwm_enabled,
+        !expect_true(output.pwm_on,
                      "START 成功后必须报告 PWM 已启用。") ||
         !expect_true((target_duty_a == 0.5f) &&
                      (target_duty_b == 0.5f) &&
@@ -241,9 +241,9 @@ int main(void)
 
     input = replay_sample(3U);
     control_cycle_step(&motor, &input, &output);
-    if (!expect_true(output.drive_state == (uint32_t)DRIVE_STATE_RUN,
+    if (!expect_true(output.state == (uint32_t)DRIVE_STATE_RUN,
                      "第 3 拍必须进入 RUN。") ||
-        !expect_true(output.duty_valid,
+        !expect_true(output.duty_ok,
                      "RUN 拍必须产生新的有效占空比。") ||
         !expect_true((target_duty_a == 0.2f) &&
                      (target_duty_b == 0.4f) &&
@@ -259,11 +259,11 @@ int main(void)
     input.pos_valid = false;
     control_cycle_step(&motor, &input, &output);
 
-    return expect_true(output.drive_state == (uint32_t)DRIVE_STATE_FAULT,
+    return expect_true(output.state == (uint32_t)DRIVE_STATE_FAULT,
                        "位置反馈失效必须在同一回放拍进入 FAULT。") &&
-           expect_true(!output.pwm_enabled,
+           expect_true(!output.pwm_on,
                        "位置反馈故障后必须报告 PWM 已关闭。") &&
-           expect_true((output.fault_bits != 0U) &&
+           expect_true((output.fault != 0U) &&
                        (motor.fault.bit.enc_err == 1U),
                        "位置反馈失效必须锁存编码器故障。") &&
            expect_true(pwm_stop_count == 1U,

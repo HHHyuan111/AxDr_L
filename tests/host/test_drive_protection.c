@@ -44,20 +44,20 @@ static drive_protection_config_t test_config(void)
 static drive_protection_sample_t safe_sample(void)
 {
     return (drive_protection_sample_t){
-        .current_a_a = 1.0f,
-        .current_b_a = -1.0f,
-        .current_c_a = 0.0f,
-        .bus_voltage_v = 24.0f,
-        .mos_temperature_c = 30.0f,
-        .coil_temperature_c = 35.0f,
-        .rotor_speed_rad_s = 20.0f,
-        .currents_valid = true,
-        .bus_voltage_valid = true,
-        .mos_temperature_valid = true,
-        .coil_temperature_valid = true,
-        .rotor_speed_valid = true,
-        .position_valid = true,
-        .power_stage_active = true,
+        .ia = 1.0f,
+        .ib = -1.0f,
+        .ic = 0.0f,
+        .vbus = 24.0f,
+        .temp_mos = 30.0f,
+        .temp_coil = 35.0f,
+        .spd = 20.0f,
+        .i_valid = true,
+        .vbus_valid = true,
+        .temp_mos_valid = true,
+        .temp_coil_valid = true,
+        .spd_valid = true,
+        .pos_valid = true,
+        .pwm_on = true,
     };
 }
 
@@ -89,7 +89,7 @@ static bool test_over_current_is_immediate_and_latched(void)
     drive_protection_sample_t sample = safe_sample();
     drive_protection_state_t state = {0};
 
-    sample.current_b_a = -5.1f;
+    sample.ib = -5.1f;
     uint32_t faults = drive_protection_step(&state, &config, &sample);
     if (!expect_true((faults & DRIVE_PROTECTION_FAULT_OVER_CURRENT) != 0U,
                      "任一相电流超过阈值应立即锁存过流。"))
@@ -109,8 +109,8 @@ static bool test_under_voltage_requires_active_power_stage(void)
     drive_protection_sample_t sample = safe_sample();
     drive_protection_state_t state = {0};
 
-    sample.bus_voltage_v = 9.0f;
-    sample.power_stage_active = false;
+    sample.vbus = 9.0f;
+    sample.pwm_on = false;
     for (unsigned int index = 0U; index < 4U; index++)
     {
         (void)drive_protection_step(&state, &config, &sample);
@@ -122,7 +122,7 @@ static bool test_under_voltage_requires_active_power_stage(void)
         return false;
     }
 
-    sample.power_stage_active = true;
+    sample.pwm_on = true;
     (void)drive_protection_step(&state, &config, &sample);
     (void)drive_protection_step(&state, &config, &sample);
     if (!expect_true(state.latched_faults == 0U,
@@ -131,7 +131,7 @@ static bool test_under_voltage_requires_active_power_stage(void)
         return false;
     }
 
-    sample.bus_voltage_v = 24.0f;
+    sample.vbus = 24.0f;
     (void)drive_protection_step(&state, &config, &sample);
     if (!expect_true(state.under_voltage_count == 0U,
                      "正常样本应清除未完成的欠压计数。"))
@@ -139,7 +139,7 @@ static bool test_under_voltage_requires_active_power_stage(void)
         return false;
     }
 
-    sample.bus_voltage_v = 9.0f;
+    sample.vbus = 9.0f;
     for (unsigned int index = 0U; index < 3U; index++)
     {
         (void)drive_protection_step(&state, &config, &sample);
@@ -156,12 +156,12 @@ static bool test_other_limits_and_invalid_samples(void)
     drive_protection_sample_t sample = safe_sample();
     drive_protection_state_t state = {0};
 
-    sample.current_a_a = NAN;
-    sample.bus_voltage_v = NAN;
-    sample.mos_temperature_c = NAN;
-    sample.coil_temperature_c = NAN;
-    sample.rotor_speed_rad_s = NAN;
-    sample.position_valid = false;
+    sample.ia = NAN;
+    sample.vbus = NAN;
+    sample.temp_mos = NAN;
+    sample.temp_coil = NAN;
+    sample.spd = NAN;
+    sample.pos_valid = false;
     (void)drive_protection_step(&state, &config, &sample);
     if (!expect_true(state.latched_faults == 0U,
                      "非有限样本应交给输入有效性故障处理，不能误判物理超限。"))
@@ -186,10 +186,10 @@ static bool test_other_limits_and_invalid_samples(void)
     drive_protection_reset(&state);
 
     sample = safe_sample();
-    sample.bus_voltage_v = 51.0f;
-    sample.mos_temperature_c = 81.0f;
-    sample.coil_temperature_c = 91.0f;
-    sample.rotor_speed_rad_s = -101.0f;
+    sample.vbus = 51.0f;
+    sample.temp_mos = 81.0f;
+    sample.temp_coil = 91.0f;
+    sample.spd = -101.0f;
     (void)drive_protection_step(&state, &config, &sample);
     const uint32_t faults = drive_protection_step(&state, &config, &sample);
 

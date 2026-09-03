@@ -35,21 +35,21 @@ typedef struct
     pid_para_t *iq_pi;
     pid_para_t *spd_pi;
     pid_para_t *pos_pi;
-    float v_d;
-    float v_q;
-    float i_q_ref;
+    float vd;
+    float vq;
+    float iq_ref;
     float spd_ref;
 } foc_ctrl_t;
 
 /**
  * @brief FOC 本周期使用的反馈。
  *
- * spd 单位为 rad/s，pos 单位为 rad，inv_v_bus 是母线电压调制系数。
+ * spd 单位为 rad/s，pos 单位为 rad，inv_vbus 是母线电压调制系数。
  */
 typedef struct
 {
     foc_sample_t sample;
-    float inv_v_bus;
+    float inv_vbus;
     float spd;
     float pos;
 } foc_fb_t;
@@ -63,10 +63,10 @@ typedef struct
 typedef struct
 {
     foc_ctrl_mode_t mode;
-    float v_d;
-    float v_q;
-    float i_d_ref;
-    float i_q_ref;
+    float vd;
+    float vq;
+    float id_ref;
+    float iq_ref;
     float spd_ref;
     float pos_ref;
     float cur_lim;
@@ -78,9 +78,9 @@ typedef struct
 {
     foc_frame_t frame;
     foc_duty_t pwm;
-    float v_d;
-    float v_q;
-    float i_q_ref;
+    float vd;
+    float vq;
+    float iq_ref;
     float spd_ref;
     bool valid;
 } foc_out_t;

@@ -20,23 +20,23 @@ PLATFORM_FAST_CODE void control_cycle_step(
     foc->fb_status.i_valid = input->i_valid;
     foc->fb_status.vbus_valid = input->vbus_valid;
     foc->fb_status.pos_valid = input->pos_valid;
-    foc->sig.i_a = input->current_a_a;
-    foc->sig.i_b = input->current_b_a;
-    foc->sig.i_c = input->current_c_a;
-    foc->sig.p_e = input->electrical_angle_rad;
-    foc->sig.mp_r = input->rotor_position_rad;
-    foc->sig.mp_m = input->output_position_rad;
+    foc->sig.ia = input->ia;
+    foc->sig.ib = input->ib;
+    foc->sig.ic = input->ic;
+    foc->sig.theta_e = input->theta_e;
+    foc->sig.pos_r = input->pos_r;
+    foc->sig.pos_m = input->pos_m;
 
     /* 控制器只消费物理量，不关心这些数据来自真实 Target、文件还是仿真模型。 */
-    ctrl_fb_update(foc, input->bus_voltage_v);
+    ctrl_fb_update(foc, input->vbus);
     drive_fast_step(foc);
     obs_step(foc);
 
     output->seq = foc->fast_seq;
-    output->drive_state = (uint32_t)foc->state;
-    output->fault_bits = foc->fault.all;
-    output->pwm_enabled = foc->pwm_active;
-    output->duty_valid = foc->pwm_cmd.valid;
+    output->state = (uint32_t)foc->state;
+    output->fault = foc->fault.all;
+    output->pwm_on = foc->pwm_active;
+    output->duty_ok = foc->pwm_cmd.valid;
     output->duty_a = foc->pwm_cmd.duty_a;
     output->duty_b = foc->pwm_cmd.duty_b;
     output->duty_c = foc->pwm_cmd.duty_c;

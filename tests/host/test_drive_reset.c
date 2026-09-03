@@ -38,16 +38,16 @@ int main(void)
             .pmax_iq = 6.0f
         },
         .sig = {
-            .p_e = 1.2f,
-            .mp_r = 8.0f,
-            .mp_m = 4.0f,
-            .wm = 1.5f,
-            .i_a = 0.3f,
-            .v_d = 2.0f,
-            .v_q = 3.0f,
-            .dtc_a = 0.2f,
-            .dtc_b = 0.4f,
-            .dtc_c = 0.6f
+            .theta_e = 1.2f,
+            .pos_r = 8.0f,
+            .pos_m = 4.0f,
+            .spd_m = 1.5f,
+            .ia = 0.3f,
+            .vd = 2.0f,
+            .vq = 3.0f,
+            .duty_a = 0.2f,
+            .duty_b = 0.4f,
+            .duty_c = 0.6f
         },
         .id_pi = {
             .kp = 0.5f,
@@ -70,12 +70,12 @@ int main(void)
                        (motor.ctrl.wr_set == 0.0f) &&
                        (motor.ctrl.posr_set == 0.0f),
                        "复位必须清除内部电流、速度和位置给定。") &&
-           expect_true((motor.sig.v_d == 0.0f) &&
-                       (motor.sig.v_q == 0.0f),
+           expect_true((motor.sig.vd == 0.0f) &&
+                       (motor.sig.vq == 0.0f),
                        "复位必须清除上一拍 dq 电压。") &&
-           expect_true((motor.sig.dtc_a == 0.5f) &&
-                       (motor.sig.dtc_b == 0.5f) &&
-                       (motor.sig.dtc_c == 0.5f),
+           expect_true((motor.sig.duty_a == 0.5f) &&
+                       (motor.sig.duty_b == 0.5f) &&
+                       (motor.sig.duty_c == 0.5f),
                        "复位后的候选占空比应回到中性值。") &&
            expect_true((motor.id_pi.kp == 0.5f) &&
                        (motor.id_pi.out_max == 10.0f) &&
@@ -93,8 +93,8 @@ int main(void)
                        (motor.ctrl.wm_acc == 20.0f) &&
                        (motor.ctrl.pmax_iq == 6.0f),
                        "复位不能覆盖周期、电机参数和限幅配置。") &&
-           expect_true((motor.sig.mp_r == 8.0f) &&
-                       (motor.sig.i_a == 0.3f),
+           expect_true((motor.sig.pos_r == 8.0f) &&
+                       (motor.sig.ia == 0.3f),
                        "复位不能抹掉当前物理位置和电流反馈。")
         ? 0
         : 1;

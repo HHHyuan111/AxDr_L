@@ -175,7 +175,7 @@ bool foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float pos)
     arguments_ok = arguments_ok &&
                    (vd_ref == foc->ctrl.vd_set) &&
                    (vq_ref == foc->ctrl.vq_set) &&
-                   (pos == foc->sig.p_e);
+                   (pos == foc->sig.theta_e);
     log_event(EVENT_FOC_VOLTAGE);
     return foc_result_valid;
 }
@@ -185,7 +185,7 @@ bool foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float pos)
     arguments_ok = arguments_ok &&
                    (id_ref == foc->ctrl.id_set) &&
                    (iq_ref == foc->ctrl.iq_set) &&
-                   (pos == foc->sig.p_e);
+                   (pos == foc->sig.theta_e);
     log_event(EVENT_FOC_CURRENT);
     return foc_result_valid;
 }
@@ -195,7 +195,7 @@ bool foc_spd_step(foc_t *foc, float vel_ref, float iq_ref, float pos)
     arguments_ok = arguments_ok &&
                    (vel_ref == foc->ctrl.wr_set) &&
                    (iq_ref == foc->ctrl.iq_set) &&
-                   (pos == foc->sig.p_e);
+                   (pos == foc->sig.theta_e);
     log_event(EVENT_FOC_VELOCITY);
     return foc_result_valid;
 }
@@ -210,7 +210,7 @@ bool foc_pos_step(foc_t *foc,
                    (pos_ref == foc->ctrl.posr_set) &&
                    (vel_ref == foc->ctrl.wr_set) &&
                    (iq_ref == foc->ctrl.iq_set) &&
-                   (pos == foc->sig.p_e);
+                   (pos == foc->sig.theta_e);
     log_event(EVENT_FOC_POSITION);
     return foc_result_valid;
 }
@@ -437,7 +437,7 @@ int main(void)
     foc.ctrl.iq_set = 1.4f;
     foc.ctrl.wr_set = 1.5f;
     foc.ctrl.posr_set = 1.6f;
-    foc.sig.p_e = 1.7f;
+    foc.sig.theta_e = 1.7f;
 
     if (!test_release_modes(&foc))
     {

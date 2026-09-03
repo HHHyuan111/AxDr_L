@@ -43,20 +43,20 @@ typedef struct
 
 typedef struct
 {
-    float current_a_a;
-    float current_b_a;
-    float current_c_a;
-    float bus_voltage_v;
-    float mos_temperature_c;
-    float coil_temperature_c;
-    float rotor_speed_rad_s;
-    bool currents_valid;
-    bool bus_voltage_valid;
-    bool mos_temperature_valid;
-    bool coil_temperature_valid;
-    bool rotor_speed_valid;
-    bool position_valid;
-    bool power_stage_active;
+    float ia;
+    float ib;
+    float ic;
+    float vbus;
+    float temp_mos;
+    float temp_coil;
+    float spd;
+    bool i_valid;
+    bool vbus_valid;
+    bool temp_mos_valid;
+    bool temp_coil_valid;
+    bool spd_valid;
+    bool pos_valid;
+    bool pwm_on;
 } drive_protection_sample_t;
 
 typedef struct
@@ -78,7 +78,8 @@ typedef struct
  *
  * @param[in,out] state 连续超限计数和已锁存故障，由当前快速周期独占写入。
  * @param[in] config 保护阈值和连续样本数。阈值或样本数为 0 时对应保护关闭。
- * @param[in] sample 本周期物理反馈及有效性，单位见字段名。
+ * @param[in] sample 本周期物理反馈及有效性。电流单位 A、电压单位 V、
+ *                  温度单位摄氏度、速度单位 rad/s。
  * @return 包含历史故障和本周期新增故障的锁存位。
  *
  * @pre 三个指针均有效。函数不分配内存、不等待外设，执行路径有界。

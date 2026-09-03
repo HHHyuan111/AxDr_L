@@ -44,10 +44,10 @@ static _RAM_FUNC void drive_diag_build_sample(foc_t *foc,
                                                mc_sample_t *sample)
 {
     const foc_sample_t foc_sample = {
-        .i_a = foc->sig.i_a,
-        .i_b = foc->sig.i_b,
-        .i_c = foc->sig.i_c,
-        .theta = foc->sig.p_e,
+        .ia = foc->sig.ia,
+        .ib = foc->sig.ib,
+        .ic = foc->sig.ic,
+        .theta = foc->sig.theta_e,
     };
     foc_frame_t frame;
 
@@ -55,18 +55,18 @@ static _RAM_FUNC void drive_diag_build_sample(foc_t *foc,
     foc_core_prepare(&foc_sample, &frame);
 
     *sample = (mc_sample_t){
-        .ia_a = foc->sig.i_a,
-        .ib_a = foc->sig.i_b,
-        .ic_a = foc->sig.i_c,
-        .i_alpha_a = frame.i_alpha,
-        .i_beta_a = frame.i_beta,
-        .id_a = frame.i_d,
-        .iq_a = frame.i_q,
-        .vd_v = foc->sig.v_d,
-        .vq_v = foc->sig.v_q,
-        .theta_mech_rad = foc->sig.mp_r,
-        .theta_elec_rad = foc->sig.p_e,
-        .omega_mech_rad_s = foc->sig.wr_f,
+        .ia_a = foc->sig.ia,
+        .ib_a = foc->sig.ib,
+        .ic_a = foc->sig.ic,
+        .i_alpha_a = frame.ialpha,
+        .i_beta_a = frame.ibeta,
+        .id_a = frame.id,
+        .iq_a = frame.iq,
+        .vd_v = foc->sig.vd,
+        .vq_v = foc->sig.vq,
+        .theta_mech_rad = foc->sig.pos_r,
+        .theta_elec_rad = foc->sig.theta_e,
+        .omega_mech_rad_s = foc->sig.spd_r,
         .vbus_v = foc->sig.vbus,
         .dt_s = foc->rate.foc_ts,
         .current_limit_a = g_diag.profile.current_limit_a,
@@ -89,7 +89,7 @@ static _RAM_FUNC bool drive_diag_voltage_is_allowed(
     }
     else
     {
-        voltage_v = hypotf(foc->sig.v_d, foc->sig.v_q);
+        voltage_v = hypotf(foc->sig.vd, foc->sig.vq);
     }
 
     return isfinite(voltage_v)
@@ -183,7 +183,7 @@ _RAM_FUNC bool drive_diag_step(foc_t *foc)
 
     control_angle_rad = command.openloop_enable
         ? command.openloop_theta_e_rad
-        : foc->sig.p_e;
+        : foc->sig.theta_e;
 
     switch (command.mode)
     {
@@ -216,7 +216,7 @@ _RAM_FUNC bool drive_diag_step(foc_t *foc)
 
     g_diag.voltage_saturated =
         (foc->sig.vs > 0.0f)
-        && (hypotf(foc->sig.v_d, foc->sig.v_q) >= (0.999f * foc->sig.vs));
+        && (hypotf(foc->sig.vd, foc->sig.vq) >= (0.999f * foc->sig.vs));
 
     if (!drive_pwm_commit(foc))
     {

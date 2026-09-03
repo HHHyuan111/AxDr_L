@@ -23,28 +23,28 @@ typedef struct
     bool i_valid;
     bool vbus_valid;
     bool pos_valid;
-    float current_a_a;
-    float current_b_a;
-    float current_c_a;
-    float bus_voltage_v;
-    float electrical_angle_rad;
-    float rotor_position_rad;
-    float output_position_rad;
+    float ia;
+    float ib;
+    float ic;
+    float vbus;
+    float theta_e;
+    float pos_r;
+    float pos_m;
 } control_cycle_input_t;
 
 /**
  * @brief 一个控制周期产生的 Drive 和逻辑三相 PWM 输出。
  *
- * duty_valid 为 false 时，本周期没有产生新的占空比命令，duty_a/b/c 不应被消费。
- * pwm_enabled 是 Drive 软件状态，不等同于功率引脚的硬件回读。
+ * duty_ok 为 false 时，本周期没有产生新的占空比命令，duty_a/b/c 不应被消费。
+ * pwm_on 是 Drive 软件状态，不等同于功率引脚的硬件回读。
  */
 typedef struct
 {
     uint32_t seq;
-    uint32_t drive_state;
-    uint32_t fault_bits;
-    bool pwm_enabled;
-    bool duty_valid;
+    uint32_t state;
+    uint32_t fault;
+    bool pwm_on;
+    bool duty_ok;
     float duty_a;
     float duty_b;
     float duty_c;

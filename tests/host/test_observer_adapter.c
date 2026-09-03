@@ -31,11 +31,11 @@ int main(void)
     obs_init(&foc);
 
     foc.pwm_active = true;
-    foc.sig.i_d = 0.0f;
-    foc.sig.i_q = 1.0f;
-    foc.sig.v_d = 0.0f;
-    foc.sig.v_q = 1.1f;
-    foc.sig.wr_f = 50.0f;
+    foc.sig.id = 0.0f;
+    foc.sig.iq = 1.0f;
+    foc.sig.vd = 0.0f;
+    foc.sig.vq = 1.1f;
+    foc.sig.spd_r = 50.0f;
     foc.sig.vs = 12.0f;
     obs_step(&foc);
 

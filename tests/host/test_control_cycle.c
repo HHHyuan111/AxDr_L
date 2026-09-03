@@ -15,21 +15,21 @@ static bool observer_called;
 static bool input_visible;
 static float received_bus_voltage_v;
 
-void ctrl_fb_update(foc_t *motor, float bus_voltage_v)
+void ctrl_fb_update(foc_t *motor, float vbus)
 {
     feedback_called = true;
-    received_bus_voltage_v = bus_voltage_v;
+    received_bus_voltage_v = vbus;
     input_visible = (motor->fast_seq == 42U) &&
                     motor->fb_status.i_valid &&
                     motor->fb_status.vbus_valid &&
                     motor->fb_status.pos_valid &&
-                    (motor->sig.i_a == 1.0f) &&
-                    (motor->sig.i_b == -2.0f) &&
-                    (motor->sig.i_c == 3.0f) &&
-                    (motor->sig.p_e == 0.25f) &&
-                    (motor->sig.mp_r == 4.0f) &&
-                    (motor->sig.mp_m == 5.0f);
-    motor->sig.vbus = bus_voltage_v;
+                    (motor->sig.ia == 1.0f) &&
+                    (motor->sig.ib == -2.0f) &&
+                    (motor->sig.ic == 3.0f) &&
+                    (motor->sig.theta_e == 0.25f) &&
+                    (motor->sig.pos_r == 4.0f) &&
+                    (motor->sig.pos_m == 5.0f);
+    motor->sig.vbus = vbus;
 }
 
 void drive_fast_step(foc_t *motor)
@@ -71,13 +71,13 @@ int main(void)
         .i_valid = true,
         .vbus_valid = true,
         .pos_valid = true,
-        .current_a_a = 1.0f,
-        .current_b_a = -2.0f,
-        .current_c_a = 3.0f,
-        .bus_voltage_v = 24.0f,
-        .electrical_angle_rad = 0.25f,
-        .rotor_position_rad = 4.0f,
-        .output_position_rad = 5.0f,
+        .ia = 1.0f,
+        .ib = -2.0f,
+        .ic = 3.0f,
+        .vbus = 24.0f,
+        .theta_e = 0.25f,
+        .pos_r = 4.0f,
+        .pos_m = 5.0f,
     };
     control_cycle_output_t output = {0};
 
@@ -93,11 +93,11 @@ int main(void)
                      "观测器必须在 Drive 本周期计算完成后运行。") ||
         !expect_true(output.seq == 42U,
                      "输出周期序号必须与输入一致。") ||
-        !expect_true(output.drive_state == (uint32_t)DRIVE_STATE_RUN,
+        !expect_true(output.state == (uint32_t)DRIVE_STATE_RUN,
                      "输出必须带出本周期 Drive 状态。") ||
-        !expect_true(output.fault_bits == 0x12U,
+        !expect_true(output.fault == 0x12U,
                      "输出必须带出本周期故障位。") ||
-        !expect_true(output.pwm_enabled && output.duty_valid,
+        !expect_true(output.pwm_on && output.duty_ok,
                      "输出必须区分 PWM 状态和占空比有效性。") ||
         !expect_true((output.duty_a == 0.2f) &&
                      (output.duty_b == 0.4f) &&

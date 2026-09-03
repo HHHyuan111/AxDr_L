@@ -41,10 +41,10 @@ PLATFORM_FAST_CODE bool board_adc_convert(const board_adc_cfg_t *cfg,
     }
 
     sample->v_bus_raw = raw->vbus;
-    sample->i_a = ((float)sample->i_raw.a - cfg->i_offset_a) * cfg->i_scale;
-    sample->i_b = ((float)sample->i_raw.b - cfg->i_offset_b) * cfg->i_scale;
-    sample->i_c = ((float)sample->i_raw.c - cfg->i_offset_c) * cfg->i_scale;
-    sample->v_bus = (float)sample->v_bus_raw * cfg->v_scale;
+    sample->ia = ((float)sample->i_raw.a - cfg->i_offset_a) * cfg->i_scale;
+    sample->ib = ((float)sample->i_raw.b - cfg->i_offset_b) * cfg->i_scale;
+    sample->ic = ((float)sample->i_raw.c - cfg->i_offset_c) * cfg->i_scale;
+    sample->vbus = (float)sample->v_bus_raw * cfg->v_scale;
 
     return true;
 }

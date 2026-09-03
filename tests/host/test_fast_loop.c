@@ -64,9 +64,9 @@ bool foc_adc_sample(foc_t *motor)
     return current_valid;
 }
 
-void ctrl_fb_update(foc_t *motor, float bus_voltage_v)
+void ctrl_fb_update(foc_t *motor, float vbus)
 {
-    (void)bus_voltage_v;
+    (void)vbus;
     last_motor = motor;
     log_event(EVENT_FEEDBACK_UPDATE);
 }

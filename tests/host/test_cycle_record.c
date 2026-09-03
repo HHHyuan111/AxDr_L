@@ -41,19 +41,19 @@ int main(void)
     foc.state = DRIVE_STATE_RUN;
     foc.fault.all = 0x12U;
     foc.sig.vbus = 24.0f;
-    foc.sig.i_a = 1.0f;
-    foc.sig.i_b = -0.4f;
-    foc.sig.i_c = -0.6f;
-    foc.sig.p_e = 0.7f;
-    foc.sig.mp_r = 1.2f;
-    foc.sig.wr_f = 3.4f;
-    foc.sig.i_d = 0.1f;
-    foc.sig.i_q = 0.8f;
-    foc.sig.v_d = 2.0f;
-    foc.sig.v_q = 3.0f;
-    foc.sig.dtc_a = 0.4f;
-    foc.sig.dtc_b = 0.5f;
-    foc.sig.dtc_c = 0.6f;
+    foc.sig.ia = 1.0f;
+    foc.sig.ib = -0.4f;
+    foc.sig.ic = -0.6f;
+    foc.sig.theta_e = 0.7f;
+    foc.sig.pos_r = 1.2f;
+    foc.sig.spd_r = 3.4f;
+    foc.sig.id = 0.1f;
+    foc.sig.iq = 0.8f;
+    foc.sig.vd = 2.0f;
+    foc.sig.vq = 3.0f;
+    foc.sig.duty_a = 0.4f;
+    foc.sig.duty_b = 0.5f;
+    foc.sig.duty_c = 0.6f;
 
     for (index = 1U; index <= (CYCLE_RECORD_CAPACITY + 3U); index++)
     {

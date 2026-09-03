@@ -15,7 +15,7 @@
 
 PLATFORM_FAST_CODE void drive_control_reset(foc_t *foc)
 {
-    const float angle_rad = isfinite(foc->sig.p_e) ? foc->sig.p_e : 0.0f;
+    const float angle_rad = isfinite(foc->sig.theta_e) ? foc->sig.theta_e : 0.0f;
 
     control_pid_clear(&foc->id_pi);
     control_pid_clear(&foc->iq_pi);
@@ -50,22 +50,22 @@ PLATFORM_FAST_CODE void drive_control_reset(foc_t *foc)
     foc->ctrl.kp = 0.0f;
     foc->ctrl.kd = 0.0f;
 
-    traj_spd_reset(&foc->spd_traj, foc->sig.wm);
-    traj_pos_reset(&foc->pos_traj, foc->sig.mp_m, foc->sig.wm);
-    foc->app.rel_pos_ref = foc->sig.mp_m;
+    traj_spd_reset(&foc->spd_traj, foc->sig.spd_m);
+    traj_pos_reset(&foc->pos_traj, foc->sig.pos_m, foc->sig.spd_m);
+    foc->app.rel_pos_ref = foc->sig.pos_m;
     foc->app.pos_reached = false;
     foc->app.vel_reached = false;
     foc->app.last_pos_pause = false;
 
-    foc->sig.i_d = 0.0f;
-    foc->sig.i_q = 0.0f;
-    foc->sig.v_d = 0.0f;
-    foc->sig.v_q = 0.0f;
-    foc->sig.i_alph = 0.0f;
-    foc->sig.i_beta = 0.0f;
-    foc->sig.v_alph = 0.0f;
-    foc->sig.v_beta = 0.0f;
-    foc->sig.dtc_a = 0.5f;
-    foc->sig.dtc_b = 0.5f;
-    foc->sig.dtc_c = 0.5f;
+    foc->sig.id = 0.0f;
+    foc->sig.iq = 0.0f;
+    foc->sig.vd = 0.0f;
+    foc->sig.vq = 0.0f;
+    foc->sig.ialpha = 0.0f;
+    foc->sig.ibeta = 0.0f;
+    foc->sig.valpha = 0.0f;
+    foc->sig.vbeta = 0.0f;
+    foc->sig.duty_a = 0.5f;
+    foc->sig.duty_b = 0.5f;
+    foc->sig.duty_c = 0.5f;
 }

@@ -10,22 +10,22 @@
 static const float foc_one_by_sqrt3 = 0.57735026919f;
 static const float foc_two_by_sqrt3 = 1.15470053838f;
 
-PLATFORM_FAST_CODE int foc_svm(float v_alpha_norm,
-                             float v_beta_norm,
-                             float *duty_a,
-                             float *duty_b,
-                             float *duty_c)
+PLATFORM_FAST_CODE int foc_svm(float valpha,
+                              float vbeta,
+                              float *duty_a,
+                              float *duty_b,
+                              float *duty_c)
 {
     int sextant;
     float phase_a;
     float phase_b;
     float phase_c;
 
-    if (v_beta_norm >= 0.0f)
+    if (vbeta >= 0.0f)
     {
-        if (v_alpha_norm >= 0.0f)
+        if (valpha >= 0.0f)
         {
-            if (foc_one_by_sqrt3 * v_beta_norm > v_alpha_norm)
+            if (foc_one_by_sqrt3 * vbeta > valpha)
             {
                 sextant = 2;
             }
@@ -36,7 +36,7 @@ PLATFORM_FAST_CODE int foc_svm(float v_alpha_norm,
         }
         else
         {
-            if (-foc_one_by_sqrt3 * v_beta_norm > v_alpha_norm)
+            if (-foc_one_by_sqrt3 * vbeta > valpha)
             {
                 sextant = 3;
             }
@@ -48,9 +48,9 @@ PLATFORM_FAST_CODE int foc_svm(float v_alpha_norm,
     }
     else
     {
-        if (v_alpha_norm >= 0.0f)
+        if (valpha >= 0.0f)
         {
-            if (-foc_one_by_sqrt3 * v_beta_norm > v_alpha_norm)
+            if (-foc_one_by_sqrt3 * vbeta > valpha)
             {
                 sextant = 5;
             }
@@ -61,7 +61,7 @@ PLATFORM_FAST_CODE int foc_svm(float v_alpha_norm,
         }
         else
         {
-            if (foc_one_by_sqrt3 * v_beta_norm > v_alpha_norm)
+            if (foc_one_by_sqrt3 * vbeta > valpha)
             {
                 sextant = 4;
             }
@@ -76,8 +76,8 @@ PLATFORM_FAST_CODE int foc_svm(float v_alpha_norm,
     {
         case 1:
         {
-            const float t1 = v_alpha_norm - foc_one_by_sqrt3 * v_beta_norm;
-            const float t2 = foc_two_by_sqrt3 * v_beta_norm;
+            const float t1 = valpha - foc_one_by_sqrt3 * vbeta;
+            const float t2 = foc_two_by_sqrt3 * vbeta;
 
             phase_a = (1.0f - t1 - t2) * 0.5f;
             phase_b = phase_a + t1;
@@ -87,8 +87,8 @@ PLATFORM_FAST_CODE int foc_svm(float v_alpha_norm,
 
         case 2:
         {
-            const float t2 = v_alpha_norm + foc_one_by_sqrt3 * v_beta_norm;
-            const float t3 = -v_alpha_norm + foc_one_by_sqrt3 * v_beta_norm;
+            const float t2 = valpha + foc_one_by_sqrt3 * vbeta;
+            const float t3 = -valpha + foc_one_by_sqrt3 * vbeta;
 
             phase_b = (1.0f - t2 - t3) * 0.5f;
             phase_a = phase_b + t3;
@@ -98,8 +98,8 @@ PLATFORM_FAST_CODE int foc_svm(float v_alpha_norm,
 
         case 3:
         {
-            const float t3 = foc_two_by_sqrt3 * v_beta_norm;
-            const float t4 = -v_alpha_norm - foc_one_by_sqrt3 * v_beta_norm;
+            const float t3 = foc_two_by_sqrt3 * vbeta;
+            const float t4 = -valpha - foc_one_by_sqrt3 * vbeta;
 
             phase_b = (1.0f - t3 - t4) * 0.5f;
             phase_c = phase_b + t3;
@@ -109,8 +109,8 @@ PLATFORM_FAST_CODE int foc_svm(float v_alpha_norm,
 
         case 4:
         {
-            const float t4 = -v_alpha_norm + foc_one_by_sqrt3 * v_beta_norm;
-            const float t5 = -foc_two_by_sqrt3 * v_beta_norm;
+            const float t4 = -valpha + foc_one_by_sqrt3 * vbeta;
+            const float t5 = -foc_two_by_sqrt3 * vbeta;
 
             phase_c = (1.0f - t4 - t5) * 0.5f;
             phase_b = phase_c + t5;
@@ -120,8 +120,8 @@ PLATFORM_FAST_CODE int foc_svm(float v_alpha_norm,
 
         case 5:
         {
-            const float t5 = -v_alpha_norm - foc_one_by_sqrt3 * v_beta_norm;
-            const float t6 = v_alpha_norm - foc_one_by_sqrt3 * v_beta_norm;
+            const float t5 = -valpha - foc_one_by_sqrt3 * vbeta;
+            const float t6 = valpha - foc_one_by_sqrt3 * vbeta;
 
             phase_c = (1.0f - t5 - t6) * 0.5f;
             phase_a = phase_c + t5;
@@ -132,8 +132,8 @@ PLATFORM_FAST_CODE int foc_svm(float v_alpha_norm,
         case 6:
         default:
         {
-            const float t6 = -foc_two_by_sqrt3 * v_beta_norm;
-            const float t1 = v_alpha_norm + foc_one_by_sqrt3 * v_beta_norm;
+            const float t6 = -foc_two_by_sqrt3 * vbeta;
+            const float t1 = valpha + foc_one_by_sqrt3 * vbeta;
 
             phase_a = (1.0f - t6 - t1) * 0.5f;
             phase_c = phase_a + t1;

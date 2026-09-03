@@ -11,42 +11,42 @@
 
 static const float foc_one_by_sqrt3 = 0.57735026919f;
 
-PLATFORM_FAST_CODE void foc_sin_cos(float theta_e_rad,
-                                        float *sin_theta,
-                                        float *cos_theta)
+PLATFORM_FAST_CODE void foc_sin_cos(float theta,
+                                    float *sin,
+                                    float *cos)
 {
-    *sin_theta = sinf(theta_e_rad);
-    *cos_theta = cosf(theta_e_rad);
+    *sin = sinf(theta);
+    *cos = cosf(theta);
 }
 
-PLATFORM_FAST_CODE void foc_clarke(float i_a,
-                                       float i_b,
-                                       float i_c,
-                                       float *i_alpha,
-                                       float *i_beta)
+PLATFORM_FAST_CODE void foc_clarke(float ia,
+                                   float ib,
+                                   float ic,
+                                   float *ialpha,
+                                   float *ibeta)
 {
-    *i_alpha = i_a;
-    *i_beta = (i_b - i_c) * foc_one_by_sqrt3;
+    *ialpha = ia;
+    *ibeta = (ib - ic) * foc_one_by_sqrt3;
 }
 
-PLATFORM_FAST_CODE void foc_park(float i_alpha,
-                                     float i_beta,
-                                     float sin_theta,
-                                     float cos_theta,
-                                     float *i_d,
-                                     float *i_q)
+PLATFORM_FAST_CODE void foc_park(float ialpha,
+                                 float ibeta,
+                                 float sin,
+                                 float cos,
+                                 float *id,
+                                 float *iq)
 {
-    *i_d = i_alpha * cos_theta + i_beta * sin_theta;
-    *i_q = i_beta * cos_theta - i_alpha * sin_theta;
+    *id = ialpha * cos + ibeta * sin;
+    *iq = ibeta * cos - ialpha * sin;
 }
 
-PLATFORM_FAST_CODE void foc_inv_park(float v_d,
-                                         float v_q,
-                                         float sin_theta,
-                                         float cos_theta,
-                                         float *v_alpha,
-                                         float *v_beta)
+PLATFORM_FAST_CODE void foc_inv_park(float vd,
+                                     float vq,
+                                     float sin,
+                                     float cos,
+                                     float *valpha,
+                                     float *vbeta)
 {
-    *v_alpha = v_d * cos_theta - v_q * sin_theta;
-    *v_beta = v_d * sin_theta + v_q * cos_theta;
+    *valpha = vd * cos - vq * sin;
+    *vbeta = vd * sin + vq * cos;
 }

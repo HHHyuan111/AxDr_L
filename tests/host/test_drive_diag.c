@@ -101,8 +101,8 @@ bool foc_cur_step(foc_t *foc, float d_ref, float q_ref, float angle)
     captured_d = d_ref;
     captured_q = q_ref;
     captured_angle = angle;
-    foc->sig.v_d = 1.0f;
-    foc->sig.v_q = 0.5f;
+    foc->sig.vd = 1.0f;
+    foc->sig.vq = 0.5f;
     foc->sig.vs = 12.0f;
     return true;
 }
@@ -113,8 +113,8 @@ bool foc_volt_step(foc_t *foc, float d_ref, float q_ref, float angle)
     captured_d = d_ref;
     captured_q = q_ref;
     captured_angle = angle;
-    foc->sig.v_d = d_ref;
-    foc->sig.v_q = q_ref;
+    foc->sig.vd = d_ref;
+    foc->sig.vq = q_ref;
     foc->sig.vs = 12.0f;
     return true;
 }
@@ -147,12 +147,12 @@ static foc_t make_motor(void)
     foc_t foc = {0};
 
     foc.state = DRIVE_STATE_STOP;
-    foc.sig.i_a = 1.0f;
-    foc.sig.i_b = -0.5f;
-    foc.sig.i_c = -0.5f;
-    foc.sig.p_e = 0.0f;
-    foc.sig.mp_r = 2.0f;
-    foc.sig.wr_f = 3.0f;
+    foc.sig.ia = 1.0f;
+    foc.sig.ib = -0.5f;
+    foc.sig.ic = -0.5f;
+    foc.sig.theta_e = 0.0f;
+    foc.sig.pos_r = 2.0f;
+    foc.sig.spd_r = 3.0f;
     foc.sig.vbus = 24.0f;
     foc.rate.foc_ts = 0.00005f;
     foc.enc.raw = 1234;

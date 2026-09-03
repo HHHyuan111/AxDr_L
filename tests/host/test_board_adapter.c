@@ -60,10 +60,10 @@ static bool test_abc_conversion(void)
                        && (sample.i_raw.b == 2200U)
                        && (sample.i_raw.c == 2300U),
                        "ABC 电流原始值映射错误。")
-        && expect_close(sample.i_a, 1.0f, "A 相电流换算错误。")
-        && expect_close(sample.i_b, 2.0f, "B 相电流换算错误。")
-        && expect_close(sample.i_c, 3.0f, "C 相电流换算错误。")
-        && expect_close(sample.v_bus, 20.0f, "母线电压换算错误。");
+        && expect_close(sample.ia, 1.0f, "A 相电流换算错误。")
+        && expect_close(sample.ib, 2.0f, "B 相电流换算错误。")
+        && expect_close(sample.ic, 3.0f, "C 相电流换算错误。")
+        && expect_close(sample.vbus, 20.0f, "母线电压换算错误。");
 }
 
 static bool test_acb_conversion(void)
@@ -82,8 +82,8 @@ static bool test_acb_conversion(void)
                        && (sample.v_raw.b == 300U)
                        && (sample.v_raw.c == 200U),
                        "ACB 电压原始值应交换 B、C 两相。")
-        && expect_close(sample.i_b, 3.0f, "ACB 的 B 相电流换算错误。")
-        && expect_close(sample.i_c, 2.0f, "ACB 的 C 相电流换算错误。");
+        && expect_close(sample.ib, 3.0f, "ACB 的 B 相电流换算错误。")
+        && expect_close(sample.ic, 2.0f, "ACB 的 C 相电流换算错误。");
 }
 
 static bool test_invalid_phase_order(void)

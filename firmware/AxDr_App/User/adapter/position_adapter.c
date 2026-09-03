@@ -67,7 +67,7 @@ _RAM_FUNC bool position_update(foc_t *foc)
 
     enc->rev_flag = 0U;
     encoder_update_angle(enc);
-    foc->sig.e_pr = enc->pos;
+    foc->sig.enc_pos_r = enc->pos;
     position_update_single_encoder(foc);
 
     foc->enc.raw = enc->raw;
@@ -78,40 +78,40 @@ _RAM_FUNC bool position_update(foc_t *foc)
 /**
  * @brief 根据单圈转子角计算电角度、累计转子位置和输出轴位置。
  *
- * @param[in,out] foc 电机对象；输入 e_pr 和电机参数，更新 p_e、mp_r、mp_m 等反馈。
+ * @param[in,out] foc 电机对象；输入 enc_pos_r 和电机参数，更新 theta_e、pos_r、pos_m。
  */
 _RAM_FUNC void position_update_single_encoder(foc_t *foc)
 {
     foc_sig_t *state = &foc->sig;
     const motor_cfg_t *motor = &foc->motor;
 
-    state->pr_dif = state->e_pr - state->pr_lst;
-    if (state->pr_dif > (0.88f * M_2PI))
+    state->pos_diff = state->enc_pos_r - state->pos_last;
+    if (state->pos_diff > (0.88f * M_2PI))
     {
         state->rev--;
     }
-    if (state->pr_dif < (-0.88f * M_2PI))
+    if (state->pos_diff < (-0.88f * M_2PI))
     {
         state->rev++;
     }
 
-    state->e_pe = state->e_pr * motor->pn
-        - (uint32_t)(state->e_pr * motor->pnd_2pi) * M_2PI
+    state->enc_theta_e = state->enc_pos_r * motor->pn
+        - (uint32_t)(state->enc_pos_r * motor->pnd_2pi) * M_2PI
         + motor->e_off;
-    wrap_0_2pi(state->e_pe);
+    wrap_0_2pi(state->enc_theta_e);
 
-    state->p_e = state->e_pr * motor->pn
-        - (uint32_t)(state->e_pr * motor->pnd_2pi) * M_2PI
+    state->theta_e = state->enc_pos_r * motor->pn
+        - (uint32_t)(state->enc_pos_r * motor->pnd_2pi) * M_2PI
         + motor->e_off;
-    wrap_0_2pi(state->p_e);
+    wrap_0_2pi(state->theta_e);
 
-    state->sp_r = state->e_pr + motor->r_off;
-    wrap_0_2pi(state->sp_r);
-    state->mp_r = state->e_pr + (float)state->rev * M_2PI + motor->r_off;
+    state->pos_r_1t = state->enc_pos_r + motor->r_off;
+    wrap_0_2pi(state->pos_r_1t);
+    state->pos_r = state->enc_pos_r + (float)state->rev * M_2PI + motor->r_off;
 
-    state->sp_m = state->sp_r * motor->div_Gr + motor->m_off;
-    wrap_0_2pi(state->sp_m);
-    state->mp_m = state->mp_r * motor->div_Gr;
-    state->m_rev = (int32_t)(state->mp_m * div_M_2PI);
-    state->pr_lst = state->e_pr;
+    state->pos_m_1t = state->pos_r_1t * motor->div_Gr + motor->m_off;
+    wrap_0_2pi(state->pos_m_1t);
+    state->pos_m = state->pos_r * motor->div_Gr;
+    state->m_rev = (int32_t)(state->pos_m * div_M_2PI);
+    state->pos_last = state->enc_pos_r;
 }

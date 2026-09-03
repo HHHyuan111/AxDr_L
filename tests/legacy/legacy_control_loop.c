@@ -18,20 +18,20 @@ bool legacy_foc_ctrl_step(foc_ctrl_t *ctrl,
     switch (ref->mode)
     {
         case FOC_CTRL_MODE_VOLT:
-            ctrl->v_d = ref->v_d;
-            ctrl->v_q = ref->v_q;
+            ctrl->vd = ref->vd;
+            ctrl->vq = ref->vq;
             break;
 
         case FOC_CTRL_MODE_CUR:
             (void)legacy_control_cur_step(&ctrl->cur_rate,
                                           ctrl->id_pi,
                                           ctrl->iq_pi,
-                                          ref->i_d_ref,
-                                          ref->i_q_ref,
-                                          out->frame.i_d,
-                                          out->frame.i_q,
-                                          &ctrl->v_d,
-                                          &ctrl->v_q);
+                                          ref->id_ref,
+                                          ref->iq_ref,
+                                          out->frame.id,
+                                          out->frame.iq,
+                                          &ctrl->vd,
+                                          &ctrl->vq);
             break;
 
         case FOC_CTRL_MODE_SPD:
@@ -40,16 +40,16 @@ bool legacy_foc_ctrl_step(foc_ctrl_t *ctrl,
                                           ref->spd_ref,
                                           fb->spd,
                                           ref->cur_lim,
-                                          &ctrl->i_q_ref);
+                                          &ctrl->iq_ref);
             (void)legacy_control_cur_step(&ctrl->cur_rate,
                                           ctrl->id_pi,
                                           ctrl->iq_pi,
-                                          ref->i_d_ref,
-                                          ctrl->i_q_ref,
-                                          out->frame.i_d,
-                                          out->frame.i_q,
-                                          &ctrl->v_d,
-                                          &ctrl->v_q);
+                                          ref->id_ref,
+                                          ctrl->iq_ref,
+                                          out->frame.id,
+                                          out->frame.iq,
+                                          &ctrl->vd,
+                                          &ctrl->vq);
             break;
 
         case FOC_CTRL_MODE_POS:
@@ -64,16 +64,16 @@ bool legacy_foc_ctrl_step(foc_ctrl_t *ctrl,
                                           ctrl->spd_ref,
                                           fb->spd,
                                           ref->cur_lim,
-                                          &ctrl->i_q_ref);
+                                          &ctrl->iq_ref);
             (void)legacy_control_cur_step(&ctrl->cur_rate,
                                           ctrl->id_pi,
                                           ctrl->iq_pi,
-                                          ref->i_d_ref,
-                                          ctrl->i_q_ref,
-                                          out->frame.i_d,
-                                          out->frame.i_q,
-                                          &ctrl->v_d,
-                                          &ctrl->v_q);
+                                          ref->id_ref,
+                                          ctrl->iq_ref,
+                                          out->frame.id,
+                                          out->frame.iq,
+                                          &ctrl->vd,
+                                          &ctrl->vq);
             break;
 
         default:
@@ -81,14 +81,14 @@ bool legacy_foc_ctrl_step(foc_ctrl_t *ctrl,
     }
 
     voltage = (foc_voltage_t){
-        .v_d = ctrl->v_d,
-        .v_q = ctrl->v_q,
-        .inv_vbus = fb->inv_v_bus,
+        .vd = ctrl->vd,
+        .vq = ctrl->vq,
+        .inv_vbus = fb->inv_vbus,
     };
 
-    out->v_d = ctrl->v_d;
-    out->v_q = ctrl->v_q;
-    out->i_q_ref = ctrl->i_q_ref;
+    out->vd = ctrl->vd;
+    out->vq = ctrl->vq;
+    out->iq_ref = ctrl->iq_ref;
     out->spd_ref = ctrl->spd_ref;
     out->valid = legacy_foc_core_modulate(&out->frame,
                                           &voltage,

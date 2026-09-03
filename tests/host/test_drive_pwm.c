@@ -102,7 +102,7 @@ static bool test_abc_commit(void)
     foc_t foc = {
         .fast_seq = 10U,
         .motor = {.phase_order = PHASE_ORDER_ABC},
-        .sig = {.dtc_a = 0.1f, .dtc_b = 0.2f, .dtc_c = 0.3f}
+        .sig = {.duty_a = 0.1f, .duty_b = 0.2f, .duty_c = 0.3f}
     };
 
     fake_target_reset();
@@ -138,7 +138,7 @@ static bool test_acb_commit(void)
     foc_t foc = {
         .fast_seq = 11U,
         .motor = {.phase_order = PHASE_ORDER_ACB},
-        .sig = {.dtc_a = 0.4f, .dtc_b = 0.5f, .dtc_c = 0.6f}
+        .sig = {.duty_a = 0.4f, .duty_b = 0.5f, .duty_c = 0.6f}
     };
 
     fake_target_reset();
@@ -174,7 +174,7 @@ static bool test_invalid_phase_does_not_commit(void)
     foc_t foc = {
         .fast_seq = 12U,
         .motor = {.phase_order = (phase_order_t)99},
-        .sig = {.dtc_a = 0.7f, .dtc_b = 0.8f, .dtc_c = 0.9f},
+        .sig = {.duty_a = 0.7f, .duty_b = 0.8f, .duty_c = 0.9f},
         .pwm_active = true,
         .pwm_commit = {.seq = 5U, .valid = true}
     };
@@ -205,7 +205,7 @@ static bool test_invalid_duty_stops_output(void)
     foc_t foc = {
         .fast_seq = 14U,
         .motor = {.phase_order = PHASE_ORDER_ABC},
-        .sig = {.dtc_a = NAN, .dtc_b = 0.5f, .dtc_c = 0.5f},
+        .sig = {.duty_a = NAN, .duty_b = 0.5f, .duty_c = 0.5f},
         .pwm_active = true,
         .pwm_commit = {.seq = 6U, .valid = true}
     };
@@ -224,8 +224,8 @@ static bool test_invalid_duty_stops_output(void)
         return false;
     }
 
-    foc.sig.dtc_a = 0.5f;
-    foc.sig.dtc_b = 1.01f;
+    foc.sig.duty_a = 0.5f;
+    foc.sig.duty_b = 1.01f;
     foc.pwm_active = true;
     fake_target_reset();
 
@@ -241,7 +241,7 @@ static bool test_failed_stop_keeps_active_state(void)
 {
     foc_t foc = {
         .motor = {.phase_order = PHASE_ORDER_ABC},
-        .sig = {.dtc_a = NAN, .dtc_b = 0.5f, .dtc_c = 0.5f},
+        .sig = {.duty_a = NAN, .duty_b = 0.5f, .duty_c = 0.5f},
         .pwm_active = true
     };
 

@@ -115,7 +115,7 @@ _RAM_FUNC bool drive_mode_step(foc_t *foc)
                     if (!foc_volt_step(foc,
                                   foc->ctrl.vd_set,
                                   foc->ctrl.vq_set,
-                                  foc->sig.p_e))
+                                  foc->sig.theta_e))
                     {
                         return false;
                     }
@@ -129,7 +129,7 @@ _RAM_FUNC bool drive_mode_step(foc_t *foc)
                     if (!foc_cur_step(foc,
                                   foc->ctrl.id_set,
                                   foc->ctrl.iq_set,
-                                  foc->sig.p_e))
+                                  foc->sig.theta_e))
                     {
                         return false;
                     }
@@ -139,7 +139,7 @@ _RAM_FUNC bool drive_mode_step(foc_t *foc)
                     if (!foc_spd_step(foc,
                                  foc->ctrl.wr_set,
                                  foc->ctrl.iq_set,
-                                 foc->sig.p_e))
+                                 foc->sig.theta_e))
                     {
                         return false;
                     }
@@ -150,7 +150,7 @@ _RAM_FUNC bool drive_mode_step(foc_t *foc)
                                  foc->ctrl.posr_set,
                                  foc->ctrl.wr_set,
                                  foc->ctrl.iq_set,
-                                 foc->sig.p_e))
+                                 foc->sig.theta_e))
                     {
                         return false;
                     }

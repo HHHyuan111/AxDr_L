@@ -68,7 +68,13 @@ typedef enum
     foc_pos_mode,
 } foc_mode_e;
 
-/** @brief 本周期 FOC 输入、反馈和中间结果。 */
+/**
+ * @brief 本周期 FOC 输入、反馈和中间结果。
+ *
+ * 实时物理量采用控制领域常用短名：i/v 表示电流/电压，theta/pos/spd 表示
+ * 角度/位置/速度，e/r/m 表示电气侧/转子侧/输出侧。电流单位 A、电压单位 V，
+ * 角度和位置单位 rad、速度单位 rad/s；字段名不再重复携带单位。
+ */
 typedef struct
 {
     foc_mode_e mode;
@@ -78,20 +84,20 @@ typedef struct
 
     int rev;
     int m_rev;
-    float e_pr;
-    float e_pe;
-    float p_e;
-    float sp_r;
-    float mp_r;
-    float mp_m;
-    float sp_m;
-    float pr_dif;
-    float pr_lst;
+    float enc_pos_r;
+    float enc_theta_e;
+    float theta_e;
+    float pos_r_1t;
+    float pos_r;
+    float pos_m;
+    float pos_m_1t;
+    float pos_diff;
+    float pos_last;
 
-    float we;
-    float wr;
-    float wr_f;
-    float wm;
+    float spd_e;
+    float spd_r_raw;
+    float spd_r;
+    float spd_m;
 
     float tor_r;
     float tor_rf;
@@ -103,24 +109,24 @@ typedef struct
     float theta;
     float sin_val;
     float cos_val;
-    float i_a;
-    float i_b;
-    float i_c;
-    float i_alph;
-    float i_beta;
-    float i_d;
-    float i_q;
+    float ia;
+    float ib;
+    float ic;
+    float ialpha;
+    float ibeta;
+    float id;
+    float iq;
     float iq_f;
-    float v_a;
-    float v_b;
-    float v_c;
-    float v_alph;
-    float v_beta;
-    float v_d;
-    float v_q;
-    float dtc_a;
-    float dtc_b;
-    float dtc_c;
+    float va;
+    float vb;
+    float vc;
+    float valpha;
+    float vbeta;
+    float vd;
+    float vq;
+    float duty_a;
+    float duty_b;
+    float duty_c;
 } foc_sig_t;
 
 typedef enum
@@ -343,7 +349,7 @@ typedef struct
     uint8_t pos_pid_cnt_val;
 } ctrl_rate_cfg_t;
 
-/** @brief 调试可见的 ADC 原始计数和三相电流零偏。 */
+/** @brief 一拍 ADC 原始计数。 */
 typedef struct
 {
     uint16_t ia;
@@ -353,6 +359,12 @@ typedef struct
     uint16_t va;
     uint16_t vb;
     uint16_t vc;
+} adc_raw_t;
+
+/** @brief 调试可见的 ADC 原始计数和三相电流零偏。 */
+typedef struct
+{
+    adc_raw_t raw;
     float ia_off;
     float ib_off;
     float ic_off;
@@ -456,14 +468,14 @@ struct foc
     traj_pos_t pos_traj;
 };
 
-void ctrl_fb_update(foc_t *foc, float bus_voltage_v);
+void ctrl_fb_update(foc_t *foc, float vbus);
 bool foc_adc_sample(foc_t *foc);
 void cur_offset_init(foc_t *foc);
 void cur_pi_init(foc_t *foc);
 void spd_pi_init(foc_t *foc);
 
-bool foc_volt_step(foc_t *foc, float v_d_ref, float v_q_ref, float angle);
-bool foc_cur_step(foc_t *foc, float i_d_ref, float i_q_ref, float angle);
+bool foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float angle);
+bool foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float angle);
 bool foc_spd_step(foc_t *foc, float spd_ref, float cur_lim, float angle);
 bool foc_pos_step(foc_t *foc,
                   float pos_ref,

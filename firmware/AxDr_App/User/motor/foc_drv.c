@@ -390,7 +390,7 @@ _RAM_FUNC void spd_pi_init(foc_t *foc)
  */
 static _RAM_FUNC bool foc_ctrl_run(
     foc_t *foc,
-    float electrical_angle_rad,
+    float theta_e,
     const foc_ref_t *ref)
 {
     foc_ctrl_t ctrl = {
@@ -410,21 +410,21 @@ static _RAM_FUNC bool foc_ctrl_run(
         .iq_pi = &foc->iq_pi,
         .spd_pi = &foc->spd_pi,
         .pos_pi = &foc->pos_pi,
-        .v_d = foc->sig.v_d,
-        .v_q = foc->sig.v_q,
-        .i_q_ref = foc->ctrl.iq_lim,
+        .vd = foc->sig.vd,
+        .vq = foc->sig.vq,
+        .iq_ref = foc->ctrl.iq_lim,
         .spd_ref = foc->ctrl.wr_lim,
     };
     const foc_fb_t fb = {
         .sample = {
-            .i_a = foc->sig.i_a,
-            .i_b = foc->sig.i_b,
-            .i_c = foc->sig.i_c,
-            .theta = electrical_angle_rad,
+            .ia = foc->sig.ia,
+            .ib = foc->sig.ib,
+            .ic = foc->sig.ic,
+            .theta = theta_e,
         },
-        .inv_v_bus = foc->sig.inv_vbus,
-        .spd = foc->sig.wr_f,
-        .pos = foc->sig.mp_r,
+        .inv_vbus = foc->sig.inv_vbus,
+        .spd = foc->sig.spd_r,
+        .pos = foc->sig.pos_r,
     };
     foc_out_t out;
     const bool valid = foc_ctrl_step(&ctrl, &fb, ref, &out);
@@ -432,30 +432,30 @@ static _RAM_FUNC bool foc_ctrl_run(
     foc->rate.cur_pid_cnt = ctrl.cur_rate.count;
     foc->rate.spd_pid_cnt = ctrl.spd_rate.count;
     foc->rate.pos_pid_cnt = ctrl.pos_rate.count;
-    foc->ctrl.iq_lim = ctrl.i_q_ref;
+    foc->ctrl.iq_lim = ctrl.iq_ref;
     foc->ctrl.wr_lim = ctrl.spd_ref;
 
     foc->sig.theta = out.frame.theta;
-    foc->sig.sin_val = out.frame.sin_theta;
-    foc->sig.cos_val = out.frame.cos_theta;
-    foc->sig.i_alph = out.frame.i_alpha;
-    foc->sig.i_beta = out.frame.i_beta;
-    foc->sig.i_d = out.frame.i_d;
-    foc->sig.i_q = out.frame.i_q;
-    foc->sig.v_d = out.v_d;
-    foc->sig.v_q = out.v_q;
-    foc->sig.v_alph = out.pwm.v_alpha;
-    foc->sig.v_beta = out.pwm.v_beta;
-    foc->sig.dtc_a = out.pwm.duty_a;
-    foc->sig.dtc_b = out.pwm.duty_b;
-    foc->sig.dtc_c = out.pwm.duty_c;
+    foc->sig.sin_val = out.frame.sin;
+    foc->sig.cos_val = out.frame.cos;
+    foc->sig.ialpha = out.frame.ialpha;
+    foc->sig.ibeta = out.frame.ibeta;
+    foc->sig.id = out.frame.id;
+    foc->sig.iq = out.frame.iq;
+    foc->sig.vd = out.vd;
+    foc->sig.vq = out.vq;
+    foc->sig.valpha = out.pwm.valpha;
+    foc->sig.vbeta = out.pwm.vbeta;
+    foc->sig.duty_a = out.pwm.duty_a;
+    foc->sig.duty_b = out.pwm.duty_b;
+    foc->sig.duty_c = out.pwm.duty_c;
 
     return valid;
 }
 
 /**
 ***********************************************************************
-* @brief:      foc_volt_step(foc_t *foc, float v_d_ref, float v_q_ref, float angle)
+* @brief:      foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float angle)
 * @param[in]:  foc 指向 PMSM 参数结构体的指针
 * @param[in]:  vd_ref d轴电压参考值
 * @param[in]:  vq_ref q轴电压参考值
@@ -464,12 +464,12 @@ static _RAM_FUNC bool foc_ctrl_run(
 * @details:    电压控制，设置d/q轴电压参考值，完成Clarke、Park变换及SVPWM计算
 ***********************************************************************
 **/
-_RAM_FUNC bool foc_volt_step(foc_t *foc, float v_d_ref, float v_q_ref, float angle)
+_RAM_FUNC bool foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float angle)
 {
     const foc_ref_t ref = {
         .mode = FOC_CTRL_MODE_VOLT,
-        .v_d = v_d_ref,
-        .v_q = v_q_ref,
+        .vd = vd_ref,
+        .vq = vq_ref,
     };
 
     foc->sig.mode = foc_volt_mode;
@@ -479,7 +479,7 @@ _RAM_FUNC bool foc_volt_step(foc_t *foc, float v_d_ref, float v_q_ref, float ang
 
 /**
 ***********************************************************************
-* @brief:      foc_cur_step(foc_t *foc, float i_d_ref, float i_q_ref, float angle)
+* @brief:      foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float angle)
 * @param[in]:  foc      指向 PMSM 参数结构体的指针
 * @param[in]:  id_set  d轴电流设定值
 * @param[in]:  iq_set  q轴电流设定值
@@ -488,12 +488,12 @@ _RAM_FUNC bool foc_volt_step(foc_t *foc, float v_d_ref, float v_q_ref, float ang
 * @details:    电流环控制，完成Clarke、Park变换、PI调节和SVPWM计算
 ***********************************************************************
 **/
-_RAM_FUNC bool foc_cur_step(foc_t *foc, float i_d_ref, float i_q_ref, float angle)
+_RAM_FUNC bool foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float angle)
 {
     const foc_ref_t ref = {
         .mode = FOC_CTRL_MODE_CUR,
-        .i_d_ref = i_d_ref,
-        .i_q_ref = i_q_ref,
+        .id_ref = id_ref,
+        .iq_ref = iq_ref,
     };
 
     foc->sig.mode = foc_curr_mode;
@@ -514,7 +514,7 @@ _RAM_FUNC bool foc_spd_step(foc_t *foc, float spd_ref, float cur_lim, float angl
 {
     const foc_ref_t ref = {
         .mode = FOC_CTRL_MODE_SPD,
-        .i_d_ref = foc->ctrl.id_set,
+        .id_ref = foc->ctrl.id_set,
         .spd_ref = spd_ref,
         .cur_lim = cur_lim,
     };
@@ -543,7 +543,7 @@ _RAM_FUNC bool foc_pos_step(foc_t *foc,
 {
     const foc_ref_t ref = {
         .mode = FOC_CTRL_MODE_POS,
-        .i_d_ref = foc->ctrl.id_set,
+        .id_ref = foc->ctrl.id_set,
         .pos_ref = pos_ref,
         .cur_lim = cur_lim,
         .spd_lim = spd_lim,
@@ -561,10 +561,10 @@ _RAM_FUNC bool foc_pos_step(foc_t *foc,
  * 本函数不直接读取硬件，也不执行电流环。它使用前面已经更新的 ADC 和角度结果，
  * 依次计算母线电压、控制器限幅、转矩和速度。
  */
-_RAM_FUNC void ctrl_fb_update(foc_t *foc, float bus_voltage_v)
+_RAM_FUNC void ctrl_fb_update(foc_t *foc, float vbus)
 {
     /* 第 1 步：保存本周期母线电压，并计算调制所需的电压系数和余量。 */
-    foc->sig.vbus = bus_voltage_v;
+    foc->sig.vbus = vbus;
 
     if (foc->sig.vbus > 0.0f)
     {
@@ -590,20 +590,20 @@ _RAM_FUNC void ctrl_fb_update(foc_t *foc, float bus_voltage_v)
     foc->pos_pi.out_min   =  foc->ctrl.nmax_vel;
 
     /* 第 3 步：滤波 q 轴电流，并换算转子侧和减速器输出侧转矩。 */
-    foc->sig.iq_f = control_lpf_step(&foc->iq_lpf, foc->sig.i_q);
-    foc->sig.tor_r  = foc->sig.i_q    * foc->motor.Kt;
+    foc->sig.iq_f = control_lpf_step(&foc->iq_lpf, foc->sig.iq);
+    foc->sig.tor_r  = foc->sig.iq     * foc->motor.Kt;
     foc->sig.tor_rf = foc->sig.iq_f   * foc->motor.Kt;
     foc->sig.tor_m  = foc->sig.tor_r  * foc->motor.Gr;
     foc->sig.tor_mf = foc->sig.tor_rf * foc->motor.Gr;
 
     /* 第 4 步：由电角度差得到电角速度，再换算转子速度和输出轴速度。 */
-    foc->sig.we = control_angle_speed_step(&foc->elec_speed_diff,
-                                           foc->sig.p_e,
+    foc->sig.spd_e = control_angle_speed_step(&foc->elec_speed_diff,
+                                           foc->sig.theta_e,
                                            DRIVE_FOC_FREQ_HZ);
-    foc->sig.wr = foc->sig.we * foc->motor.div_pn; // rad/s;
+    foc->sig.spd_r_raw = foc->sig.spd_e * foc->motor.div_pn; // rad/s;
 
-    foc->sig.wr_f = control_lpf_step(&foc->wr_lpf, foc->sig.wr);
-    foc->sig.wm = foc->sig.wr_f * foc->motor.div_Gr; // rad/s
+    foc->sig.spd_r = control_lpf_step(&foc->wr_lpf, foc->sig.spd_r_raw);
+    foc->sig.spd_m = foc->sig.spd_r * foc->motor.div_Gr; // rad/s
 
 }
 
@@ -674,18 +674,18 @@ _RAM_FUNC bool foc_adc_sample(foc_t *foc)
         return false;
     }
 
-    foc->adc.ia = sample.i_raw.a;
-    foc->adc.ib = sample.i_raw.b;
-    foc->adc.ic = sample.i_raw.c;
-    foc->adc.va = sample.v_raw.a;
-    foc->adc.vb = sample.v_raw.b;
-    foc->adc.vc = sample.v_raw.c;
-    foc->adc.vbus = sample.v_bus_raw;
+    foc->adc.raw.ia = sample.i_raw.a;
+    foc->adc.raw.ib = sample.i_raw.b;
+    foc->adc.raw.ic = sample.i_raw.c;
+    foc->adc.raw.va = sample.v_raw.a;
+    foc->adc.raw.vb = sample.v_raw.b;
+    foc->adc.raw.vc = sample.v_raw.c;
+    foc->adc.raw.vbus = sample.v_bus_raw;
 
-    foc->sig.i_a = sample.i_a;
-    foc->sig.i_b = sample.i_b;
-    foc->sig.i_c = sample.i_c;
-    foc->sig.vbus = sample.v_bus;
+    foc->sig.ia = sample.ia;
+    foc->sig.ib = sample.ib;
+    foc->sig.ic = sample.ic;
+    foc->sig.vbus = sample.vbus;
 
     return true;
 }

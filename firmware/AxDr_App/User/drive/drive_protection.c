@@ -46,26 +46,26 @@ PLATFORM_FAST_CODE uint32_t drive_protection_step(
     const drive_protection_config_t *config,
     const drive_protection_sample_t *sample)
 {
-    const bool currents_valid = sample->currents_valid &&
-                                isfinite(sample->current_a_a) &&
-                                isfinite(sample->current_b_a) &&
-                                isfinite(sample->current_c_a);
-    const bool bus_voltage_valid = sample->bus_voltage_valid &&
-                                   isfinite(sample->bus_voltage_v);
-    const bool mos_temperature_valid = sample->mos_temperature_valid &&
-                                       isfinite(sample->mos_temperature_c);
-    const bool coil_temperature_valid = sample->coil_temperature_valid &&
-                                        isfinite(sample->coil_temperature_c);
-    const bool rotor_speed_valid = sample->rotor_speed_valid &&
-                                   isfinite(sample->rotor_speed_rad_s);
-    const float max_phase_current_a = fmaxf(fabsf(sample->current_a_a),
-                                            fmaxf(fabsf(sample->current_b_a),
-                                                  fabsf(sample->current_c_a)));
+    const bool currents_valid = sample->i_valid &&
+                                isfinite(sample->ia) &&
+                                isfinite(sample->ib) &&
+                                isfinite(sample->ic);
+    const bool bus_voltage_valid = sample->vbus_valid &&
+                                   isfinite(sample->vbus);
+    const bool mos_temperature_valid = sample->temp_mos_valid &&
+                                       isfinite(sample->temp_mos);
+    const bool coil_temperature_valid = sample->temp_coil_valid &&
+                                        isfinite(sample->temp_coil);
+    const bool rotor_speed_valid = sample->spd_valid &&
+                                   isfinite(sample->spd);
+    const float max_phase_current_a = fmaxf(fabsf(sample->ia),
+                                            fmaxf(fabsf(sample->ib),
+                                                  fabsf(sample->ic)));
 
     drive_protection_update_counter(
         &state->invalid_current_count,
         config->invalid_current_samples,
-        sample->power_stage_active &&
+        sample->pwm_on &&
             (config->invalid_current_samples > 0U) &&
             !currents_valid,
         DRIVE_PROTECTION_FAULT_CURRENT_FEEDBACK,
@@ -74,7 +74,7 @@ PLATFORM_FAST_CODE uint32_t drive_protection_step(
     drive_protection_update_counter(
         &state->invalid_bus_voltage_count,
         config->invalid_bus_voltage_samples,
-        sample->power_stage_active &&
+        sample->pwm_on &&
             (config->invalid_bus_voltage_samples > 0U) &&
             !bus_voltage_valid,
         DRIVE_PROTECTION_FAULT_BUS_FEEDBACK,
@@ -83,9 +83,9 @@ PLATFORM_FAST_CODE uint32_t drive_protection_step(
     drive_protection_update_counter(
         &state->invalid_position_count,
         config->invalid_position_samples,
-        sample->power_stage_active &&
+        sample->pwm_on &&
             (config->invalid_position_samples > 0U) &&
-            !sample->position_valid,
+            !sample->pos_valid,
         DRIVE_PROTECTION_FAULT_POSITION_FEEDBACK,
         &state->latched_faults);
 
@@ -102,11 +102,11 @@ PLATFORM_FAST_CODE uint32_t drive_protection_step(
     drive_protection_update_counter(
         &state->under_voltage_count,
         config->under_voltage_samples,
-        sample->power_stage_active && bus_voltage_valid &&
+        sample->pwm_on && bus_voltage_valid &&
             drive_protection_limit_enabled(
             config->under_voltage_v,
             config->under_voltage_samples) &&
-            (sample->bus_voltage_v < config->under_voltage_v),
+            (sample->vbus < config->under_voltage_v),
         DRIVE_PROTECTION_FAULT_UNDER_VOLTAGE,
         &state->latched_faults);
 
@@ -116,7 +116,7 @@ PLATFORM_FAST_CODE uint32_t drive_protection_step(
         bus_voltage_valid && drive_protection_limit_enabled(
             config->over_voltage_v,
             config->over_voltage_samples) &&
-            (sample->bus_voltage_v > config->over_voltage_v),
+            (sample->vbus > config->over_voltage_v),
         DRIVE_PROTECTION_FAULT_OVER_VOLTAGE,
         &state->latched_faults);
 
@@ -126,7 +126,7 @@ PLATFORM_FAST_CODE uint32_t drive_protection_step(
         mos_temperature_valid && drive_protection_limit_enabled(
             config->mos_over_temperature_c,
             config->mos_over_temperature_samples) &&
-            (sample->mos_temperature_c > config->mos_over_temperature_c),
+            (sample->temp_mos > config->mos_over_temperature_c),
         DRIVE_PROTECTION_FAULT_MOS_OVER_TEMPERATURE,
         &state->latched_faults);
 
@@ -136,7 +136,7 @@ PLATFORM_FAST_CODE uint32_t drive_protection_step(
         coil_temperature_valid && drive_protection_limit_enabled(
             config->coil_over_temperature_c,
             config->coil_over_temperature_samples) &&
-            (sample->coil_temperature_c > config->coil_over_temperature_c),
+            (sample->temp_coil > config->coil_over_temperature_c),
         DRIVE_PROTECTION_FAULT_COIL_OVER_TEMPERATURE,
         &state->latched_faults);
 
@@ -146,7 +146,7 @@ PLATFORM_FAST_CODE uint32_t drive_protection_step(
         rotor_speed_valid && drive_protection_limit_enabled(
             config->over_speed_rad_s,
             config->over_speed_samples) &&
-            (fabsf(sample->rotor_speed_rad_s) > config->over_speed_rad_s),
+            (fabsf(sample->spd) > config->over_speed_rad_s),
         DRIVE_PROTECTION_FAULT_OVER_SPEED,
         &state->latched_faults);
 

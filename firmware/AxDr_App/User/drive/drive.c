@@ -19,32 +19,32 @@ static _RAM_FUNC void drive_update_protection(foc_t *foc)
                                  (foc->req == DRIVE_REQ_START) ||
                                  (foc->req == DRIVE_REQ_RUN);
     const bool currents_valid = foc->fb_status.i_valid &&
-                                isfinite(foc->sig.i_a) &&
-                                isfinite(foc->sig.i_b) &&
-                                isfinite(foc->sig.i_c);
+                                isfinite(foc->sig.ia) &&
+                                isfinite(foc->sig.ib) &&
+                                isfinite(foc->sig.ic);
     const bool bus_voltage_valid = foc->fb_status.vbus_valid &&
                                    isfinite(foc->sig.vbus) &&
                                    (foc->sig.vbus >= 0.0f);
     const bool position_valid = foc->fb_status.pos_valid &&
-                                isfinite(foc->sig.p_e) &&
-                                isfinite(foc->sig.mp_r) &&
-                                isfinite(foc->sig.mp_m);
+                                isfinite(foc->sig.theta_e) &&
+                                isfinite(foc->sig.pos_r) &&
+                                isfinite(foc->sig.pos_m);
     const drive_protection_sample_t sample = {
-        .current_a_a = foc->sig.i_a,
-        .current_b_a = foc->sig.i_b,
-        .current_c_a = foc->sig.i_c,
-        .bus_voltage_v = foc->sig.vbus,
-        .mos_temperature_c = foc->sig.Tmos,
-        .coil_temperature_c = foc->sig.Tcoil,
-        .rotor_speed_rad_s = foc->sig.wr_f,
-        .currents_valid = currents_valid,
-        .bus_voltage_valid = bus_voltage_valid,
+        .ia = foc->sig.ia,
+        .ib = foc->sig.ib,
+        .ic = foc->sig.ic,
+        .vbus = foc->sig.vbus,
+        .temp_mos = foc->sig.Tmos,
+        .temp_coil = foc->sig.Tcoil,
+        .spd = foc->sig.spd_r,
+        .i_valid = currents_valid,
+        .vbus_valid = bus_voltage_valid,
         /* 当前板级采样链尚未接入两个温度 ADC，不宣称温度数据有效。 */
-        .mos_temperature_valid = false,
-        .coil_temperature_valid = false,
-        .rotor_speed_valid = position_valid,
-        .position_valid = position_valid,
-        .power_stage_active = power_requested,
+        .temp_mos_valid = false,
+        .temp_coil_valid = false,
+        .spd_valid = position_valid,
+        .pos_valid = position_valid,
+        .pwm_on = power_requested,
     };
     const uint32_t faults = drive_protection_step(&foc->prot_state,
                                                   &foc->prot_cfg,

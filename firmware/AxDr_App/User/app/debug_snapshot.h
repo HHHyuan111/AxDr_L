@@ -46,28 +46,28 @@ typedef struct
     uint32_t obs_samples;
 
     /* 母线电压单位 V；三相电流单位 A；电角度单位 rad。 */
-    float v_bus;
-    float i_a;
-    float i_b;
-    float i_c;
+    float vbus;
+    float ia;
+    float ib;
+    float ic;
     float theta_e;
 
     /* 转子侧位置单位 rad，转子侧角速度单位 rad/s。 */
     float pos_r_ref;
     float pos_r_fbk;
-    float vel_r_ref;
-    float vel_r_fbk;
+    float spd_r_ref;
+    float spd_r_fbk;
 
-    /* dq 轴电流单位 A；i_q_ref 是原始目标，i_q_lim 是级联环实际限幅结果。 */
-    float i_d_ref;
-    float i_d_fbk;
-    float i_q_ref;
-    float i_q_lim;
-    float i_q_fbk;
+    /* dq 轴电流单位 A；iq_ref 是原始目标，iq_lim 是级联环实际限幅结果。 */
+    float id_ref;
+    float id_fbk;
+    float iq_ref;
+    float iq_lim;
+    float iq_fbk;
 
     /* dq 轴电压指令单位 V；三相 duty 是范围通常为 [0, 1] 的候选比例。 */
-    float v_d_cmd;
-    float v_q_cmd;
+    float vd;
+    float vq;
     float diag_id_ref;
     float diag_iq_ref;
     float diag_vd_ref;
