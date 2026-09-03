@@ -40,9 +40,9 @@ static bool test_positive_polarity_and_limits(void)
     foc_t motor = test_motor();
 
     motor.mode.release = csp_mode;
-    motor.cmd.torm_set = 3.0f;
-    motor.cmd.wm_set = -120.0f;
-    motor.cmd.posm_set = 4.0f;
+    motor.cmd.torq = 3.0f;
+    motor.cmd.spd = -120.0f;
+    motor.cmd.pos = 4.0f;
 
     return expect_true(drive_cmd_apply(&motor),
                        "有限命令和有效限幅应被接受。") &&
@@ -60,9 +60,9 @@ static bool test_negative_polarity(void)
 
     motor.mode.release = csp_mode;
     motor.app.polarity = motor_polarity_n;
-    motor.cmd.torm_set = 1.0f;
-    motor.cmd.wm_set = -20.0f;
-    motor.cmd.posm_set = 3.0f;
+    motor.cmd.torq = 1.0f;
+    motor.cmd.spd = -20.0f;
+    motor.cmd.pos = 3.0f;
 
     return expect_true(drive_cmd_apply(&motor),
                        "反向极性下的有效命令应被接受。") &&
@@ -80,9 +80,9 @@ static bool test_mit_command(void)
 
     motor.mode.release = mit_mode;
     motor.app.polarity = motor_polarity_n;
-    motor.cmd.mit_tor_set = 3.0f;
-    motor.cmd.wm_set = 20.0f;
-    motor.cmd.posm_set = 3.0f;
+    motor.cmd.mit_ff = 3.0f;
+    motor.cmd.spd = 20.0f;
+    motor.cmd.pos = 3.0f;
     motor.cmd.kp = 2.0f;
     motor.cmd.kd = 0.5f;
 
@@ -104,7 +104,7 @@ static bool test_invalid_input_does_not_update_setpoints(void)
     motor.ctrl.torm_set = 0.1f;
     motor.ctrl.wm_set = 0.2f;
     motor.ctrl.posm_set = 0.3f;
-    motor.cmd.wm_set = NAN;
+    motor.cmd.spd = NAN;
 
     if (!expect_true(!drive_cmd_apply(&motor),
                      "NaN 命令必须被拒绝。") ||
@@ -116,7 +116,7 @@ static bool test_invalid_input_does_not_update_setpoints(void)
         return false;
     }
 
-    motor.cmd.wm_set = 0.0f;
+    motor.cmd.spd = 0.0f;
     motor.app.nmax_velm = 10.0f;
     motor.app.pmax_velm = -10.0f;
     if (!expect_true(!drive_cmd_apply(&motor),

@@ -4,6 +4,8 @@
  */
 
 #include "common.h"
+
+#include <math.h>
 #include "encoder_config.h"
 #include "target_encoder.h"
 

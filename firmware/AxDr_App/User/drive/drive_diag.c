@@ -20,7 +20,7 @@ diag_runtime_t g_diag;
 
 void drive_diag_init(const foc_t *foc)
 {
-    const encoder_data_t *encoder = (foc->enc.sensory1 == ENCODER_TYPE_MT6816)
+    const encoder_data_t *encoder = (foc->enc.primary == ENCODER_TYPE_MT6816)
         ? &foc->enc.mt6816
         : &foc->enc.ma732;
     const diag_seed_t seed = {
@@ -70,7 +70,7 @@ static _RAM_FUNC void drive_diag_build_sample(foc_t *foc,
         .vbus_v = foc->sig.vbus,
         .dt_s = foc->rate.foc_ts,
         .current_limit_a = g_diag.profile.current_limit_a,
-        .encoder_raw = (uint32_t)foc->enc.raw_1,
+        .encoder_raw = (uint32_t)foc->enc.raw,
         .encoder_full_scale = g_diag.profile.encoder_full_scale,
         .fault_code = foc->fault.all,
         .voltage_saturated = g_diag.voltage_saturated,

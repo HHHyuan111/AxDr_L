@@ -107,8 +107,8 @@ _RAM_FUNC void svpwm_midpoint(foc_sig_t *foc)
     float va = foc->v_alph;
     float vb = -0.5f * foc->v_alph + SQRT3_BY_2 *foc->v_beta;
     float vc = -0.5f * foc->v_alph - SQRT3_BY_2 *foc->v_beta;
-    float vmax = max(max(va, vb), vc);
-    float vmin = min(min(va, vb), vc);
+    float vmax = LEGACY_MAX(LEGACY_MAX(va, vb), vc);
+    float vmin = LEGACY_MIN(LEGACY_MIN(va, vb), vc);
     float vcom = (vmax + vmin) * 0.5f;
     foc->dtc_a = 1.0f-((va - vcom) + 0.5f);
     foc->dtc_b = 1.0f-((vb - vcom) + 0.5f);

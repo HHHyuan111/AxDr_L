@@ -32,6 +32,7 @@ $controlLoopTestSource = Join-Path $testDir "test_control_loop.c"
 $controlTrajTestSource = Join-Path $testDir "test_control_traj.c"
 $observerAdapterTestSource = Join-Path $testDir "test_observer_adapter.c"
 $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
+$cycleRecordTestSource = Join-Path $testDir "test_cycle_record.c"
 $controlCycleTestSource = Join-Path $testDir "test_control_cycle.c"
 $controlReplayTestSource = Join-Path $testDir "test_control_replay.c"
 $fastLoopTestSource = Join-Path $testDir "test_fast_loop.c"
@@ -43,6 +44,7 @@ $targetIrqSource = Join-Path $bspDir "target_irq.c"
 $boardAdapterSource = Join-Path $adapterDir "board_adapter.c"
 $observerAdapterSource = Join-Path $adapterDir "observer_adapter.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
+$cycleRecordSource = Join-Path $appDir "cycle_record.c"
 $legacyFocSource = Join-Path $legacyDir "legacy_foc.c"
 $legacyFocCoreSource = Join-Path $legacyDir "legacy_foc_core.c"
 $legacyCascadeSource = Join-Path $legacyDir "legacy_control_cascade.c"
@@ -63,7 +65,7 @@ $speedSource = Join-Path $controlDir "control_speed.c"
 $diagnosticCoreDir = Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic/core"
 $mcCommonSource = Join-Path $diagnosticCoreDir "mc_common.c"
 $mcFluxObserverSource = Join-Path $diagnosticCoreDir "mc_flux_observer.c"
-$utilSource = Join-Path $motorDir "util.c"
+$utilSource = Join-Path $RepoRoot "tests/legacy/legacy_trig.c"
 $driveSource = Join-Path $driveDir "drive.c"
 $driveDiagSource = Join-Path $driveDir "drive_diag.c"
 $driveModeSource = Join-Path $driveDir "drive_mode.c"
@@ -86,6 +88,7 @@ $controlLoopExecutablePath = Join-Path $outputDir "test_control_loop.exe"
 $controlTrajExecutablePath = Join-Path $outputDir "test_control_traj.exe"
 $observerAdapterExecutablePath = Join-Path $outputDir "test_observer_adapter.exe"
 $debugSnapshotExecutablePath = Join-Path $outputDir "test_debug_snapshot.exe"
+$cycleRecordExecutablePath = Join-Path $outputDir "test_cycle_record.exe"
 $controlCycleExecutablePath = Join-Path $outputDir "test_control_cycle.exe"
 $controlReplayExecutablePath = Join-Path $outputDir "test_control_replay.exe"
 $fastLoopExecutablePath = Join-Path $outputDir "test_fast_loop.exe"
@@ -239,6 +242,28 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/只读调试快照测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
+        "-I$motorDir" "-I$driveDir" `
+        $cycleRecordTestSource $cycleRecordSource `
+        -o $cycleRecordExecutablePath 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host 周期记录测试编译失败，退出码：$compileExitCode"
+}
+
+& $cycleRecordExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host 周期记录测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/快速周期环形记录测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `

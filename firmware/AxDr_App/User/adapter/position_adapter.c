@@ -13,12 +13,12 @@
  */
 _RAM_FUNC bool encoder_sample(encoder_state_t *enc)
 {
-    if (enc->pos_mode != Sensorsory_s)
+    if (enc->source != POSITION_SOURCE_ENCODER)
     {
         return false;
     }
 
-    switch (enc->sensory1)
+    switch (enc->primary)
     {
         case ENCODER_TYPE_MA732:
             return read_ma732_raw(&enc->ma732);
@@ -41,12 +41,12 @@ _RAM_FUNC bool position_update(foc_t *foc)
 {
     encoder_data_t *enc;
 
-    if (foc->enc.pos_mode != Sensorsory_s)
+    if (foc->enc.source != POSITION_SOURCE_ENCODER)
     {
         return false;
     }
 
-    switch (foc->enc.sensory1)
+    switch (foc->enc.primary)
     {
         case ENCODER_TYPE_MA732:
             enc = &foc->enc.ma732;
@@ -70,9 +70,8 @@ _RAM_FUNC bool position_update(foc_t *foc)
     foc->sig.e_pr = enc->pos;
     position_update_single_encoder(foc);
 
-    foc->enc.raw_1 = enc->raw;
-    foc->enc.bit_1 = enc->bit;
-    foc->enc.pos_1 = enc->pos;
+    foc->enc.raw = enc->raw;
+    foc->enc.pos = enc->pos;
     return true;
 }
 

@@ -16,10 +16,6 @@
 #define DRIVE_CURRENT_AMP_GAIN                (20.0f)
 #define DRIVE_VBUS_DIVIDER_HIGH_OHM           (20000.0f)
 #define DRIVE_VBUS_DIVIDER_LOW_OHM            (1000.0f)
-#define DRIVE_NTC_NOMINAL_OHM                 (10000.0f)
-#define DRIVE_NTC_DIVIDER_OHM                 (10000.0f)
-#define DRIVE_NTC_ZERO_CELSIUS_K              (273.15f)
-#define DRIVE_NTC_BETA_K                      (3950.0f)
 #define DRIVE_HARDWARE_DEADTIME_US            (0.5f)
 
 /* 驱动保护阈值。 */

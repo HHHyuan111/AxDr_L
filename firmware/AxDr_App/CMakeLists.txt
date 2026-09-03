@@ -47,6 +47,7 @@ set(AXDR_USER_SOURCES
     User/adapter/observer_adapter.c
     User/adapter/position_adapter.c
     User/app/control_cycle.c
+    User/app/cycle_record.c
     User/app/fast_loop.c
     User/app/debug_snapshot.c
     User/bsp/target_adc.c
@@ -89,7 +90,6 @@ set(AXDR_USER_SOURCES
     User/moldue/lcd.c
     User/motor/foc_drv.c
     User/motor/motor_modes.c
-    User/motor/util.c
 )
 
 # Create an executable object type

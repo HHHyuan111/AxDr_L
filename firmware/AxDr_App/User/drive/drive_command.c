@@ -33,9 +33,9 @@ PLATFORM_FAST_CODE bool drive_cmd_apply(foc_t *foc)
             float spd;
             float torq_ff;
 
-            if (!isfinite(foc->cmd.posm_set) ||
-                !isfinite(foc->cmd.wm_set) ||
-                !isfinite(foc->cmd.mit_tor_set) ||
+            if (!isfinite(foc->cmd.pos) ||
+                !isfinite(foc->cmd.spd) ||
+                !isfinite(foc->cmd.mit_ff) ||
                 !isfinite(foc->cmd.kp) ||
                 !isfinite(foc->cmd.kd) ||
                 (foc->cmd.kp < 0.0f) ||
@@ -47,13 +47,13 @@ PLATFORM_FAST_CODE bool drive_cmd_apply(foc_t *foc)
                 return false;
             }
 
-            pos = control_limit(foc->cmd.posm_set,
+            pos = control_limit(foc->cmd.pos,
                                 foc->app.pmax_posm,
                                 foc->app.nmax_posm);
-            spd = control_limit(foc->cmd.wm_set,
+            spd = control_limit(foc->cmd.spd,
                                 foc->app.pmax_velm,
                                 foc->app.nmax_velm);
-            torq_ff = control_limit(foc->cmd.mit_tor_set,
+            torq_ff = control_limit(foc->cmd.mit_ff,
                                     foc->app.pmax_torm,
                                     foc->app.nmax_torm);
 
@@ -66,12 +66,12 @@ PLATFORM_FAST_CODE bool drive_cmd_apply(foc_t *foc)
         }
 
         case cst_mode:
-            if (!isfinite(foc->cmd.torm_set) ||
+            if (!isfinite(foc->cmd.torq) ||
                 !drive_cmd_range_valid(foc->app.nmax_torm, foc->app.pmax_torm))
             {
                 return false;
             }
-            foc->ctrl.torm_set = control_limit(foc->cmd.torm_set,
+            foc->ctrl.torm_set = control_limit(foc->cmd.torq,
                                                foc->app.pmax_torm,
                                                foc->app.nmax_torm);
             if (reverse)
@@ -82,17 +82,17 @@ PLATFORM_FAST_CODE bool drive_cmd_apply(foc_t *foc)
 
         case vel_mode:
         case csv_mode:
-            if (!isfinite(foc->cmd.torm_set) ||
-                !isfinite(foc->cmd.wm_set) ||
+            if (!isfinite(foc->cmd.torq) ||
+                !isfinite(foc->cmd.spd) ||
                 !drive_cmd_range_valid(foc->app.nmax_torm, foc->app.pmax_torm) ||
                 !drive_cmd_range_valid(foc->app.nmax_velm, foc->app.pmax_velm))
             {
                 return false;
             }
-            foc->ctrl.torm_set = control_limit(foc->cmd.torm_set,
+            foc->ctrl.torm_set = control_limit(foc->cmd.torq,
                                                foc->app.pmax_torm,
                                                foc->app.nmax_torm);
-            foc->ctrl.wm_set = control_limit(foc->cmd.wm_set,
+            foc->ctrl.wm_set = control_limit(foc->cmd.spd,
                                              foc->app.pmax_velm,
                                              foc->app.nmax_velm);
             if (reverse)
@@ -104,22 +104,22 @@ PLATFORM_FAST_CODE bool drive_cmd_apply(foc_t *foc)
 
         case pos_mode:
         case csp_mode:
-            if (!isfinite(foc->cmd.torm_set) ||
-                !isfinite(foc->cmd.wm_set) ||
-                !isfinite(foc->cmd.posm_set) ||
+            if (!isfinite(foc->cmd.torq) ||
+                !isfinite(foc->cmd.spd) ||
+                !isfinite(foc->cmd.pos) ||
                 !drive_cmd_range_valid(foc->app.nmax_torm, foc->app.pmax_torm) ||
                 !drive_cmd_range_valid(foc->app.nmax_velm, foc->app.pmax_velm) ||
                 !drive_cmd_range_valid(foc->app.nmax_posm, foc->app.pmax_posm))
             {
                 return false;
             }
-            foc->ctrl.torm_set = control_limit(foc->cmd.torm_set,
+            foc->ctrl.torm_set = control_limit(foc->cmd.torq,
                                                foc->app.pmax_torm,
                                                foc->app.nmax_torm);
-            foc->ctrl.wm_set = control_limit(foc->cmd.wm_set,
+            foc->ctrl.wm_set = control_limit(foc->cmd.spd,
                                              foc->app.pmax_velm,
                                              foc->app.nmax_velm);
-            foc->ctrl.posm_set = control_limit(foc->cmd.posm_set,
+            foc->ctrl.posm_set = control_limit(foc->cmd.pos,
                                                foc->app.pmax_posm,
                                                foc->app.nmax_posm);
             if (reverse)

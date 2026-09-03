@@ -41,12 +41,9 @@ PLATFORM_FAST_CODE void drive_control_reset(foc_t *foc)
     foc->ctrl.wr_lim = 0.0f;
     foc->ctrl.wm_set = 0.0f;
     foc->ctrl.wm_ref = 0.0f;
-    foc->ctrl.wm_lim = 0.0f;
-    foc->ctrl.wm_diff = 0.0f;
     foc->ctrl.posm_set = 0.0f;
     foc->ctrl.posm_ref = 0.0f;
     foc->ctrl.posr_set = 0.0f;
-    foc->ctrl.wm_lst = 0.0f;
     foc->ctrl.posm_lst = 0.0f;
     foc->ctrl.mit_tor_set = 0.0f;
     foc->ctrl.mit_tor_out = 0.0f;
@@ -58,7 +55,6 @@ PLATFORM_FAST_CODE void drive_control_reset(foc_t *foc)
     foc->app.rel_pos_ref = foc->sig.mp_m;
     foc->app.pos_reached = false;
     foc->app.vel_reached = false;
-    foc->app.tor_reached = false;
     foc->app.last_pos_pause = false;
 
     foc->sig.i_d = 0.0f;

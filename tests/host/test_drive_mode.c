@@ -152,12 +152,6 @@ void cali_mag_encoder(foc_t *foc)
     log_event(EVENT_ENCODER_CALIBRATION);
 }
 
-void iden_pmsm_first(idpm_t *idpm)
-{
-    arguments_ok = arguments_ok && (idpm != NULL);
-    log_event(EVENT_IDENTIFICATION);
-}
-
 void anticogging_calibration(foc_t *foc)
 {
     (void)foc;

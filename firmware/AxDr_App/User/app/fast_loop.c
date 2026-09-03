@@ -12,6 +12,7 @@
 
 #include "common.h"
 #include "control_cycle.h"
+#include "cycle_record.h"
 #include "debug_snapshot.h"
 
 /*
@@ -72,4 +73,7 @@ _RAM_FUNC void fast_loop_step(foc_t *foc)
 
     /* 第 5 步：复制本周期最终结果，仅供调试器观察，不参与控制。 */
     debug_snapshot_publish(foc);
+
+    /* 第 6 步：仅在人工启用时，保存最近 32 个周期供离线分析。 */
+    cycle_record_publish(foc);
 }

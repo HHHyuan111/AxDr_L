@@ -9,6 +9,7 @@
 
 #include "common.h"
 #include "fast_loop.h"
+#include "main.h"
 
 typedef enum
 {
@@ -18,11 +19,12 @@ typedef enum
     EVENT_FEEDBACK_UPDATE,
     EVENT_DRIVE_STEP,
     EVENT_OBSERVER_STEP,
-    EVENT_SNAPSHOT_PUBLISH
+    EVENT_SNAPSHOT_PUBLISH,
+    EVENT_RECORD_PUBLISH
 } fast_event_e;
 
-#define EVENT_COUNT_PER_CYCLE (7U)
-#define EVENT_CAPACITY        (21U)
+#define EVENT_COUNT_PER_CYCLE (8U)
+#define EVENT_CAPACITY        (24U)
 
 foc_t g_foc;
 
@@ -87,6 +89,12 @@ void debug_snapshot_publish(const foc_t *motor)
     log_event(EVENT_SNAPSHOT_PUBLISH);
 }
 
+void cycle_record_publish(const foc_t *motor)
+{
+    last_motor = motor;
+    log_event(EVENT_RECORD_PUBLISH);
+}
+
 static bool expect_true(bool condition, const char *message)
 {
     if (condition)
@@ -107,7 +115,8 @@ static bool expect_cycle_events(size_t first_event)
         EVENT_FEEDBACK_UPDATE,
         EVENT_DRIVE_STEP,
         EVENT_OBSERVER_STEP,
-        EVENT_SNAPSHOT_PUBLISH
+        EVENT_SNAPSHOT_PUBLISH,
+        EVENT_RECORD_PUBLISH
     };
     size_t index;
 
@@ -148,7 +157,7 @@ static bool test_explicit_motor_cycle(foc_t *motor)
     fast_loop_step(motor);
 
     if (!expect_true(event_count == EVENT_COUNT_PER_CYCLE,
-                     "一次快速周期应依次调用六个步骤。") ||
+                      "一次快速周期应依次调用八个步骤。") ||
         !expect_cycle_events(0U) ||
         !expect_true(motor->fast_seq == 8U,
                      "放行后的快速周期应增加一次周期编号。") ||

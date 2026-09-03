@@ -1,4 +1,7 @@
 #include "common.h"
+
+#include <string.h>
+
 #include "algorithm_config.h"
 #include "board_adapter.h"
 #include "board_config.h"
@@ -9,6 +12,7 @@
 #include "motor_config.h"
 #include "observer_adapter.h"
 #include "target_adc.h"
+#include "main.h"
 
 _RAM_DATA foc_t g_foc;
 
@@ -38,16 +42,6 @@ static void board_cfg_init(foc_t *foc)
 
     foc->board.i_max = foc->board.v_adc * foc->board.i_ratio * 0.5f;
     foc->board.v_max = foc->board.v_adc * foc->board.v_ratio;
-
-    foc->board.Rt_Mos = DRIVE_NTC_NOMINAL_OHM;
-    foc->board.Rt_Mos_res = DRIVE_NTC_DIVIDER_OHM;
-    foc->board.Rt_Mos_Ka = DRIVE_NTC_ZERO_CELSIUS_K;
-    foc->board.Rt_Mos_B = DRIVE_NTC_BETA_K;
-
-    foc->board.Rt_rotor = DRIVE_NTC_NOMINAL_OHM;
-    foc->board.Rt_rotor_res = DRIVE_NTC_DIVIDER_OHM;
-    foc->board.Rt_rotor_Ka = DRIVE_NTC_ZERO_CELSIUS_K;
-    foc->board.Rt_rotor_B = DRIVE_NTC_BETA_K;
 
     foc->board.dead_time = DRIVE_HARDWARE_DEADTIME_US;
 }
@@ -119,8 +113,6 @@ static void motor_pr60_init(foc_t *foc)
     foc->motor.div_pn = 1.0f / foc->motor.pn;
     foc->motor.pnd_2pi = foc->motor.pn / M_2PI;
     foc->motor.div_Gr = 1.0f / foc->motor.Gr;
-    foc->motor.Gref = 1.0f;
-
     foc->motor.Kt = 1.5f * foc->motor.pn * foc->motor.flux;
     foc->motor.div_Kt = 1.0f / foc->motor.Kt;
 
@@ -141,15 +133,13 @@ static void motor_pr60_init(foc_t *foc)
     foc->app.pmax_posm = MOTOR_MAX_POSITION_RAD;
     foc->app.nmax_posm = -MOTOR_MAX_POSITION_RAD;
 
-    foc->ctrl.pmax_tor =  foc->app.pmax_torm*foc->motor.div_Gr;
-    foc->ctrl.nmax_tor =  foc->app.nmax_torm*foc->motor.div_Gr;
-    foc->ctrl.pmax_iq  =  foc->ctrl.pmax_tor*foc->motor.div_Kt;
-    foc->ctrl.nmax_iq  =  foc->ctrl.nmax_tor*foc->motor.div_Kt;
+    foc->ctrl.pmax_iq = foc->app.pmax_torm
+        * foc->motor.div_Gr * foc->motor.div_Kt;
+    foc->ctrl.nmax_iq = foc->app.nmax_torm
+        * foc->motor.div_Gr * foc->motor.div_Kt;
 
     foc->ctrl.pmax_vel =  foc->app.pmax_velm*foc->motor.Gr;
     foc->ctrl.nmax_vel =  foc->app.nmax_velm*foc->motor.Gr;
-    foc->ctrl.pmax_pos =  foc->app.pmax_posm*foc->motor.Gr;
-    foc->ctrl.nmax_pos =  foc->app.nmax_posm*foc->motor.Gr;
 }
 #endif
 
@@ -179,8 +169,6 @@ static void motor_2312s_init(foc_t *foc)
     foc->motor.div_pn = 1.0f / foc->motor.pn;
     foc->motor.pnd_2pi = foc->motor.pn / M_2PI;
     foc->motor.div_Gr = 1.0f / foc->motor.Gr;
-    foc->motor.Gref = 1.0f;
-
     foc->motor.Kt = 1.5f * foc->motor.pn * foc->motor.flux;
     foc->motor.div_Kt = 1.0f / foc->motor.Kt;
 
@@ -201,15 +189,13 @@ static void motor_2312s_init(foc_t *foc)
     foc->app.pmax_posm = MOTOR_MAX_POSITION_RAD;
     foc->app.nmax_posm = -MOTOR_MAX_POSITION_RAD;
 
-    foc->ctrl.pmax_tor =  foc->app.pmax_torm*foc->motor.div_Gr;
-    foc->ctrl.nmax_tor =  foc->app.nmax_torm*foc->motor.div_Gr;
-    foc->ctrl.pmax_iq  =  foc->ctrl.pmax_tor*foc->motor.div_Kt;
-    foc->ctrl.nmax_iq  =  foc->ctrl.nmax_tor*foc->motor.div_Kt;
+    foc->ctrl.pmax_iq = foc->app.pmax_torm
+        * foc->motor.div_Gr * foc->motor.div_Kt;
+    foc->ctrl.nmax_iq = foc->app.nmax_torm
+        * foc->motor.div_Gr * foc->motor.div_Kt;
 
     foc->ctrl.pmax_vel =  foc->app.pmax_velm*foc->motor.Gr;
     foc->ctrl.nmax_vel =  foc->app.nmax_velm*foc->motor.Gr;
-    foc->ctrl.pmax_pos =  foc->app.pmax_posm*foc->motor.Gr;
-    foc->ctrl.nmax_pos =  foc->app.nmax_posm*foc->motor.Gr;
 }
 #endif
 
@@ -238,9 +224,6 @@ static void ctrl_rate_init(foc_t *foc)
     foc->rate.pos_pid_ts = 1.0f / foc->rate.pos_pid_fs;
     foc->rate.pos_pid_cnt_val = foc->rate.foc_fs * foc->rate.pos_pid_ts;
 
-    foc->rate.spd_mea_fs = CTRL_SPEED_MEASURE_FREQ_HZ;
-    foc->rate.spd_mea_ts = 1.0f / foc->rate.spd_mea_fs;
-    foc->rate.spd_mea_cnt_val = foc->rate.foc_fs * foc->rate.spd_mea_ts;
 }
 
 /**
@@ -253,33 +236,12 @@ static void ctrl_rate_init(foc_t *foc)
 **/
 static void ctrl_filter_init(foc_t *foc)
 {
-    foc->id_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
-    foc->id_lpf.fs = DRIVE_FOC_FREQ_HZ;
     foc->iq_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
     foc->iq_lpf.fs = DRIVE_FOC_FREQ_HZ;
-    foc->vd_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
-    foc->vd_lpf.fs = DRIVE_FOC_FREQ_HZ;
-    foc->vq_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
-    foc->vq_lpf.fs = DRIVE_FOC_FREQ_HZ;
-
-    foc->ibus_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
-    foc->ibus_lpf.fs = DRIVE_FOC_FREQ_HZ;
-    foc->vbus_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
-    foc->vbus_lpf.fs = DRIVE_FOC_FREQ_HZ;
-
-    foc->iabs_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
-    foc->iabs_lpf.fs = DRIVE_FOC_FREQ_HZ;
-
     foc->wr_lpf.fc = CTRL_SIGNAL_FILTER_CUTOFF_HZ;
     foc->wr_lpf.fs = DRIVE_FOC_FREQ_HZ;
 
-    control_lpf_init(&foc->id_lpf);
     control_lpf_init(&foc->iq_lpf);
-    control_lpf_init(&foc->vd_lpf);
-    control_lpf_init(&foc->vq_lpf);
-    control_lpf_init(&foc->ibus_lpf);
-    control_lpf_init(&foc->iabs_lpf);
-    control_lpf_init(&foc->vbus_lpf);
     control_lpf_init(&foc->wr_lpf);
 }
 
@@ -360,8 +322,8 @@ void foc_init(foc_t *foc)
     foc->state = DRIVE_STATE_STOP;
     foc->pwm_active = false;
 
-    foc->enc.pos_mode = Sensorsory_s;
-    foc->enc.sensory1 = ENCODER_SELECTED_TYPE;
+    foc->enc.source = POSITION_SOURCE_ENCODER;
+    foc->enc.primary = ENCODER_SELECTED_TYPE;
     encoder_init(&foc->enc);
 
     /* 默认使用零电流闭环调试；切换模式前仍需显式发送 START 请求。 */
@@ -372,17 +334,12 @@ void foc_init(foc_t *foc)
     foc->app.polarity = motor_polarity_p;
     foc->app.pos_ctrl_mode = abs_pos_mode;
 
-    foc->app.p_curve = tcurve;
-    foc->app.v_curve = tcurve;
-    foc->app.vel_set_immediate = 1;
-    foc->app.pos_set_immediate = 1;
     foc->app.pause_dec = foc->ctrl.wm_dec;
     foc->app.quick_stop_dec = foc->ctrl.wm_dec;
-    foc->app.fault_stop_dec = foc->ctrl.wm_dec;
 
     foc->cmd.kp = CTRL_MIT_POSITION_GAIN_NM_PER_RAD;
     foc->cmd.kd = CTRL_MIT_SPEED_GAIN_NM_S_PER_RAD;
-    foc->cmd.mit_tor_set = CTRL_MIT_TORQUE_FEEDFORWARD_NM;
+    foc->cmd.mit_ff = CTRL_MIT_TORQUE_FEEDFORWARD_NM;
 
     drive_diag_init(foc);
     obs_init(foc);
@@ -686,54 +643,6 @@ void cur_offset_init(foc_t *foc)
 }
 
 /**
-***********************************************************************
-* @brief:      foc_clear(void)
-* @param[in]:  void
-* @retval:     void
-* @details:    FOC相关参数清零，包括控制参数和FOC结构体的重置
-***********************************************************************
-**/
-_RAM_FUNC void foc_clear(foc_t *foc)
-{
-    foc->ctrl.vd_set       = 0.0f;
-    foc->ctrl.vq_set       = 0.0f;
-    foc->ctrl.id_set       = 0.0f;
-    foc->ctrl.iq_set       = 0.0f;
-    foc->ctrl.iq_lim       = 0.0f;
-    foc->ctrl.torm_set     = 0.0f;
-    foc->ctrl.tor_set      = 0.0f;
-    foc->ctrl.we_set       = 0.0f;
-    foc->ctrl.wr_set       = 0.0f;
-    foc->ctrl.wr_lim       = 0.0f;
-    foc->ctrl.wm_set       = 0.0f;
-    foc->ctrl.wm_ref       = 0.0f;
-    foc->ctrl.wm_lim       = 0.0f;
-    foc->ctrl.wm_diff      = 0.0f;
-    foc->ctrl.posm_set     = 0.0f;
-    foc->ctrl.posm_ref     = 0.0f;
-    foc->ctrl.posr_set     = 0.0f;
-    foc->ctrl.wm_lst       = 0.0f;
-    foc->ctrl.posm_lst     = 0.0f;
-    foc->ctrl.mit_tor_set  = 0.0f;
-    foc->ctrl.kp           = 0.0f;
-    foc->ctrl.kd           = 0.0f;
-}
-
-// 计算温度的函数
-void temp_update(foc_t *foc)
-{
-    float mos_ntc_volt  = (foc->adc.Tmos_bc / (float)foc->board.v_adc) * foc->board.v_ref;  // 转换ADC读数为电压
-    
-    foc->board.Rt_Mos = mos_ntc_volt*foc->board.Rt_Mos_res/(3.3f-mos_ntc_volt);
-    foc->sig.Tmos = 1.0f/(1.0f/(foc->board.Rt_Mos_Ka+25.0f) + logf(foc->board.Rt_Mos/foc->board.Rt_Mos_res)/foc->board.Rt_Mos_B) - foc->board.Rt_Mos_Ka + 0.5;
-
-    float rotor_ntc_volt  = (foc->adc.Trotor / (float)foc->board.v_adc) * foc->board.v_ref;  // 转换ADC读数为电压
-    
-    foc->board.Rt_rotor = rotor_ntc_volt*foc->board.Rt_rotor_res/(3.3f-rotor_ntc_volt);
-    foc->sig.Tcoil = 1.0f/(1.0f/(foc->board.Rt_rotor_Ka+25.0f) + logf(foc->board.Rt_rotor/foc->board.Rt_rotor_res)/foc->board.Rt_rotor_B) - foc->board.Rt_rotor_Ka + 0.5;
-}
-
-/**
  * @brief 读取本控制周期的原始 ADC 数据并换算三相电流。
  *
  * @param[in,out] foc 电机控制对象，用于保存原始 ADC 值和换算后的三相电流。
@@ -772,12 +681,6 @@ _RAM_FUNC bool foc_adc_sample(foc_t *foc)
     foc->adc.vb = sample.v_raw.b;
     foc->adc.vc = sample.v_raw.c;
     foc->adc.vbus = sample.v_bus_raw;
-
-    // foc->adc.Trotor   = adc3_seq_buff[4] & 0x0000FFFF;
-    // foc->adc.Tmos_ab  = adc3_seq_buff[5] & 0x0000FFFF;
-    // foc->adc.Tmos_bc  = adc3_seq_buff[6] & 0x0000FFFF;
-    // foc->adc.sin_hall = adc3_seq_buff[7] & 0x0000FFFF;
-    // foc->adc.cos_hall = adc3_seq_buff[8] & 0x0000FFFF;
 
     foc->sig.i_a = sample.i_a;
     foc->sig.i_b = sample.i_b;

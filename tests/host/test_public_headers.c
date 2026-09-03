@@ -5,6 +5,7 @@
 
 #include "fast_loop.h"
 #include "control_cycle.h"
+#include "cycle_record.h"
 #include "debug_snapshot.h"
 #include "drive.h"
 #include "drive_diag.h"

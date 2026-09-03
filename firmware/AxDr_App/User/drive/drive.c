@@ -5,6 +5,8 @@
 
 #include "drive.h"
 
+#include <math.h>
+
 #include "common.h"
 #include "drive_diag.h"
 #include "drive_mode.h"

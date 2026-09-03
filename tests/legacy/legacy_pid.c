@@ -102,8 +102,8 @@ _RAM_FUNC float parallel_pid_ctrl(pid_para_t *pid, float ref_value, float fdback
     pid->pre_err = pid->error;
 
     // 动态积分限幅
-    pid->i_term_max = max(pid->out_max - pid->p_term, 0.0f);
-    pid->i_term_min = min(pid->out_min - pid->p_term, 0.0f);
+    pid->i_term_max = LEGACY_MAX(pid->out_max - pid->p_term, 0.0f);
+    pid->i_term_min = LEGACY_MIN(pid->out_min - pid->p_term, 0.0f);
 
     pid->i_term += pid->ki * pid->error * pid->ts;
 
@@ -164,8 +164,8 @@ _RAM_FUNC float pdff_ctrl(pid_para_t *pid, float ref_value, float fdback_value)
 	pid->p_term = pid->kp * err_kf;
 
     // 动态积分限幅
-    pid->i_term_max = max(pid->out_max - pid->p_term, 0.0f);
-    pid->i_term_min = min(pid->out_min - pid->p_term, 0.0f);
+    pid->i_term_max = LEGACY_MAX(pid->out_max - pid->p_term, 0.0f);
+    pid->i_term_min = LEGACY_MIN(pid->out_min - pid->p_term, 0.0f);
 
     pid->i_term += pid->ki * pid->error * pid->ts;
 

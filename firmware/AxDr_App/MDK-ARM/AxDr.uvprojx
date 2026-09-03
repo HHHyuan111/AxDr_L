@@ -390,6 +390,11 @@
               <FilePath>..\User\app\control_cycle.c</FilePath>
             </File>
             <File>
+              <FileName>cycle_record.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\app\cycle_record.c</FilePath>
+            </File>
+            <File>
               <FileName>fast_loop.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\app\fast_loop.c</FilePath>
@@ -903,11 +908,6 @@
               <FileName>motor_modes.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\motor\motor_modes.c</FilePath>
-            </File>
-            <File>
-              <FileName>util.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\util.c</FilePath>
             </File>
           </Files>
         </Group>

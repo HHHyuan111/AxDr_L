@@ -4,6 +4,8 @@
  */
 
 #include "common.h"
+
+#include <math.h>
 #include "algorithm_config.h"
 #include "control_limit.h"
 #include "control_mit.h"

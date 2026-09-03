@@ -9,11 +9,19 @@
 #define TESTS_LEGACY_CONTROL_H
 
 #include <stdbool.h>
+#include <math.h>
 
 #include "common.h"
 #include "control_cascade.h"
 #include "foc_control.h"
 #include "foc_core.h"
+
+/* 迁移前实现使用的局部常量，仅保留在数值回归测试中。 */
+#define LEGACY_MIN(x, y) (((x) < (y)) ? (x) : (y))
+#define LEGACY_MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define LEGACY_ABS(x)    (((x) >= 0.0f) ? (x) : -(x))
+#define SQRT3            (1.73205080757f)
+#define TWO_BY_SQRT3     (1.15470053838f)
 
 void foc_calc(foc_sig_t *foc);
 void sin_cos_val(foc_sig_t *foc);

@@ -42,11 +42,11 @@ bool legacy_control_spd_step(control_rate_t *rate,
         pdff_ctrl(speed_pid, speed_ref, speed_feedback);
         *iq_ref = speed_pid->out_value;
 
-        if (ABS(iq_limit_abs) > 0)
+        if (LEGACY_ABS(iq_limit_abs) > 0)
         {
             *iq_ref = sat1_datf(*iq_ref,
-                                ABS(iq_limit_abs),
-                                -ABS(iq_limit_abs));
+                                LEGACY_ABS(iq_limit_abs),
+                                -LEGACY_ABS(iq_limit_abs));
         }
 
         return true;
@@ -68,11 +68,11 @@ bool legacy_control_pos_step(control_rate_t *rate,
         parallel_pid_ctrl(position_pid, position_ref, position_feedback);
         *speed_ref = position_pid->out_value;
 
-        if (ABS(speed_limit_abs) > 0)
+        if (LEGACY_ABS(speed_limit_abs) > 0)
         {
             *speed_ref = sat1_datf(*speed_ref,
-                                   ABS(speed_limit_abs),
-                                   -ABS(speed_limit_abs));
+                                   LEGACY_ABS(speed_limit_abs),
+                                   -LEGACY_ABS(speed_limit_abs));
         }
 
         return true;

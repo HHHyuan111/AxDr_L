@@ -155,7 +155,7 @@ static foc_t make_motor(void)
     foc.sig.wr_f = 3.0f;
     foc.sig.vbus = 24.0f;
     foc.rate.foc_ts = 0.00005f;
-    foc.enc.raw_1 = 1234;
+    foc.enc.raw = 1234;
     return foc;
 }
 
