@@ -58,12 +58,12 @@ _RAM_FUNC void cali_mag_encoder(pmsm_t *pm)
 
             if (pos_dif < 0) {
                 // 编码器反馈值递减，需要调换V和W两相
-                if(pm->para.phase_order == ABC_PHASE) {
-                    pm->para.phase_order = ACB_PHASE;
-                    x->order = ACB_PHASE;
+                if(pm->para.phase_order == PHASE_ORDER_ABC) {
+                    pm->para.phase_order = PHASE_ORDER_ACB;
+                    x->order = PHASE_ORDER_ACB;
                 } else {
-                    pm->para.phase_order = ABC_PHASE;
-                    x->order = ABC_PHASE;
+                    pm->para.phase_order = PHASE_ORDER_ABC;
+                    x->order = PHASE_ORDER_ABC;
                 }
                 x->dir = -1;
             } else {
@@ -267,4 +267,3 @@ _RAM_FUNC void cali_reset_state(cali_t *x)
     x->mean = 0.0f;
     x->ind  = 0;
 }
-

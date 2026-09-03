@@ -12,7 +12,7 @@
  */
 _RAM_FUNC bool encoder_sample(pos_box_t *pos_box)
 {
-    if ((pos_box->pos_mode == Sensorsory_s) && (pos_box->sensory1 == MT6816))
+    if ((pos_box->pos_mode == Sensorsory_s) && (pos_box->sensory1 == ENCODER_TYPE_MT6816))
     {
         return read_mt6816_raw(&pos_box->mt6816);
     }
@@ -41,10 +41,10 @@ _RAM_FUNC bool position_update(pmsm_t *pm)
 
     switch (pm->pos_box.sensory1)
     {
-        case MT6825: primary_enc = &pm->pos_box.mt6825; break;
-        case MT6816: primary_enc = &pm->pos_box.mt6816; break;
-        case MA732:  primary_enc = &pm->pos_box.ma732; break;
-        case DMENC:  primary_enc = &pm->pos_box.dm485enc; break;
+        case ENCODER_TYPE_MT6825: primary_enc = &pm->pos_box.mt6825; break;
+        case ENCODER_TYPE_MT6816: primary_enc = &pm->pos_box.mt6816; break;
+        case ENCODER_TYPE_MA732:  primary_enc = &pm->pos_box.ma732; break;
+        case ENCODER_TYPE_DMENC:  primary_enc = &pm->pos_box.dm485enc; break;
         default: return false;
     }
 

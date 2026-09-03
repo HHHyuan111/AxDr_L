@@ -8,10 +8,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "board_config.h"
 #include "common.h"
 #include "diag_runtime.h"
 #include "drive_diag.h"
-#include "motor_drive_config.h"
 
 static mc_status_t fake_start_status;
 static mc_status_t fake_step_status;

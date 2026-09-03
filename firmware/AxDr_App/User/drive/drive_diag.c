@@ -10,17 +10,19 @@
 
 #include <math.h>
 
+#include "board_config.h"
 #include "common.h"
 #include "diag_runtime.h"
 #include "drive_pwm.h"
 #include "foc_core.h"
-#include "motor_drive_config.h"
 
 diag_runtime_t g_diag;
 
 void drive_diag_init(const pmsm_t *pm)
 {
-    const enc_para_t *encoder = &pm->pos_box.ma732;
+    const enc_para_t *encoder = (pm->pos_box.sensory1 == ENCODER_TYPE_MT6816)
+        ? &pm->pos_box.mt6816
+        : &pm->pos_box.ma732;
     const diag_seed_t seed = {
         .control_period_s = pm->period.foc_ts,
         .phase_resistance_ohm = pm->para.Rs,

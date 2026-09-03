@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../USB_Device/App;../USB_Device/Target;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/ST/STM32_USB_Device_Library/Core/Inc;../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;..\User\app;..\User\common;..\User\control;..\User\diagnostic\include;..\User\drive;..\User\motor;..\User\bsp\inc;..\User\bsp;..\User\moldue\inc</IncludePath>
+              <IncludePath>../Core/Inc;../USB_Device/App;../USB_Device/Target;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/ST/STM32_USB_Device_Library/Core/Inc;../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;..\User\adapter;..\User\app;..\User\common;..\User\config;..\User\control;..\User\diagnostic\include;..\User\drive;..\User\motor;..\User\bsp\inc;..\User\bsp;..\User\moldue\inc</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -857,13 +857,28 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>User/motor</GroupName>
+          <GroupName>User/adapter</GroupName>
           <Files>
             <File>
-              <FileName>encoder_feedback.c</FileName>
+              <FileName>board_adapter.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\motor\encoder_feedback.c</FilePath>
+              <FilePath>..\User\adapter\board_adapter.c</FilePath>
             </File>
+            <File>
+              <FileName>encoder_adapter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\adapter\encoder_adapter.c</FilePath>
+            </File>
+            <File>
+              <FileName>position_adapter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\adapter\position_adapter.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>User/motor</GroupName>
+          <Files>
             <File>
               <FileName>foc_drv.c</FileName>
               <FileType>1</FileType>
@@ -873,11 +888,6 @@
               <FileName>motor_modes.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\motor\motor_modes.c</FilePath>
-            </File>
-            <File>
-              <FileName>position_feedback.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\motor\position_feedback.c</FilePath>
             </File>
             <File>
               <FileName>util.c</FileName>

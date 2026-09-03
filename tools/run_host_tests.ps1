@@ -8,10 +8,12 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $testDir = Join-Path $repoRoot "tests/host"
 $legacyDir = Join-Path $repoRoot "tests/legacy"
 $focFakeIncludeDir = Join-Path $testDir "fakes"
+$adapterDir = Join-Path $repoRoot "firmware/AxDr_App/User/adapter"
 $appDir = Join-Path $repoRoot "firmware/AxDr_App/User/app"
 $bspDir = Join-Path $repoRoot "firmware/AxDr_App/User/bsp"
 $bspIncludeDir = Join-Path $bspDir "inc"
 $commonDir = Join-Path $repoRoot "firmware/AxDr_App/User/common"
+$configDir = Join-Path $repoRoot "firmware/AxDr_App/User/config"
 $controlDir = Join-Path $repoRoot "firmware/AxDr_App/User/control"
 $diagnosticIncludeDir = Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic/include"
 $motorDir = Join-Path $repoRoot "firmware/AxDr_App/User/motor"
@@ -31,10 +33,12 @@ $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
 $controlCycleTestSource = Join-Path $testDir "test_control_cycle.c"
 $controlReplayTestSource = Join-Path $testDir "test_control_replay.c"
 $fastLoopTestSource = Join-Path $testDir "test_fast_loop.c"
+$boardAdapterTestSource = Join-Path $testDir "test_board_adapter.c"
 $publicHeadersTestSource = Join-Path $testDir "test_public_headers.c"
 $controlCycleSource = Join-Path $appDir "control_cycle.c"
 $fastLoopSource = Join-Path $appDir "fast_loop.c"
 $targetIrqSource = Join-Path $bspDir "target_irq.c"
+$boardAdapterSource = Join-Path $adapterDir "board_adapter.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
 $legacyFocSource = Join-Path $legacyDir "legacy_foc.c"
 $legacyFocCoreSource = Join-Path $legacyDir "legacy_foc_core.c"
@@ -76,6 +80,7 @@ $debugSnapshotExecutablePath = Join-Path $outputDir "test_debug_snapshot.exe"
 $controlCycleExecutablePath = Join-Path $outputDir "test_control_cycle.exe"
 $controlReplayExecutablePath = Join-Path $outputDir "test_control_replay.exe"
 $fastLoopExecutablePath = Join-Path $outputDir "test_fast_loop.exe"
+$boardAdapterExecutablePath = Join-Path $outputDir "test_board_adapter.exe"
 $publicHeadersExecutablePath = Join-Path $outputDir "test_public_headers.exe"
 
 $compilerCommand = Get-Command $Compiler -ErrorAction SilentlyContinue
@@ -423,7 +428,28 @@ Write-Host "Host C11/Drive 状态测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" `
+        "-I$adapterDir" "-I$bspIncludeDir" "-I$commonDir" `
+        $boardAdapterTestSource $boardAdapterSource `
+        -o $boardAdapterExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host 板卡适配层测试编译失败，退出码：$compileExitCode"
+}
+
+& $boardAdapterExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host 板卡适配层测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/板卡相序与ADC换算适配测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" `
         "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $driveDiagTestSource $driveDiagSource $focCoreSource `
         $svmSource $transformSource `

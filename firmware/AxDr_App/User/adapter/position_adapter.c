@@ -1,5 +1,5 @@
 /**
- * @file position_feedback.c
+ * @file position_adapter.c
  * @brief 正式单编码器机械角、电角度和多圈位置更新。
  */
 
@@ -20,10 +20,10 @@ _RAM_FUNC bool encoder_sample(pos_box_t *pos_box)
 
     switch (pos_box->sensory1)
     {
-        case MA732:
+        case ENCODER_TYPE_MA732:
             return read_ma732_raw(&pos_box->ma732);
 
-        case MT6816:
+        case ENCODER_TYPE_MT6816:
             return read_mt6816_raw(&pos_box->mt6816);
 
         default:
@@ -48,11 +48,11 @@ _RAM_FUNC bool position_update(pmsm_t *pm)
 
     switch (pm->pos_box.sensory1)
     {
-        case MA732:
+        case ENCODER_TYPE_MA732:
             enc = &pm->pos_box.ma732;
             break;
 
-        case MT6816:
+        case ENCODER_TYPE_MT6816:
             enc = &pm->pos_box.mt6816;
             break;
 

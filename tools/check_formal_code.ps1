@@ -4,7 +4,9 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $formalDirs = @(
+    (Join-Path $repoRoot "firmware/AxDr_App/User/adapter"),
     (Join-Path $repoRoot "firmware/AxDr_App/User/app"),
+    (Join-Path $repoRoot "firmware/AxDr_App/User/config"),
     (Join-Path $repoRoot "firmware/AxDr_App/User/control"),
     (Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic"),
     (Join-Path $repoRoot "firmware/AxDr_App/User/drive"),
@@ -13,9 +15,8 @@ $formalDirs = @(
 $formalFiles = @(
     (Join-Path $repoRoot "firmware/AxDr_App/User/common/compiler.h"),
     (Join-Path $repoRoot "firmware/AxDr_App/User/bsp/inc/spi_bsp.h"),
-    (Join-Path $repoRoot "firmware/AxDr_App/User/motor/encoder_feedback.c"),
-    (Join-Path $repoRoot "firmware/AxDr_App/User/motor/motor_modes.c"),
-    (Join-Path $repoRoot "firmware/AxDr_App/User/motor/position_feedback.c")
+    (Join-Path $repoRoot "firmware/AxDr_App/User/common/phase_order.h"),
+    (Join-Path $repoRoot "firmware/AxDr_App/User/motor/motor_modes.c")
 )
 
 $formalFiles += Get-ChildItem `

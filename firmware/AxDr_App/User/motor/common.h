@@ -15,9 +15,11 @@
 #include "control_speed.h"
 #include "drive_io.h"
 #include "drive_protection.h"
+#include "encoder_type.h"
 #include "main.h"
 #include "bsp.h"
 #include "motor_fwd.h"
+#include "phase_order.h"
 
 #define _RAM_FUNC PLATFORM_FAST_CODE
 #define _RAM_DATA PLATFORM_FAST_DATA
@@ -117,12 +119,6 @@ typedef __I uint8_t vcu8;
 #define cs_down       HAL_GPIO_WritePin(SPI1_CSN_GPIO_Port, SPI1_CSN_Pin, GPIO_PIN_RESET);
 #define cs_up         HAL_GPIO_WritePin(SPI1_CSN_GPIO_Port, SPI1_CSN_Pin, GPIO_PIN_SET);
 
-
-// 相序枚举 只会调换BC
-typedef enum {
-    ABC_PHASE = 0,      // 默认相序 A-B-C
-    ACB_PHASE = 1,      // A-C-B
-} phase_order_e;
 
 // PLL parameter structure
 typedef struct
@@ -328,16 +324,6 @@ typedef enum
 
 typedef enum
 {
-    MA732  = 1,
-    MT6816 = 2,
-    MT6825 = 3,
-    Hall   = 4,
-    Xhall  = 5,
-    DMENC  = 6,
-} encoder_type_e;
-
-typedef enum
-{
     Nlob = 1,
     Alob = 2,
     Scvm = 3,
@@ -350,8 +336,8 @@ typedef struct
 {
     pos_mode_e     pos_mode;   // 位置模式：有感/无感
     senless_type_e senless;    // 无感类型
-    encoder_type_e sensory1;    // 主编码器类型
-    encoder_type_e sensory2;   // 第二编码器类型（如有）
+    encoder_type_t sensory1;    // 主编码器类型
+    encoder_type_t sensory2;   // 第二编码器类型（如有）
 } pos_type_t;
 
 typedef enum
@@ -384,7 +370,7 @@ typedef struct
     float peak_torque;     // 峰值扭矩
     float peak_speed;      // 峰值转速
 
-    phase_order_e phase_order;
+    phase_order_t phase_order;
     float Rs; // Resistance
     float Ls; // Inductance
     float Ld; // d-axis inductance
@@ -1231,8 +1217,8 @@ typedef struct
 {
     pos_mode_e     pos_mode;   // 位置模式：有感/无感
     senless_type_e senless;    // 无感类型
-    encoder_type_e sensory1;    // 主编码器类型
-    encoder_type_e sensory2;   // 第二编码器类型（如有）
+    encoder_type_t sensory1;    // 主编码器类型
+    encoder_type_t sensory2;   // 第二编码器类型（如有）
 
     // 编码器参数
     enc_para_t ma732;

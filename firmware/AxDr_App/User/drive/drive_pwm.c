@@ -71,13 +71,13 @@ _RAM_FUNC bool drive_pwm_commit(pmsm_t *pm)
 
     switch (pm->para.phase_order)
     {
-        case ABC_PHASE:
+        case PHASE_ORDER_ABC:
             target_pwm_set_duty_ratios(pm->foc.dtc_a,
                                        pm->foc.dtc_b,
                                        pm->foc.dtc_c);
             break;
 
-        case ACB_PHASE:
+        case PHASE_ORDER_ACB:
             target_pwm_set_duty_ratios(pm->foc.dtc_a,
                                        pm->foc.dtc_c,
                                        pm->foc.dtc_b);

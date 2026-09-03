@@ -61,7 +61,7 @@ _RAM_FUNC void fast_loop_step(pmsm_t *motor)
         .current_a_a = motor->foc.i_a,
         .current_b_a = motor->foc.i_b,
         .current_c_a = motor->foc.i_c,
-        .bus_voltage_v = (float)motor->adc.vbus * motor->board.v_ratio,
+        .bus_voltage_v = motor->foc.vbus,
         .electrical_angle_rad = motor->foc.p_e,
         .rotor_position_rad = motor->foc.mp_r,
         .output_position_rad = motor->foc.mp_m,

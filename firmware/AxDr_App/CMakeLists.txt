@@ -29,9 +29,11 @@ project(${CMAKE_PROJECT_NAME} LANGUAGES C ASM)
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
 include_directories(
+    "User/adapter"
     "User/app"
     "User/bsp/inc"
     "User/common"
+    "User/config"
     "User/control"
     "User/diagnostic/include"
     "User/drive"
@@ -40,6 +42,9 @@ include_directories(
 )
 
 set(AXDR_USER_SOURCES
+    User/adapter/board_adapter.c
+    User/adapter/encoder_adapter.c
+    User/adapter/position_adapter.c
     User/app/control_cycle.c
     User/app/fast_loop.c
     User/app/debug_snapshot.c
@@ -79,10 +84,8 @@ set(AXDR_USER_SOURCES
     User/drive/drive_reset.c
     User/moldue/display.c
     User/moldue/lcd.c
-    User/motor/encoder_feedback.c
     User/motor/foc_drv.c
     User/motor/motor_modes.c
-    User/motor/position_feedback.c
     User/motor/util.c
 )
 

@@ -1,9 +1,12 @@
 #include "common.h"
 #include "algorithm_config.h"
+#include "board_adapter.h"
+#include "board_config.h"
 #include "control_filter.h"
+#include "encoder_config.h"
 #include "foc_control.h"
 #include "drive_diag.h"
-#include "motor_drive_config.h"
+#include "motor_config.h"
 #include "target_adc.h"
 
 _RAM_DATA pmsm_t pm;
@@ -358,7 +361,7 @@ void pmsm_init(void)
     pm.pwm_active = false;
 
     pm.pos_box.pos_mode = Sensorsory_s;
-    pm.pos_box.sensory1 = MA732;
+    pm.pos_box.sensory1 = ENCODER_SELECTED_TYPE;
 
     /* 默认使用零电流闭环调试；切换模式前仍需显式发送 START 请求。 */
     pm.mode.sys = debug_mode;
@@ -646,32 +649,25 @@ void foc_get_curr_off(void)
 
     for (int i = 0; i < 1000; i++)
     {
-        target_adc_abc_raw_t iabc_raw;
+        target_adc_abc_raw_t raw;
+        target_adc_abc_raw_t phase;
 
         HAL_Delay(1);
-        target_adc_read_iabc_raw(&iabc_raw);
+        target_adc_read_iabc_raw(&raw);
+        if (!board_phase_map(pm.para.phase_order, &raw, &phase))
+        {
+            return;
+        }
 
-        ia_sum += (float)iabc_raw.a;
-        ib_sum += (float)iabc_raw.b;
-        ic_sum += (float)iabc_raw.c;
+        ia_sum += (float)phase.a;
+        ib_sum += (float)phase.b;
+        ic_sum += (float)phase.c;
     }
 
     /* 0.001f 等于 1/1000，把累加值换算成 1000 次采样的平均值。 */
-    switch (pm.para.phase_order) {
-    case ABC_PHASE:
-        pm.adc.ia_off = ia_sum * 0.001f;
-        pm.adc.ib_off = ib_sum * 0.001f;
-        pm.adc.ic_off = ic_sum * 0.001f;
-        break;
-    case ACB_PHASE:
-        pm.adc.ia_off = ia_sum * 0.001f;
-        pm.adc.ib_off = ic_sum * 0.001f;
-        pm.adc.ic_off = ib_sum * 0.001f;
-        break;
-    default:
-        /* 保留原有行为：相序无效时不更新三相电流零偏。 */
-        break;
-    }
+    pm.adc.ia_off = ia_sum * 0.001f;
+    pm.adc.ib_off = ib_sum * 0.001f;
+    pm.adc.ic_off = ic_sum * 0.001f;
 }
 
 /**
@@ -734,37 +730,33 @@ void temp_calc(void)
  */
 _RAM_FUNC bool foc_adc_sample(pmsm_t* pm)
 {
-    target_adc_raw_t adc_raw;
+    const board_adc_cfg_t cfg = {
+        .phase_order = pm->para.phase_order,
+        .i_scale = pm->board.i_ratio,
+        .v_scale = pm->board.v_ratio,
+        .i_offset_a = pm->adc.ia_off,
+        .i_offset_b = pm->adc.ib_off,
+        .i_offset_c = pm->adc.ic_off,
+    };
+    target_adc_raw_t raw;
+    board_sample_t sample;
 
     /* 第 1 步：从板级适配层取得当前已经完成的 ADC 原始结果。 */
-    target_adc_read_raw(&adc_raw);
+    target_adc_read_raw(&raw);
 
-    /* 第 2 步：把板上固定采样链映射为电机逻辑上的 A、B、C 相。 */
-    switch (pm->para.phase_order) {
-    case ABC_PHASE:
-        pm->adc.ia = adc_raw.i.a;
-        pm->adc.ib = adc_raw.i.b;
-        pm->adc.ic = adc_raw.i.c;
-
-        pm->adc.va = adc_raw.v.a;
-        pm->adc.vb = adc_raw.v.b;
-        pm->adc.vc = adc_raw.v.c;
-        break;
-    case ACB_PHASE:
-        pm->adc.ia = adc_raw.i.a;
-        pm->adc.ic = adc_raw.i.b;
-        pm->adc.ib = adc_raw.i.c;
-
-        pm->adc.va = adc_raw.v.a;
-        pm->adc.vc = adc_raw.v.b;
-        pm->adc.vb = adc_raw.v.c;
-        break;
-    default:
+    /* 第 2 步：适配层统一完成相序映射、零偏扣除和物理量换算。 */
+    if (!board_adc_convert(&cfg, &raw, &sample))
+    {
         return false;
     }
 
-    /* 母线电压不参与相序交换，每个控制周期都直接更新。 */
-    pm->adc.vbus = adc_raw.vbus;
+    pm->adc.ia = sample.i_raw.a;
+    pm->adc.ib = sample.i_raw.b;
+    pm->adc.ic = sample.i_raw.c;
+    pm->adc.va = sample.v_raw.a;
+    pm->adc.vb = sample.v_raw.b;
+    pm->adc.vc = sample.v_raw.c;
+    pm->adc.vbus = sample.v_bus_raw;
 
     // pm->adc.Trotor   = adc3_seq_buff[4] & 0x0000FFFF;
     // pm->adc.Tmos_ab  = adc3_seq_buff[5] & 0x0000FFFF;
@@ -772,10 +764,10 @@ _RAM_FUNC bool foc_adc_sample(pmsm_t* pm)
     // pm->adc.sin_hall = adc3_seq_buff[7] & 0x0000FFFF;
     // pm->adc.cos_hall = adc3_seq_buff[8] & 0x0000FFFF;
 
-    /* 第 3 步：原始计数减去零偏，再乘以换算系数，得到单位为安培的三相电流。 */
-    pm->foc.i_a = ((float) pm->adc.ia - pm->adc.ia_off) * pm->board.i_ratio;
-    pm->foc.i_b = ((float) pm->adc.ib - pm->adc.ib_off) * pm->board.i_ratio;
-    pm->foc.i_c = ((float) pm->adc.ic - pm->adc.ic_off) * pm->board.i_ratio;
+    pm->foc.i_a = sample.i_a;
+    pm->foc.i_b = sample.i_b;
+    pm->foc.i_c = sample.i_c;
+    pm->foc.vbus = sample.v_bus;
 
     return true;
 }

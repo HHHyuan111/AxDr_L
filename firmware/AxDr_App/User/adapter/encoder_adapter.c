@@ -1,10 +1,10 @@
 /**
- * @file encoder_feedback.c
+ * @file encoder_adapter.c
  * @brief 正式单 MA732/MT6816 位置反馈所需的编码器适配。
  */
 
 #include "common.h"
-#include "motor_drive_config.h"
+#include "encoder_config.h"
 #include "target_encoder.h"
 
 /**

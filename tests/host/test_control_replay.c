@@ -187,7 +187,7 @@ int main(void)
         .mode = {.sys = debug_mode, .debug = curr_cl},
         .req = DRIVE_REQ_STOP,
         .state = DRIVE_STATE_STOP,
-        .para = {.phase_order = ABC_PHASE},
+        .para = {.phase_order = PHASE_ORDER_ABC},
         .prot_cfg = {.invalid_position_samples = 1U}
     };
     control_cycle_input_t input = replay_sample(1U);

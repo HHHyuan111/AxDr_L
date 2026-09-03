@@ -101,7 +101,7 @@ static bool test_abc_commit(void)
 {
     pmsm_t pm = {
         .fast_seq = 10U,
-        .para = {.phase_order = ABC_PHASE},
+        .para = {.phase_order = PHASE_ORDER_ABC},
         .foc = {.dtc_a = 0.1f, .dtc_b = 0.2f, .dtc_c = 0.3f}
     };
 
@@ -137,7 +137,7 @@ static bool test_acb_commit(void)
 {
     pmsm_t pm = {
         .fast_seq = 11U,
-        .para = {.phase_order = ACB_PHASE},
+        .para = {.phase_order = PHASE_ORDER_ACB},
         .foc = {.dtc_a = 0.4f, .dtc_b = 0.5f, .dtc_c = 0.6f}
     };
 
@@ -173,7 +173,7 @@ static bool test_invalid_phase_does_not_commit(void)
 {
     pmsm_t pm = {
         .fast_seq = 12U,
-        .para = {.phase_order = (phase_order_e)99},
+        .para = {.phase_order = (phase_order_t)99},
         .foc = {.dtc_a = 0.7f, .dtc_b = 0.8f, .dtc_c = 0.9f},
         .pwm_active = true,
         .pwm_commit = {.seq = 5U, .valid = true}
@@ -204,7 +204,7 @@ static bool test_invalid_duty_stops_output(void)
 {
     pmsm_t pm = {
         .fast_seq = 14U,
-        .para = {.phase_order = ABC_PHASE},
+        .para = {.phase_order = PHASE_ORDER_ABC},
         .foc = {.dtc_a = NAN, .dtc_b = 0.5f, .dtc_c = 0.5f},
         .pwm_active = true,
         .pwm_commit = {.seq = 6U, .valid = true}
@@ -240,7 +240,7 @@ static bool test_invalid_duty_stops_output(void)
 static bool test_failed_stop_keeps_active_state(void)
 {
     pmsm_t pm = {
-        .para = {.phase_order = ABC_PHASE},
+        .para = {.phase_order = PHASE_ORDER_ABC},
         .foc = {.dtc_a = NAN, .dtc_b = 0.5f, .dtc_c = 0.5f},
         .pwm_active = true
     };
@@ -258,7 +258,7 @@ static bool test_neutral_commit(void)
 {
     pmsm_t pm = {
         .fast_seq = 13U,
-        .para = {.phase_order = (phase_order_e)99}
+        .para = {.phase_order = (phase_order_t)99}
     };
 
     fake_target_reset();
