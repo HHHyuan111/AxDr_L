@@ -7,119 +7,119 @@
 
 void iden_init(void)
 {
-    memset(&pm.idpm, 0, sizeof(pm.idpm));
-    pm.idpm.fs = 20000.0f;
-    pm.idpm.ts = 0.00005f;
+    memset(&g_foc.idpm, 0, sizeof(g_foc.idpm));
+    g_foc.idpm.fs = 20000.0f;
+    g_foc.idpm.ts = 0.00005f;
 
     // First
-    pm.idpm.steps = 4;
-    pm.idpm.hstep = pm.idpm.steps / 2;
-    pm.idpm.samps = 10;
-    pm.idpm.is_max = 5.0f;
-    pm.idpm.is_thre = 0.1f;
-    pm.idpm.vs_step = 0.0001f;
+    g_foc.idpm.steps = 4;
+    g_foc.idpm.hstep = g_foc.idpm.steps / 2;
+    g_foc.idpm.samps = 10;
+    g_foc.idpm.is_max = 5.0f;
+    g_foc.idpm.is_thre = 0.1f;
+    g_foc.idpm.vs_step = 0.0001f;
 
-    pm.idpm.L_cycle = 500;
-    pm.idpm.Lts = 0.0001f;
-    pm.idpm.vd_plus = +0.6f;
-    pm.idpm.vd_minu = -0.6f;
-    pm.idpm.vq_plus = +0.6f;
-    pm.idpm.vq_minu = -0.6f;
+    g_foc.idpm.L_cycle = 500;
+    g_foc.idpm.Lts = 0.0001f;
+    g_foc.idpm.vd_plus = +0.6f;
+    g_foc.idpm.vd_minu = -0.6f;
+    g_foc.idpm.vq_plus = +0.6f;
+    g_foc.idpm.vq_minu = -0.6f;
 
-    pm.idpm.fiq_ref = 5.0f;
-    pm.idpm.we_l = 500.0f;//1000.0f;   // 低速参考值
-    pm.idpm.we_h = 1000.0f; // 高速参考值
-    pm.idpm.we_acc = 500.0f;    // 加速度设定
+    g_foc.idpm.fiq_ref = 5.0f;
+    g_foc.idpm.we_l = 500.0f;//1000.0f;   // 低速参考值
+    g_foc.idpm.we_h = 1000.0f; // 高速参考值
+    g_foc.idpm.we_acc = 500.0f;    // 加速度设定
 
-    pm.idpm.Jiq_max = 1.0f;
-    pm.idpm.Jfs = 1.0f; // Hz
-    pm.idpm.Jts = 1.0f/pm.idpm.Jfs;
-    pm.idpm.Js_samps = 6.0f;
-    pm.idpm.lambda = 31.4f;
-    pm.idpm.Js_init= 1e-3f;
+    g_foc.idpm.Jiq_max = 1.0f;
+    g_foc.idpm.Jfs = 1.0f; // Hz
+    g_foc.idpm.Jts = 1.0f/g_foc.idpm.Jfs;
+    g_foc.idpm.Js_samps = 6.0f;
+    g_foc.idpm.lambda = 31.4f;
+    g_foc.idpm.Js_init= 1e-3f;
 	
-	pm.idpm.id_state    = id_Rs;
-    pm.idpm.id_Rs_state = id_Rs_init;
-	pm.idpm.id_Ls_state = id_Ls_init;
-    pm.idpm.id_Fs_state = id_Fs_init;
-    pm.idpm.id_Js_state = id_Js_init;
+	g_foc.idpm.id_state    = id_Rs;
+    g_foc.idpm.id_Rs_state = id_Rs_init;
+	g_foc.idpm.id_Ls_state = id_Ls_init;
+    g_foc.idpm.id_Fs_state = id_Fs_init;
+    g_foc.idpm.id_Js_state = id_Js_init;
 
 
-//    pm.idpm.id_state    = id_RL;
-//    pm.idpm.id_RL_state = id_RL_init;
-//    pm.idpm.id_Fx_state = id_Fx_init;
-//    pm.idpm.id_JB_state = id_JB_init;
+//    g_foc.idpm.id_state    = id_RL;
+//    g_foc.idpm.id_RL_state = id_RL_init;
+//    g_foc.idpm.id_Fx_state = id_Fx_init;
+//    g_foc.idpm.id_JB_state = id_JB_init;
 }
 
 _RAM_FUNC void iden_pmsm_first(idpm_t *x)
 {
     static uint16_t wait_cnt = 0;
 
-    x->vs     = pm.foc.vs;
-    x->v_alph = pm.foc.v_alph;
-    x->v_beta = pm.foc.v_beta;
-    x->i_alph = pm.foc.i_alph;
-    x->i_beta = pm.foc.i_beta;
-    x->v_d    = pm.foc.v_d;
-    x->v_q    = pm.foc.v_q;
-    x->i_d    = pm.foc.i_d;
-    x->i_q    = pm.foc.i_q;
-    x->iq_f   = pm.foc.iq_f;
-    x->wr     = pm.foc.wr_f;
-    x->we     = x->wr * pm.para.pn; // 电角速度
+    x->vs     = g_foc.sig.vs;
+    x->v_alph = g_foc.sig.v_alph;
+    x->v_beta = g_foc.sig.v_beta;
+    x->i_alph = g_foc.sig.i_alph;
+    x->i_beta = g_foc.sig.i_beta;
+    x->v_d    = g_foc.sig.v_d;
+    x->v_q    = g_foc.sig.v_q;
+    x->i_d    = g_foc.sig.i_d;
+    x->i_q    = g_foc.sig.i_q;
+    x->iq_f   = g_foc.sig.iq_f;
+    x->wr     = g_foc.sig.wr_f;
+    x->we     = x->wr * g_foc.motor.pn; // 电角速度
 
     switch (x->id_state) {
         case id_Rs:
-            if (foc_volt(&pm, x->vd_ref, x->vq_ref, 0.0f)) {
-                drive_pwm_commit(&pm);
+            if (foc_volt_step(&g_foc, x->vd_ref, x->vq_ref, 0.0f)) {
+                drive_pwm_commit(&g_foc);
             }
             iden_Rs(x);
             if (x->id_Rs_state == id_Rs_end) {
-                pm.para.Rs = x->Rs;
+                g_foc.motor.Rs = x->Rs;
                 x->id_state = id_Ls;
                 x->id_Ls_state = id_Ls_init;
             }
             break;
 
         case id_Ls:
-            if (foc_volt(&pm, x->vd_ref, x->vq_ref, 0.0f)) {
-                drive_pwm_commit(&pm);
+            if (foc_volt_step(&g_foc, x->vd_ref, x->vq_ref, 0.0f)) {
+                drive_pwm_commit(&g_foc);
             }
             iden_Ls(x);
             if (x->id_Ls_state == id_Ls_end) {
-                pm.para.Ls = x->Ls;
-                pm.para.Ld = x->Ld;
-                pm.para.Lq = x->Lq;
-                pm.para.Ldif = x->Ldif;
-                foc_cur_pi_calc(&pm);
+                g_foc.motor.Ls = x->Ls;
+                g_foc.motor.Ld = x->Ld;
+                g_foc.motor.Lq = x->Lq;
+                g_foc.motor.Ldif = x->Ldif;
+                cur_pi_init(&g_foc);
                 x->id_state = id_Fs;
                 x->id_Fs_state = id_Fs_init;
             }
             break;
 
         case id_Fs:
-            if (foc_curr(&pm, 0.0f, x->fiq_ref, x->p_e)) {
-                drive_pwm_commit(&pm);
+            if (foc_cur_step(&g_foc, 0.0f, x->fiq_ref, x->p_e)) {
+                drive_pwm_commit(&g_foc);
             }
             iden_Fs(x);
             if (x->id_Fs_state == id_Fs_end){
-                pm.para.flux = x->flux;
+                g_foc.motor.flux = x->flux;
                 x->id_state = id_Js;
                 x->id_Js_state = id_Js_init;
             }
             break;
 
         case id_Js:
-            if (foc_curr(&pm, 0.0f, x->Jiq_ref, pm.foc.p_e)) {
-                drive_pwm_commit(&pm);
+            if (foc_cur_step(&g_foc, 0.0f, x->Jiq_ref, g_foc.sig.p_e)) {
+                drive_pwm_commit(&g_foc);
             }
             iden_Js(x);
             if (x->id_Js_state == id_Js_end) {
                 if (++wait_cnt == 10000) { // 50us * 10000
                     wait_cnt = 0;
-                    pm.para.B = x->B;
-                    pm.para.Js = x->Js;
-                    foc_spd_pi_calc(&pm);
+                    g_foc.motor.B = x->B;
+                    g_foc.motor.Js = x->Js;
+                    spd_pi_init(&g_foc);
                     x->id_state = id_end;
                 }
             }
@@ -133,9 +133,9 @@ _RAM_FUNC void iden_pmsm_first(idpm_t *x)
             x->id_Fs_state  = id_Fs_init;
             x->id_Js_state  = id_Js_init;
 
-            pm.req = DRIVE_REQ_STOP;
-            pm.mode.sys = release_mode;
-            pm.flag.bit.idpm_done = 1;
+            g_foc.req = DRIVE_REQ_STOP;
+            g_foc.mode.sys = release_mode;
+            g_foc.flag.bit.idpm_done = 1;
             break;
 
         default:
@@ -587,7 +587,7 @@ _RAM_FUNC void iden_Js(idpm_t *x)
 		    x->tc += x->ts;
 			x->Jtc += x->ts;
 			
-			x->Tem = 1.5f*pm.para.pn*x->flux*x->i_q; 
+			x->Tem = 1.5f*g_foc.motor.pn*x->flux*x->i_q;
 			
 			q0 += x->lambda*(-q0 + x->Tem) * x->ts;
 			q1_dot = x->lambda*(-q1 + x->wr);

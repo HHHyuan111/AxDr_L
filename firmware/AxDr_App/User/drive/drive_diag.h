@@ -8,7 +8,7 @@
 
 #include <stdbool.h>
 
-#include "motor_fwd.h"
+#include "foc_fwd.h"
 
 struct diag_runtime;
 
@@ -16,19 +16,19 @@ struct diag_runtime;
 extern struct diag_runtime g_diag;
 
 /** 使用当前电机和主编码器参数初始化诊断运行对象。 */
-void drive_diag_init(const pmsm_t *pm);
+void drive_diag_init(const foc_t *foc);
 
 /** 读取调试器写入的诊断请求，并转换成普通 Drive 启停请求。 */
-void drive_diag_poll_request(pmsm_t *pm);
+void drive_diag_poll_request(foc_t *foc);
 
 /** 当前模式是否选择了已经接入的参数辨识入口。 */
-bool drive_diag_is_supported(const pmsm_t *pm);
+bool drive_diag_is_supported(const foc_t *foc);
 
 /** 在 PWM 关闭时启动选定的诊断任务。 */
-bool drive_diag_prepare(pmsm_t *pm);
+bool drive_diag_prepare(foc_t *foc);
 
 /** 用本周期反馈推进一次算法，并通过现有 FOC/PWM 链执行输出。 */
-bool drive_diag_step(pmsm_t *pm);
+bool drive_diag_step(foc_t *foc);
 
 /** PWM 确认关闭后，结束并释放当前诊断任务。 */
 void drive_diag_on_stopped(void);

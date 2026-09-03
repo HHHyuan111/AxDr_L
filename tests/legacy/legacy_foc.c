@@ -10,13 +10,13 @@
 
 /**
 ***********************************************************************
-* @brief:      foc_calc(pmsm_foc_t *foc)
+* @brief:      foc_calc(foc_sig_t *foc)
 * @param[in]:  foc  Pointer to FOC parameter structure
 * @retval:     void
 * @details:    FOC algorithm: coordinate transformation and voltage calculation
 ***********************************************************************
 **/
-_RAM_FUNC void foc_calc(pmsm_foc_t *foc)
+_RAM_FUNC void foc_calc(foc_sig_t *foc)
 {
     foc->sin_val = sin_f32(foc->theta);
     foc->cos_val = cos_f32(foc->theta);
@@ -31,13 +31,13 @@ _RAM_FUNC void foc_calc(pmsm_foc_t *foc)
 
 /**
 ***********************************************************************
-* @brief:      sin_cos_val(pmsm_foc_t *foc)
+* @brief:      sin_cos_val(foc_sig_t *foc)
 * @param[in]:  foc  FOC参数结构体指针
 * @retval:     void
 * @details:    计算角度 theta 对应的 sin 和 cos 值
 ***********************************************************************
 **/
-_RAM_FUNC void sin_cos_val(pmsm_foc_t *foc)
+_RAM_FUNC void sin_cos_val(foc_sig_t *foc)
 {
     foc->sin_val = sinf(foc->theta);
     foc->cos_val = cosf(foc->theta);
@@ -45,13 +45,13 @@ _RAM_FUNC void sin_cos_val(pmsm_foc_t *foc)
 
 /**
 ***********************************************************************
-* @brief:      clarke_transform(pmsm_foc_t *foc)
+* @brief:      clarke_transform(foc_sig_t *foc)
 * @param[in]:  foc  FOC参数结构体指针
 * @retval:     void
 * @details:    Clarke变换，将三相电流变换为Alpha-Beta坐标系下的电流
 ***********************************************************************
 **/
-_RAM_FUNC void clarke_transform(pmsm_foc_t *foc)
+_RAM_FUNC void clarke_transform(foc_sig_t *foc)
 {
     foc->i_alph = foc->i_a;
     foc->i_beta = (foc->i_b - foc->i_c) * ONE_BY_SQRT3;
@@ -59,13 +59,13 @@ _RAM_FUNC void clarke_transform(pmsm_foc_t *foc)
 
 /**
 ***********************************************************************
-* @brief:      inverse_clarke(pmsm_foc_t *foc)
+* @brief:      inverse_clarke(foc_sig_t *foc)
 * @param[in]:  foc  FOC参数结构体指针
 * @retval:     void
 * @details:    逆Clarke变换，将 Alpha-Beta 坐标系下的电压转换为三相电压
 ***********************************************************************
 **/
-_RAM_FUNC void inverse_clarke(pmsm_foc_t *foc)
+_RAM_FUNC void inverse_clarke(foc_sig_t *foc)
 {
     foc->v_a = foc->v_alph;
     foc->v_b = -0.5f * foc->v_alph + SQRT3_BY_2 *foc->v_beta;
@@ -74,13 +74,13 @@ _RAM_FUNC void inverse_clarke(pmsm_foc_t *foc)
 
 /**
 ***********************************************************************
-* @brief:      park_transform(pmsm_foc_t *foc)
+* @brief:      park_transform(foc_sig_t *foc)
 * @param[in]:  foc  FOC参数结构体指针
 * @retval:     void
 * @details:    Park变换，将 Alpha-Beta 坐标系下的电流转换为 dq 坐标系下的电流
 ***********************************************************************
 **/
-_RAM_FUNC void park_transform(pmsm_foc_t *foc)
+_RAM_FUNC void park_transform(foc_sig_t *foc)
 {
     foc->i_d = foc->i_alph * foc->cos_val + foc->i_beta * foc->sin_val;
     foc->i_q = foc->i_beta * foc->cos_val - foc->i_alph * foc->sin_val;
@@ -88,19 +88,19 @@ _RAM_FUNC void park_transform(pmsm_foc_t *foc)
 
 /**
 ***********************************************************************
-* @brief:      inverse_park(pmsm_foc_t *foc)
+* @brief:      inverse_park(foc_sig_t *foc)
 * @param[in]:  foc  FOC参数结构体指针
 * @retval:     void
 * @details:    逆Park变换，将 dq 坐标系下的电压转换为 Alpha-Beta 坐标系下的电压
 ***********************************************************************
 **/
-_RAM_FUNC void inverse_park(pmsm_foc_t *foc)
+_RAM_FUNC void inverse_park(foc_sig_t *foc)
 {
     foc->v_alph = (foc->v_d *foc->cos_val - foc->v_q *foc->sin_val);
     foc->v_beta = (foc->v_d *foc->sin_val + foc->v_q *foc->cos_val);
 }
 
-_RAM_FUNC void svpwm_midpoint(pmsm_foc_t *foc)
+_RAM_FUNC void svpwm_midpoint(foc_sig_t *foc)
 {
     foc->v_alph = foc->inv_vbus *foc->v_alph;
     foc->v_beta = foc->inv_vbus *foc->v_beta;
@@ -115,7 +115,7 @@ _RAM_FUNC void svpwm_midpoint(pmsm_foc_t *foc)
     foc->dtc_c = 1.0f-((vc - vcom) + 0.5f);
 }
 
-_RAM_FUNC void svpwm_sector(pmsm_foc_t *foc)
+_RAM_FUNC void svpwm_sector(foc_sig_t *foc)
 {
     float TS = 1.0f;
     float ta = 0.0f, tb = 0.0f, tc = 0.0f;

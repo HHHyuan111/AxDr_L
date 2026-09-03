@@ -21,23 +21,23 @@ static bool expect_true(bool condition, const char *message)
     return false;
 }
 
-static pmsm_t test_motor(void)
+static foc_t test_motor(void)
 {
-    pmsm_t motor = {0};
+    foc_t motor = {0};
 
-    motor.app_ctrl.polarity = motor_polarity_p;
-    motor.app_ctrl.nmax_torm = -2.0f;
-    motor.app_ctrl.pmax_torm = 2.0f;
-    motor.app_ctrl.nmax_velm = -100.0f;
-    motor.app_ctrl.pmax_velm = 100.0f;
-    motor.app_ctrl.nmax_posm = -10.0f;
-    motor.app_ctrl.pmax_posm = 10.0f;
+    motor.app.polarity = motor_polarity_p;
+    motor.app.nmax_torm = -2.0f;
+    motor.app.pmax_torm = 2.0f;
+    motor.app.nmax_velm = -100.0f;
+    motor.app.pmax_velm = 100.0f;
+    motor.app.nmax_posm = -10.0f;
+    motor.app.pmax_posm = 10.0f;
     return motor;
 }
 
 static bool test_positive_polarity_and_limits(void)
 {
-    pmsm_t motor = test_motor();
+    foc_t motor = test_motor();
 
     motor.cmd.torm_set = 3.0f;
     motor.cmd.wm_set = -120.0f;
@@ -55,9 +55,9 @@ static bool test_positive_polarity_and_limits(void)
 
 static bool test_negative_polarity(void)
 {
-    pmsm_t motor = test_motor();
+    foc_t motor = test_motor();
 
-    motor.app_ctrl.polarity = motor_polarity_n;
+    motor.app.polarity = motor_polarity_n;
     motor.cmd.torm_set = 1.0f;
     motor.cmd.wm_set = -20.0f;
     motor.cmd.posm_set = 3.0f;
@@ -74,7 +74,7 @@ static bool test_negative_polarity(void)
 
 static bool test_invalid_input_does_not_update_setpoints(void)
 {
-    pmsm_t motor = test_motor();
+    foc_t motor = test_motor();
 
     motor.ctrl.torm_set = 0.1f;
     motor.ctrl.wm_set = 0.2f;
@@ -92,17 +92,17 @@ static bool test_invalid_input_does_not_update_setpoints(void)
     }
 
     motor.cmd.wm_set = 0.0f;
-    motor.app_ctrl.nmax_velm = 10.0f;
-    motor.app_ctrl.pmax_velm = -10.0f;
+    motor.app.nmax_velm = 10.0f;
+    motor.app.pmax_velm = -10.0f;
     if (!expect_true(!drive_cmd_apply(&motor),
                      "上下限颠倒时必须拒绝命令。"))
     {
         return false;
     }
 
-    motor.app_ctrl.nmax_velm = -100.0f;
-    motor.app_ctrl.pmax_velm = 100.0f;
-    motor.app_ctrl.polarity = (motor_polarity_e)99;
+    motor.app.nmax_velm = -100.0f;
+    motor.app.pmax_velm = 100.0f;
+    motor.app.polarity = (motor_polarity_e)99;
     return expect_true(!drive_cmd_apply(&motor),
                        "未知极性必须拒绝命令。");
 }

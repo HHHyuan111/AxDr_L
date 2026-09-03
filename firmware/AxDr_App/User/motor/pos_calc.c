@@ -10,7 +10,7 @@
  *
  * @return 本周期取得有效的新原始位置返回 true，否则返回 false。
  */
-_RAM_FUNC bool encoder_sample(pos_box_t *pos_box)
+_RAM_FUNC bool encoder_sample(encoder_state_t *pos_box)
 {
     if ((pos_box->pos_mode == Sensorsory_s) && (pos_box->sensory1 == ENCODER_TYPE_MT6816))
     {
@@ -23,28 +23,28 @@ _RAM_FUNC bool encoder_sample(pos_box_t *pos_box)
 /**
  * @brief 根据当前位置模式更新机械角、电角度和多圈位置反馈。
  *
- * @param[in,out] pm 电机控制对象，提供位置配置并接收本周期的位置结果。
+ * @param[in,out] foc 电机控制对象，提供位置配置并接收本周期的位置结果。
  *
  * 当前正式运行链只接受单编码器反馈。观测器和双编码器算法仍保留在源码中，
  * 但在对应适配和验证完成以前，不允许进入正式控制链。
  *
  * @return 成功更新本周期位置反馈返回 true，否则返回 false。
  */
-_RAM_FUNC bool position_update(pmsm_t *pm)
+_RAM_FUNC bool position_update(foc_t *foc)
 {
-    enc_para_t *primary_enc = NULL;
+    encoder_data_t *primary_enc = NULL;
 
-    if (pm->pos_box.pos_mode != Sensorsory_s)
+    if (foc->enc.pos_mode != Sensorsory_s)
     {
         return false;
     }
 
-    switch (pm->pos_box.sensory1)
+    switch (foc->enc.sensory1)
     {
-        case ENCODER_TYPE_MT6825: primary_enc = &pm->pos_box.mt6825; break;
-        case ENCODER_TYPE_MT6816: primary_enc = &pm->pos_box.mt6816; break;
-        case ENCODER_TYPE_MA732:  primary_enc = &pm->pos_box.ma732; break;
-        case ENCODER_TYPE_DMENC:  primary_enc = &pm->pos_box.dm485enc; break;
+        case ENCODER_TYPE_MT6825: primary_enc = &foc->enc.mt6825; break;
+        case ENCODER_TYPE_MT6816: primary_enc = &foc->enc.mt6816; break;
+        case ENCODER_TYPE_MA732:  primary_enc = &foc->enc.ma732; break;
+        case ENCODER_TYPE_DMENC:  primary_enc = &foc->enc.dm485enc; break;
         default: return false;
     }
 
@@ -55,12 +55,12 @@ _RAM_FUNC bool position_update(pmsm_t *pm)
 
     primary_enc->rev_flag = 0;
     encoder_update_angle(primary_enc);
-    pm->foc.e_pr = primary_enc->pos;
-    position_update_single_encoder(pm);
+    foc->sig.e_pr = primary_enc->pos;
+    position_update_single_encoder(foc);
 
-    pm->pos_box.raw_1 = primary_enc->raw;
-    pm->pos_box.bit_1 = primary_enc->bit;
-    pm->pos_box.pos_1 = primary_enc->pos;
+    foc->enc.raw_1 = primary_enc->raw;
+    foc->enc.bit_1 = primary_enc->bit;
+    foc->enc.pos_1 = primary_enc->pos;
 
     return true;
 }
@@ -68,16 +68,16 @@ _RAM_FUNC bool position_update(pmsm_t *pm)
 /**
  * @brief 根据主编码器单圈角度更新电机的完整位置反馈。
  *
- * @param[in,out] pm 电机控制对象；输入主编码器角度和电机参数，输出电角度、
+ * @param[in,out] foc 电机控制对象；输入主编码器角度和电机参数，输出电角度、
  *                   转子单圈/多圈位置、输出轴单圈/多圈位置及机械圈数。
  *
- * 本函数不读取编码器硬件。进入本函数前，pm->foc.e_pr 已经是 0～2π 范围内
+ * 本函数不读取编码器硬件。进入本函数前，foc->sig.e_pr 已经是 0～2π 范围内
  * 的主编码器机械角度。
  */
-_RAM_FUNC void position_update_single_encoder(pmsm_t *pm)
+_RAM_FUNC void position_update_single_encoder(foc_t *foc)
 {
-    pmsm_foc_t *foc = &pm->foc;
-    pmsm_para_t *motor_para = &pm->para;
+    foc_sig_t *foc = &foc->sig;
+    motor_cfg_t *motor_para = &foc->motor;
 
     /*
      * 第 1 步：判断单圈角度是否跨过 0/2π 边界，并累计转子圈数。
@@ -123,10 +123,10 @@ _RAM_FUNC void position_update_single_encoder(pmsm_t *pm)
     foc->pr_lst = foc->e_pr;
 }
 
-_RAM_FUNC void sensory2_pos_calc(pmsm_t* pm)
+_RAM_FUNC void sensory2_pos_calc(foc_t *foc)
 {
-    pmsm_foc_t* x = &pm->foc;
-    pmsm_para_t* y = &pm->para;
+    foc_sig_t* x = &foc->sig;
+    motor_cfg_t* y = &foc->motor;
 
     // 计算位置差异和转数
     x->pr_dif = x->e_pr - x->pr_lst;
@@ -161,16 +161,16 @@ _RAM_FUNC void sensory2_pos_calc(pmsm_t* pm)
 
 /**
 ***********************************************************************
-* @brief:      senless_pos_calc(pmsm_t* pm)
-* @param[in]:  pm  指向永磁同步电机（PMSM）控制结构体的指针
+* @brief:      senless_pos_calc(foc_t *foc)
+* @param[in]:  foc  指向永磁同步电机（PMSM）控制结构体的指针
 * @retval:     void
 * @details:    无传感器模式下的位置和角度计算，通过电角度反推转子角度，计算多圈机械角度和圈数
 ***********************************************************************
 **/
-_RAM_FUNC void senless_pos_calc(pmsm_t* pm)
+_RAM_FUNC void senless_pos_calc(foc_t *foc)
 {
-    pmsm_foc_t* x = &pm->foc;
-    pmsm_para_t* y = &pm->para;
+    foc_sig_t* x = &foc->sig;
+    motor_cfg_t* y = &foc->motor;
 
     // 由电角度反推转子角度
     x->sp_r = x->p_e * y->div_pn;

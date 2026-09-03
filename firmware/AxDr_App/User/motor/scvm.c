@@ -2,24 +2,24 @@
 
 void scvm_init(void)
 {
-	memset(&pm.scvm, 0, sizeof(pm.scvm));
+	memset(&g_foc.scvm, 0, sizeof(g_foc.scvm));
 
-	pm.scvm.v_alph = &pm.foc.v_alph;
-	pm.scvm.v_beta = &pm.foc.v_beta;
-	pm.scvm.i_alph = &pm.foc.i_alph;
-	pm.scvm.i_beta = &pm.foc.i_beta;
+	g_foc.scvm.v_alph = &g_foc.sig.v_alph;
+	g_foc.scvm.v_beta = &g_foc.sig.v_beta;
+	g_foc.scvm.i_alph = &g_foc.sig.i_alph;
+	g_foc.scvm.i_beta = &g_foc.sig.i_beta;
 
-	pm.scvm.Rs = &pm.para.Rs;
-	pm.scvm.Ls = &pm.para.Ls;
-	pm.scvm.Ld = &pm.para.Ld;
-	pm.scvm.Lq = &pm.para.Lq;
-	pm.scvm.flux = &pm.para.flux;
+	g_foc.scvm.Rs = &g_foc.motor.Rs;
+	g_foc.scvm.Ls = &g_foc.motor.Ls;
+	g_foc.scvm.Ld = &g_foc.motor.Ld;
+	g_foc.scvm.Lq = &g_foc.motor.Lq;
+	g_foc.scvm.flux = &g_foc.motor.flux;
 
-	pm.scvm.alpha0 = 1500;
-	pm.scvm.lamda1 = 0.99f;
-	pm.scvm.id_gain = 0.8f; //0-2之间 越小越稳定，越大低速性能越强
-	pm.scvm.ts = 0.00005f;
-	pm.scvm.fs = 20000;
+	g_foc.scvm.alpha0 = 1500;
+	g_foc.scvm.lamda1 = 0.99f;
+	g_foc.scvm.id_gain = 0.8f; //0-2之间 越小越稳定，越大低速性能越强
+	g_foc.scvm.ts = 0.00005f;
+	g_foc.scvm.fs = 20000;
 }
 
 

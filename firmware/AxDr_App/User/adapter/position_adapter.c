@@ -8,23 +8,23 @@
 /**
  * @brief 按当前正式配置读取本周期编码器原始值。
  *
- * @param[in,out] pos_box 位置反馈配置和编码器数据对象。
+ * @param[in,out] enc 位置反馈配置和编码器数据对象。
  * @return 单 MA732 或 MT6816 配置且读取成功返回 true，其他配置返回 false。
  */
-_RAM_FUNC bool encoder_sample(pos_box_t *pos_box)
+_RAM_FUNC bool encoder_sample(encoder_state_t *enc)
 {
-    if (pos_box->pos_mode != Sensorsory_s)
+    if (enc->pos_mode != Sensorsory_s)
     {
         return false;
     }
 
-    switch (pos_box->sensory1)
+    switch (enc->sensory1)
     {
         case ENCODER_TYPE_MA732:
-            return read_ma732_raw(&pos_box->ma732);
+            return read_ma732_raw(&enc->ma732);
 
         case ENCODER_TYPE_MT6816:
-            return read_mt6816_raw(&pos_box->mt6816);
+            return read_mt6816_raw(&enc->mt6816);
 
         default:
             return false;
@@ -34,26 +34,26 @@ _RAM_FUNC bool encoder_sample(pos_box_t *pos_box)
 /**
  * @brief 使用本周期新编码器数据更新电角度及单圈、多圈机械位置。
  *
- * @param[in,out] pm 电机对象；输入主编码器原始值，输出控制周期位置反馈。
+ * @param[in,out] foc 电机对象；输入主编码器原始值，输出控制周期位置反馈。
  * @return 存在有效的新位置样本返回 true，否则不更新位置并返回 false。
  */
-_RAM_FUNC bool position_update(pmsm_t *pm)
+_RAM_FUNC bool position_update(foc_t *foc)
 {
-    enc_para_t *enc;
+    encoder_data_t *enc;
 
-    if (pm->pos_box.pos_mode != Sensorsory_s)
+    if (foc->enc.pos_mode != Sensorsory_s)
     {
         return false;
     }
 
-    switch (pm->pos_box.sensory1)
+    switch (foc->enc.sensory1)
     {
         case ENCODER_TYPE_MA732:
-            enc = &pm->pos_box.ma732;
+            enc = &foc->enc.ma732;
             break;
 
         case ENCODER_TYPE_MT6816:
-            enc = &pm->pos_box.mt6816;
+            enc = &foc->enc.mt6816;
             break;
 
         default:
@@ -67,52 +67,52 @@ _RAM_FUNC bool position_update(pmsm_t *pm)
 
     enc->rev_flag = 0U;
     encoder_update_angle(enc);
-    pm->foc.e_pr = enc->pos;
-    position_update_single_encoder(pm);
+    foc->sig.e_pr = enc->pos;
+    position_update_single_encoder(foc);
 
-    pm->pos_box.raw_1 = enc->raw;
-    pm->pos_box.bit_1 = enc->bit;
-    pm->pos_box.pos_1 = enc->pos;
+    foc->enc.raw_1 = enc->raw;
+    foc->enc.bit_1 = enc->bit;
+    foc->enc.pos_1 = enc->pos;
     return true;
 }
 
 /**
  * @brief 根据单圈转子角计算电角度、累计转子位置和输出轴位置。
  *
- * @param[in,out] pm 电机对象；输入 e_pr 和电机参数，更新 p_e、mp_r、mp_m 等反馈。
+ * @param[in,out] foc 电机对象；输入 e_pr 和电机参数，更新 p_e、mp_r、mp_m 等反馈。
  */
-_RAM_FUNC void position_update_single_encoder(pmsm_t *pm)
+_RAM_FUNC void position_update_single_encoder(foc_t *foc)
 {
-    pmsm_foc_t *foc = &pm->foc;
-    const pmsm_para_t *motor = &pm->para;
+    foc_sig_t *state = &foc->sig;
+    const motor_cfg_t *motor = &foc->motor;
 
-    foc->pr_dif = foc->e_pr - foc->pr_lst;
-    if (foc->pr_dif > (0.88f * M_2PI))
+    state->pr_dif = state->e_pr - state->pr_lst;
+    if (state->pr_dif > (0.88f * M_2PI))
     {
-        foc->rev--;
+        state->rev--;
     }
-    if (foc->pr_dif < (-0.88f * M_2PI))
+    if (state->pr_dif < (-0.88f * M_2PI))
     {
-        foc->rev++;
+        state->rev++;
     }
 
-    foc->e_pe = foc->e_pr * motor->pn
-        - (uint32_t)(foc->e_pr * motor->pnd_2pi) * M_2PI
+    state->e_pe = state->e_pr * motor->pn
+        - (uint32_t)(state->e_pr * motor->pnd_2pi) * M_2PI
         + motor->e_off;
-    wrap_0_2pi(foc->e_pe);
+    wrap_0_2pi(state->e_pe);
 
-    foc->p_e = foc->e_pr * motor->pn
-        - (uint32_t)(foc->e_pr * motor->pnd_2pi) * M_2PI
+    state->p_e = state->e_pr * motor->pn
+        - (uint32_t)(state->e_pr * motor->pnd_2pi) * M_2PI
         + motor->e_off;
-    wrap_0_2pi(foc->p_e);
+    wrap_0_2pi(state->p_e);
 
-    foc->sp_r = foc->e_pr + motor->r_off;
-    wrap_0_2pi(foc->sp_r);
-    foc->mp_r = foc->e_pr + (float)foc->rev * M_2PI + motor->r_off;
+    state->sp_r = state->e_pr + motor->r_off;
+    wrap_0_2pi(state->sp_r);
+    state->mp_r = state->e_pr + (float)state->rev * M_2PI + motor->r_off;
 
-    foc->sp_m = foc->sp_r * motor->div_Gr + motor->m_off;
-    wrap_0_2pi(foc->sp_m);
-    foc->mp_m = foc->mp_r * motor->div_Gr;
-    foc->m_rev = (int32_t)(foc->mp_m * div_M_2PI);
-    foc->pr_lst = foc->e_pr;
+    state->sp_m = state->sp_r * motor->div_Gr + motor->m_off;
+    wrap_0_2pi(state->sp_m);
+    state->mp_m = state->mp_r * motor->div_Gr;
+    state->m_rev = (int32_t)(state->mp_m * div_M_2PI);
+    state->pr_lst = state->e_pr;
 }

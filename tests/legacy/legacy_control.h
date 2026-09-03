@@ -15,14 +15,14 @@
 #include "foc_control.h"
 #include "foc_core.h"
 
-void foc_calc(pmsm_foc_t *foc);
-void sin_cos_val(pmsm_foc_t *foc);
-void clarke_transform(pmsm_foc_t *foc);
-void inverse_clarke(pmsm_foc_t *foc);
-void park_transform(pmsm_foc_t *foc);
-void inverse_park(pmsm_foc_t *foc);
-void svpwm_midpoint(pmsm_foc_t *foc);
-void svpwm_sector(pmsm_foc_t *foc);
+void foc_calc(foc_sig_t *foc);
+void sin_cos_val(foc_sig_t *foc);
+void clarke_transform(foc_sig_t *foc);
+void inverse_clarke(foc_sig_t *foc);
+void park_transform(foc_sig_t *foc);
+void inverse_park(foc_sig_t *foc);
+void svpwm_midpoint(foc_sig_t *foc);
+void svpwm_sector(foc_sig_t *foc);
 int svm(float alpha, float beta, float *ta, float *tb, float *tc);
 
 void pid_para_init(pid_para_t *pid_config);

@@ -10,75 +10,75 @@
 #include "drive_diag.h"
 #include "drive_pwm.h"
 
-bool drive_mode_is_supported(const pmsm_t *pm)
+bool drive_mode_is_supported(const foc_t *foc)
 {
-    switch (pm->mode.sys)
+    switch (foc->mode.sys)
     {
         case release_mode:
-            return (pm->mode.release == cst_mode) ||
-                   (pm->mode.release == csv_mode) ||
-                   (pm->mode.release == csp_mode);
+            return (foc->mode.release == cst_mode) ||
+                   (foc->mode.release == csv_mode) ||
+                   (foc->mode.release == csp_mode);
 
         case halt_mode:
-            return pm->mode.halt == quick_mode;
+            return foc->mode.halt == quick_mode;
 
         case debug_mode:
-            return (pm->mode.debug == drag_vf) ||
-                   (pm->mode.debug == drag_if) ||
-                   (pm->mode.debug == volt_op) ||
-                   (pm->mode.debug == curr_cl) ||
-                   (pm->mode.debug == spd_curr_cl) ||
-                   (pm->mode.debug == pos_spd_curr_cl);
+            return (foc->mode.debug == drag_vf) ||
+                   (foc->mode.debug == drag_if) ||
+                   (foc->mode.debug == volt_op) ||
+                   (foc->mode.debug == curr_cl) ||
+                   (foc->mode.debug == spd_curr_cl) ||
+                   (foc->mode.debug == pos_spd_curr_cl);
 
         case calibrat_mode:
-            return drive_diag_is_supported(pm);
+            return drive_diag_is_supported(foc);
 
         default:
             return false;
     }
 }
 
-bool drive_mode_prepare(pmsm_t *pm)
+bool drive_mode_prepare(foc_t *foc)
 {
-    if (!drive_mode_is_supported(pm))
+    if (!drive_mode_is_supported(foc))
     {
         return false;
     }
 
-    if (pm->mode.sys == release_mode)
+    if (foc->mode.sys == release_mode)
     {
-        return drive_cmd_apply(pm);
+        return drive_cmd_apply(foc);
     }
-    if (pm->mode.sys == calibrat_mode)
+    if (foc->mode.sys == calibrat_mode)
     {
-        return drive_diag_prepare(pm);
+        return drive_diag_prepare(foc);
     }
 
     return true;
 }
 
-_RAM_FUNC bool drive_mode_step(pmsm_t *pm)
+_RAM_FUNC bool drive_mode_step(foc_t *foc)
 {
-    if (!drive_mode_prepare(pm))
+    if (!drive_mode_prepare(foc))
     {
         return false;
     }
 
-    switch (pm->mode.sys)
+    switch (foc->mode.sys)
     {
         case release_mode:
-            switch (pm->mode.release)
+            switch (foc->mode.release)
             {
                 case cst_mode:
-                    cst_tor_mode(pm);
+                    cst_step(foc);
                     return true;
 
                 case csv_mode:
-                    csv_vel_mode(pm);
+                    csv_step(foc);
                     return true;
 
                 case csp_mode:
-                    csp_pos_mode(pm);
+                    csp_step(foc);
                     return true;
 
                 default:
@@ -86,67 +86,67 @@ _RAM_FUNC bool drive_mode_step(pmsm_t *pm)
             }
 
         case halt_mode:
-            pmsm_quick_stop_mode(pm);
+            quick_stop_step(foc);
             return true;
 
         case debug_mode:
-            switch (pm->mode.debug)
+            switch (foc->mode.debug)
             {
                 case drag_vf:
-                    force_volt_mode(pm);
+                    open_volt_step(foc);
                     return true;
 
                 case volt_op:
-                    if (!foc_volt(pm,
-                                  pm->ctrl.vd_set,
-                                  pm->ctrl.vq_set,
-                                  pm->foc.p_e))
+                    if (!foc_volt_step(foc,
+                                  foc->ctrl.vd_set,
+                                  foc->ctrl.vq_set,
+                                  foc->sig.p_e))
                     {
                         return false;
                     }
-                    return drive_pwm_commit(pm);
+                    return drive_pwm_commit(foc);
 
                 case drag_if:
-                    force_curr_mode(pm);
+                    open_cur_step(foc);
                     return true;
 
                 case curr_cl:
-                    if (!foc_curr(pm,
-                                  pm->ctrl.id_set,
-                                  pm->ctrl.iq_set,
-                                  pm->foc.p_e))
+                    if (!foc_cur_step(foc,
+                                  foc->ctrl.id_set,
+                                  foc->ctrl.iq_set,
+                                  foc->sig.p_e))
                     {
                         return false;
                     }
-                    return drive_pwm_commit(pm);
+                    return drive_pwm_commit(foc);
 
                 case spd_curr_cl:
-                    if (!foc_vel(pm,
-                                 pm->ctrl.wr_set,
-                                 pm->ctrl.iq_set,
-                                 pm->foc.p_e))
+                    if (!foc_spd_step(foc,
+                                 foc->ctrl.wr_set,
+                                 foc->ctrl.iq_set,
+                                 foc->sig.p_e))
                     {
                         return false;
                     }
-                    return drive_pwm_commit(pm);
+                    return drive_pwm_commit(foc);
 
                 case pos_spd_curr_cl:
-                    if (!foc_pos(pm,
-                                 pm->ctrl.posr_set,
-                                 pm->ctrl.wr_set,
-                                 pm->ctrl.iq_set,
-                                 pm->foc.p_e))
+                    if (!foc_pos_step(foc,
+                                 foc->ctrl.posr_set,
+                                 foc->ctrl.wr_set,
+                                 foc->ctrl.iq_set,
+                                 foc->sig.p_e))
                     {
                         return false;
                     }
-                    return drive_pwm_commit(pm);
+                    return drive_pwm_commit(foc);
 
                 default:
                     return false;
             }
 
         case calibrat_mode:
-            return drive_diag_step(pm);
+            return drive_diag_step(foc);
 
         default:
             return false;

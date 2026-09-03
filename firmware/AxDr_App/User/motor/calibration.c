@@ -1,25 +1,25 @@
 #include "common.h"
 #include "drive_pwm.h"
 
-void cali_init(void)
+void cali_init(foc_t *foc)
 {
-    pm.calibr.vd_set = 0.8f;
-    pm.calibr.state = cali_pp_start;
+    foc->calibr.vd_set = 0.8f;
+    foc->calibr.state = cali_pp_start;
 
 }
 
-_RAM_FUNC void cali_mag_encoder(pmsm_t *pm)
+_RAM_FUNC void cali_mag_encoder(foc_t *foc)
 {
-    cali_t *x = &pm->calibr;
+    cali_t *x = &foc->calibr;
 
     x->lut_num = 256;
     x->window  = 128;
 
-    x->raw = pm->pos_box.raw_1;
-    x->pos = pm->pos_box.pos_1;
-    x->bit = pm->pos_box.bit_1;
-    if (foc_volt(pm, x->vd_ref, x->vq_ref, x->pe_set)) {
-        drive_pwm_commit(pm);
+    x->raw = foc->enc.raw_1;
+    x->pos = foc->enc.pos_1;
+    x->bit = foc->enc.bit_1;
+    if (foc_volt_step(foc, x->vd_ref, x->vq_ref, x->pe_set)) {
+        drive_pwm_commit(foc);
     }
     
     switch (x->state)
@@ -51,18 +51,18 @@ _RAM_FUNC void cali_mag_encoder(pmsm_t *pm)
         case cali_pp_calc:
         {
             x->pn = x->pe_set / M_2PI;
-            pm->para.pn = x->pn;
+            foc->motor.pn = x->pn;
 
             float pos_dif = x->pos_dir_end - x->pos_start;
             wrap_pm_pi(pos_dif);
 
             if (pos_dif < 0) {
                 // 编码器反馈值递减，需要调换V和W两相
-                if(pm->para.phase_order == PHASE_ORDER_ABC) {
-                    pm->para.phase_order = PHASE_ORDER_ACB;
+                if(foc->motor.phase_order == PHASE_ORDER_ABC) {
+                    foc->motor.phase_order = PHASE_ORDER_ACB;
                     x->order = PHASE_ORDER_ACB;
                 } else {
-                    pm->para.phase_order = PHASE_ORDER_ABC;
+                    foc->motor.phase_order = PHASE_ORDER_ABC;
                     x->order = PHASE_ORDER_ABC;
                 }
                 x->dir = -1;
@@ -198,8 +198,8 @@ _RAM_FUNC void cali_mag_encoder(pmsm_t *pm)
             {
                 if (++x->j < x->lut_num)
                 {
-                    pm->map.enc_lut = x->lut[x->j];
-                    pm->map.enc_table[x->j] = x->lut[x->j];
+                    foc->map.enc_lut = x->lut[x->j];
+                    foc->map.enc_table[x->j] = x->lut[x->j];
                     x->j++;
                 }
                 else
@@ -209,14 +209,14 @@ _RAM_FUNC void cali_mag_encoder(pmsm_t *pm)
         }
         case cali_lut_end:
             x->state = cali_pp_start;
-            pm->req = DRIVE_REQ_STOP;
-            pm->mode.sys = release_mode;
-            //pm->pos_box.dir_1 = x->dir;
-            pm->para.pn = x->pn;
-            //pm->para.phase_order = x->order;
-            pm->para.e_off = x->e_off;
-            pm->para.r_off = x->r_off;
-            pm->flag.bit.cali_sensor1_done = 1;
+            foc->req = DRIVE_REQ_STOP;
+            foc->mode.sys = release_mode;
+            //foc->enc.dir_1 = x->dir;
+            foc->motor.pn = x->pn;
+            //foc->motor.phase_order = x->order;
+            foc->motor.e_off = x->e_off;
+            foc->motor.r_off = x->r_off;
+            foc->flag.bit.cali_sensor1_done = 1;
 
             // ---- reset variables ----
 //            cali_reset_state(x);

@@ -58,9 +58,9 @@ static void test_reset_fakes(void)
     test_pwm_stop_result = true;
 }
 
-void drive_diag_poll_request(pmsm_t *pm)
+void drive_diag_poll_request(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
 }
 
 void drive_diag_on_stopped(void)
@@ -71,9 +71,9 @@ void drive_diag_on_fault(void)
 {
 }
 
-bool drive_mode_prepare(pmsm_t *pm)
+bool drive_mode_prepare(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     return test_mode_supported;
 }
 
@@ -129,35 +129,35 @@ bool drive_pwm_stop(void)
     return test_pwm_stop_result;
 }
 
-void drive_pwm_set_neutral(pmsm_t *pm)
+void drive_pwm_set_neutral(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     test_log_event(TEST_EVENT_DUTY_NEUTRAL);
 }
 
-void drive_control_reset(pmsm_t *pm)
+void drive_control_reset(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     test_log_event(TEST_EVENT_RESET);
 }
 
-bool drive_mode_step(pmsm_t *pm)
+bool drive_mode_step(foc_t *foc)
 {
     test_log_event(TEST_EVENT_RUN_MODE);
 
     if (test_mode_writes_pwm)
     {
-        pm->pwm_cmd.valid = true;
+        foc->pwm_cmd.valid = true;
     }
 
     if (test_mode_sets_fault)
     {
-        pm->fault.all = 1U;
+        foc->fault.all = 1U;
     }
 
     if (test_mode_requests_stop)
     {
-        pm->req = DRIVE_REQ_STOP;
+        foc->req = DRIVE_REQ_STOP;
     }
 
     return test_mode_valid;
@@ -165,7 +165,7 @@ bool drive_mode_step(pmsm_t *pm)
 
 static bool test_power_on_stays_stopped(void)
 {
-    pmsm_t pm = {
+    foc_t foc = {
         .fast_seq = 17U,
         .pwm_cmd = {
             .seq = 3U,
@@ -177,19 +177,19 @@ static bool test_power_on_stays_stopped(void)
     };
 
     test_reset_fakes();
-    drive_fast_step(&pm);
+    drive_fast_step(&foc);
 
     return test_expect(test_event_count == 0U,
                        "上电 STOP 周期不应调用 PWM 接口。") &&
-           test_expect(pm.req == DRIVE_REQ_STOP,
+           test_expect(foc.req == DRIVE_REQ_STOP,
                        "上电请求应保持 STOP。") &&
-           test_expect(pm.state == DRIVE_STATE_STOP,
+           test_expect(foc.state == DRIVE_STATE_STOP,
                        "上电状态应保持 STOP。") &&
-           test_expect(!pm.pwm_active,
+           test_expect(!foc.pwm_active,
                        "上电时三相 PWM 软件状态应为关闭。") &&
-           test_expect(pm.pwm_cmd.seq == 17U,
+           test_expect(foc.pwm_cmd.seq == 17U,
                        "本周期占空比请求应使用当前快速周期序号。") &&
-           test_expect(!pm.pwm_cmd.valid,
+           test_expect(!foc.pwm_cmd.valid,
                        "没有运行控制模式时不得沿用上一周期占空比请求。");
 }
 
@@ -203,37 +203,37 @@ static bool test_start_then_run(void)
     static const test_event_e run_events[] = {
         TEST_EVENT_RUN_MODE
     };
-    pmsm_t pm = {0};
+    foc_t foc = {0};
 
-    pm.req = DRIVE_REQ_START;
+    foc.req = DRIVE_REQ_START;
     test_reset_fakes();
-    drive_fast_step(&pm);
+    drive_fast_step(&foc);
 
     if (!test_expect_events(start_events,
                             sizeof(start_events) / sizeof(start_events[0])) ||
-        !test_expect(pm.req == DRIVE_REQ_RUN,
+        !test_expect(foc.req == DRIVE_REQ_RUN,
                      "START 成功后请求应自动转为 RUN。") ||
-        !test_expect(pm.state == DRIVE_STATE_STARTING,
+        !test_expect(foc.state == DRIVE_STATE_STARTING,
                      "START 周期结束时状态应为 STARTING。") ||
-        !test_expect(pm.pwm_active,
+        !test_expect(foc.pwm_active,
                      "START 周期结束时三相 PWM 应标记为已启动。"))
     {
         return false;
     }
 
     test_reset_fakes();
-    drive_fast_step(&pm);
+    drive_fast_step(&foc);
 
     if (!test_expect_events(run_events,
                             sizeof(run_events) / sizeof(run_events[0])) ||
-        !test_expect(pm.state == DRIVE_STATE_RUN,
+        !test_expect(foc.state == DRIVE_STATE_RUN,
                      "START 后的下一周期应进入 RUN。"))
     {
         return false;
     }
 
     test_reset_fakes();
-    drive_fast_step(&pm);
+    drive_fast_step(&foc);
 
     return test_expect_events(run_events,
                               sizeof(run_events) / sizeof(run_events[0]));
@@ -245,52 +245,52 @@ static bool test_stop_runs_once(void)
         TEST_EVENT_PWM_STOP,
         TEST_EVENT_RESET
     };
-    pmsm_t pm = {
+    foc_t foc = {
         .req = DRIVE_REQ_STOP,
         .state = DRIVE_STATE_RUN,
         .pwm_active = true
     };
 
     test_reset_fakes();
-    drive_fast_step(&pm);
+    drive_fast_step(&foc);
 
     if (!test_expect_events(stop_events,
                             sizeof(stop_events) / sizeof(stop_events[0])) ||
-        !test_expect(pm.state == DRIVE_STATE_STOP,
+        !test_expect(foc.state == DRIVE_STATE_STOP,
                      "STOP 后状态应为 STOP。") ||
-        !test_expect(!pm.pwm_active,
+        !test_expect(!foc.pwm_active,
                      "STOP 后三相 PWM 应标记为关闭。"))
     {
         return false;
     }
 
     test_reset_fakes();
-    drive_fast_step(&pm);
+    drive_fast_step(&foc);
 
     return test_expect(test_event_count == 0U,
                        "持续 STOP 时不应重复停止 PWM。") &&
-           test_expect(pm.state == DRIVE_STATE_STOP,
+           test_expect(foc.state == DRIVE_STATE_STOP,
                        "持续 STOP 时状态应保持 STOP。");
 }
 
 static bool test_unsupported_mode_never_starts_pwm(void)
 {
-    pmsm_t pm = {
+    foc_t foc = {
         .req = DRIVE_REQ_START,
         .state = DRIVE_STATE_STOP
     };
 
     test_reset_fakes();
     test_mode_supported = false;
-    drive_fast_step(&pm);
+    drive_fast_step(&foc);
 
     return test_expect(test_event_count == 0U,
                        "未验证模式不能产生任何功率级启动动作。") &&
-           test_expect(pm.req == DRIVE_REQ_STOP,
+           test_expect(foc.req == DRIVE_REQ_STOP,
                        "未验证模式的 START 请求应退回 STOP。") &&
-           test_expect(pm.state == DRIVE_STATE_STOP,
+           test_expect(foc.state == DRIVE_STATE_STOP,
                        "未验证模式应保持 STOP 状态。") &&
-           test_expect(!pm.pwm_active,
+           test_expect(!foc.pwm_active,
                        "未验证模式不能把 PWM 标记为已启动。");
 }
 
@@ -306,8 +306,8 @@ static bool test_pwm_action_failure_is_reported(void)
         TEST_EVENT_PWM_STOP,
         TEST_EVENT_RESET
     };
-    pmsm_t start_pm = {.req = DRIVE_REQ_START};
-    pmsm_t stop_pm = {
+    foc_t start_pm = {.req = DRIVE_REQ_START};
+    foc_t stop_pm = {
         .req = DRIVE_REQ_STOP,
         .state = DRIVE_STATE_RUN,
         .pwm_active = true
@@ -351,7 +351,7 @@ static bool test_fault_stops_same_cycle(void)
         TEST_EVENT_PWM_STOP,
         TEST_EVENT_RESET
     };
-    pmsm_t pm = {
+    foc_t foc = {
         .req = DRIVE_REQ_RUN,
         .state = DRIVE_STATE_RUN,
         .pwm_active = true
@@ -359,15 +359,15 @@ static bool test_fault_stops_same_cycle(void)
 
     test_reset_fakes();
     test_mode_sets_fault = true;
-    drive_fast_step(&pm);
+    drive_fast_step(&foc);
 
     return test_expect_events(fault_events,
                               sizeof(fault_events) / sizeof(fault_events[0])) &&
-           test_expect(pm.req == DRIVE_REQ_STOP,
+           test_expect(foc.req == DRIVE_REQ_STOP,
                        "故障后请求应退回 STOP。") &&
-           test_expect(pm.state == DRIVE_STATE_FAULT,
+           test_expect(foc.state == DRIVE_STATE_FAULT,
                        "故障后状态应为 FAULT。") &&
-           test_expect(!pm.pwm_active,
+           test_expect(!foc.pwm_active,
                        "故障周期末三相 PWM 应标记为关闭。");
 }
 
@@ -377,12 +377,12 @@ static bool test_existing_fault_blocks_start_and_run(void)
         TEST_EVENT_PWM_STOP,
         TEST_EVENT_RESET
     };
-    pmsm_t start_pm = {
+    foc_t start_pm = {
         .req = DRIVE_REQ_START,
         .state = DRIVE_STATE_STOP,
         .fault = {.all = 1U}
     };
-    pmsm_t run_pm = {
+    foc_t run_pm = {
         .req = DRIVE_REQ_RUN,
         .state = DRIVE_STATE_RUN,
         .pwm_active = true,
@@ -425,12 +425,12 @@ static bool test_invalid_mode_or_missing_pwm_stops(void)
         TEST_EVENT_PWM_STOP,
         TEST_EVENT_RESET
     };
-    pmsm_t invalid_mode_pm = {
+    foc_t invalid_mode_pm = {
         .req = DRIVE_REQ_RUN,
         .state = DRIVE_STATE_RUN,
         .pwm_active = true
     };
-    pmsm_t missing_pwm_pm = invalid_mode_pm;
+    foc_t missing_pwm_pm = invalid_mode_pm;
 
     test_reset_fakes();
     test_mode_valid = false;
@@ -468,20 +468,20 @@ static bool test_protection_blocks_power_actions(void)
         TEST_EVENT_PWM_STOP,
         TEST_EVENT_RESET
     };
-    pmsm_t under_voltage_pm = {
+    foc_t under_voltage_pm = {
         .req = DRIVE_REQ_START,
-        .foc = {.vbus = 12.0f},
+        .sig = {.vbus = 12.0f},
         .fb_status = {.i_valid = true, .vbus_valid = true, .pos_valid = true},
         .prot_cfg = {
             .under_voltage_v = 15.0f,
             .under_voltage_samples = 1U
         }
     };
-    pmsm_t over_current_pm = {
+    foc_t over_current_pm = {
         .req = DRIVE_REQ_RUN,
         .state = DRIVE_STATE_RUN,
         .pwm_active = true,
-        .foc = {.i_a = 81.0f, .vbus = 24.0f},
+        .sig = {.i_a = 81.0f, .vbus = 24.0f},
         .fb_status = {.i_valid = true, .vbus_valid = true, .pos_valid = true},
         .prot_cfg = {
             .over_current_a = 80.0f,
@@ -517,15 +517,15 @@ static bool test_protection_blocks_power_actions(void)
 
 static bool test_invalid_feedback_blocks_start(void)
 {
-    pmsm_t invalid_current_pm = {
+    foc_t invalid_current_pm = {
         .req = DRIVE_REQ_START,
-        .foc = {.i_a = NAN, .vbus = 24.0f},
+        .sig = {.i_a = NAN, .vbus = 24.0f},
         .fb_status = {.i_valid = true, .vbus_valid = true, .pos_valid = true},
         .prot_cfg = {.invalid_current_samples = 1U}
     };
-    pmsm_t invalid_position_pm = {
+    foc_t invalid_position_pm = {
         .req = DRIVE_REQ_START,
-        .foc = {.vbus = 24.0f, .p_e = NAN},
+        .sig = {.vbus = 24.0f, .p_e = NAN},
         .fb_status = {.i_valid = true, .vbus_valid = true, .pos_valid = true},
         .prot_cfg = {.invalid_position_samples = 1U}
     };
@@ -558,7 +558,7 @@ static bool test_stop_request_during_mode_is_preserved(void)
         TEST_EVENT_PWM_STOP,
         TEST_EVENT_RESET
     };
-    pmsm_t pm = {
+    foc_t foc = {
         .req = DRIVE_REQ_RUN,
         .state = DRIVE_STATE_RUN,
         .pwm_active = true
@@ -566,24 +566,24 @@ static bool test_stop_request_during_mode_is_preserved(void)
 
     test_reset_fakes();
     test_mode_requests_stop = true;
-    drive_fast_step(&pm);
+    drive_fast_step(&foc);
 
     if (!test_expect_events(run_events,
                             sizeof(run_events) / sizeof(run_events[0])) ||
-        !test_expect(pm.req == DRIVE_REQ_STOP,
+        !test_expect(foc.req == DRIVE_REQ_STOP,
                      "模式内写入的 STOP 请求不能被状态更新覆盖。") ||
-        !test_expect(pm.state == DRIVE_STATE_RUN,
+        !test_expect(foc.state == DRIVE_STATE_RUN,
                      "STOP 请求所在周期仍应完成当前 RUN 动作。"))
     {
         return false;
     }
 
     test_reset_fakes();
-    drive_fast_step(&pm);
+    drive_fast_step(&foc);
 
     return test_expect_events(stop_events,
                               sizeof(stop_events) / sizeof(stop_events[0])) &&
-           test_expect(pm.state == DRIVE_STATE_STOP,
+           test_expect(foc.state == DRIVE_STATE_STOP,
                        "下一周期应执行 STOP。");
 }
 
@@ -593,12 +593,12 @@ static bool test_invalid_requests_do_not_run(void)
         TEST_EVENT_PWM_STOP,
         TEST_EVENT_RESET
     };
-    pmsm_t inactive_pm = {
+    foc_t inactive_pm = {
         .req = DRIVE_REQ_RUN,
         .state = DRIVE_STATE_STOP,
         .pwm_active = false
     };
-    pmsm_t invalid_pm = {
+    foc_t invalid_pm = {
         .req = (drive_req_e)99,
         .state = DRIVE_STATE_RUN,
         .pwm_active = true
@@ -633,13 +633,13 @@ static bool test_invalid_requests_do_not_run(void)
 static bool test_fault_clear_requires_stopped_pwm(void)
 {
     static const test_event_e reset_events[] = {TEST_EVENT_RESET};
-    pmsm_t active_pm = {
+    foc_t active_pm = {
         .req = DRIVE_REQ_STOP,
         .state = DRIVE_STATE_FAULT,
         .pwm_active = true,
         .fault = {.all = 1U}
     };
-    pmsm_t stopped_pm = {
+    foc_t stopped_pm = {
         .req = DRIVE_REQ_STOP,
         .state = DRIVE_STATE_FAULT,
         .pwm_active = false,

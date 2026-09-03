@@ -60,28 +60,28 @@ static void reset_fakes(void)
     arguments_ok = true;
 }
 
-bool drive_cmd_apply(pmsm_t *pm)
+bool drive_cmd_apply(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     command_apply_count++;
     return command_valid;
 }
 
-bool drive_diag_is_supported(const pmsm_t *pm)
+bool drive_diag_is_supported(const foc_t *foc)
 {
-    return (pm->mode.sys == calibrat_mode)
-        && (pm->mode.calibrat == iden_pm);
+    return (foc->mode.sys == calibrat_mode)
+        && (foc->mode.calibrat == iden_pm);
 }
 
-bool drive_diag_prepare(pmsm_t *pm)
+bool drive_diag_prepare(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     return true;
 }
 
-bool drive_diag_step(pmsm_t *pm)
+bool drive_diag_step(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_IDENTIFICATION);
     return true;
 }
@@ -92,63 +92,63 @@ static void log_event(mode_event_e event)
     event_count++;
 }
 
-void pm_mit_mode(pmsm_t *pm)
+void pm_mit_mode(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_MIT);
 }
 
-void pt_tor_mode(pmsm_t *pm)
+void pt_tor_mode(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_TORQUE);
 }
 
-void pv_vel_mode(pmsm_t *pm)
+void pv_vel_mode(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_VELOCITY);
 }
 
-void pp_pos_mode(pmsm_t *pm)
+void pp_pos_mode(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_POSITION);
 }
 
-void cst_tor_mode(pmsm_t *pm)
+void cst_step(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_CST);
 }
 
-void csv_vel_mode(pmsm_t *pm)
+void csv_step(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_CSV);
 }
 
-void csp_pos_mode(pmsm_t *pm)
+void csp_step(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_CSP);
 }
 
-void pmsm_quick_stop_mode(pmsm_t *pm)
+void quick_stop_step(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_QUICK_STOP);
 }
 
-void pmsm_fault_stop_mode(pmsm_t *pm)
+void fault_stop_step(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_FAULT_STOP);
 }
 
-void cali_mag_encoder(pmsm_t *pm)
+void cali_mag_encoder(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_ENCODER_CALIBRATION);
 }
 
@@ -158,72 +158,72 @@ void iden_pmsm_first(idpm_t *idpm)
     log_event(EVENT_IDENTIFICATION);
 }
 
-void anticogging_calibration(pmsm_t *pm)
+void anticogging_calibration(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_ANTICOGGING);
 }
 
-void force_volt_mode(pmsm_t *pm)
+void open_volt_step(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_FORCE_VOLTAGE);
 }
 
-void force_curr_mode(pmsm_t *pm)
+void open_cur_step(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     log_event(EVENT_FORCE_CURRENT);
 }
 
-bool foc_volt(pmsm_t *pm, float vd_ref, float vq_ref, float pos)
+bool foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float pos)
 {
     arguments_ok = arguments_ok &&
-                   (vd_ref == pm->ctrl.vd_set) &&
-                   (vq_ref == pm->ctrl.vq_set) &&
-                   (pos == pm->foc.p_e);
+                   (vd_ref == foc->ctrl.vd_set) &&
+                   (vq_ref == foc->ctrl.vq_set) &&
+                   (pos == foc->sig.p_e);
     log_event(EVENT_FOC_VOLTAGE);
     return foc_result_valid;
 }
 
-bool foc_curr(pmsm_t *pm, float id_ref, float iq_ref, float pos)
+bool foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float pos)
 {
     arguments_ok = arguments_ok &&
-                   (id_ref == pm->ctrl.id_set) &&
-                   (iq_ref == pm->ctrl.iq_set) &&
-                   (pos == pm->foc.p_e);
+                   (id_ref == foc->ctrl.id_set) &&
+                   (iq_ref == foc->ctrl.iq_set) &&
+                   (pos == foc->sig.p_e);
     log_event(EVENT_FOC_CURRENT);
     return foc_result_valid;
 }
 
-bool foc_vel(pmsm_t *pm, float vel_ref, float iq_ref, float pos)
+bool foc_spd_step(foc_t *foc, float vel_ref, float iq_ref, float pos)
 {
     arguments_ok = arguments_ok &&
-                   (vel_ref == pm->ctrl.wr_set) &&
-                   (iq_ref == pm->ctrl.iq_set) &&
-                   (pos == pm->foc.p_e);
+                   (vel_ref == foc->ctrl.wr_set) &&
+                   (iq_ref == foc->ctrl.iq_set) &&
+                   (pos == foc->sig.p_e);
     log_event(EVENT_FOC_VELOCITY);
     return foc_result_valid;
 }
 
-bool foc_pos(pmsm_t *pm,
+bool foc_pos_step(foc_t *foc,
              float pos_ref,
              float vel_ref,
              float iq_ref,
              float pos)
 {
     arguments_ok = arguments_ok &&
-                   (pos_ref == pm->ctrl.posr_set) &&
-                   (vel_ref == pm->ctrl.wr_set) &&
-                   (iq_ref == pm->ctrl.iq_set) &&
-                   (pos == pm->foc.p_e);
+                   (pos_ref == foc->ctrl.posr_set) &&
+                   (vel_ref == foc->ctrl.wr_set) &&
+                   (iq_ref == foc->ctrl.iq_set) &&
+                   (pos == foc->sig.p_e);
     log_event(EVENT_FOC_POSITION);
     return foc_result_valid;
 }
 
-bool drive_pwm_commit(pmsm_t *pm)
+bool drive_pwm_commit(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     commit_count++;
     return true;
 }
@@ -239,14 +239,14 @@ static bool expect_true(bool condition, const char *message)
     return false;
 }
 
-static bool expect_dispatch(pmsm_t *pm,
+static bool expect_dispatch(foc_t *foc,
                             mode_event_e expected_event,
                             bool expected_commit)
 {
     bool mode_valid;
 
     reset_fakes();
-    mode_valid = drive_mode_step(pm);
+    mode_valid = drive_mode_step(foc);
 
     return expect_true(mode_valid, "已实现模式应返回有效。") &&
            expect_true(event_count == 1U, "模式应且只应调用一个实现。") &&
@@ -256,7 +256,7 @@ static bool expect_dispatch(pmsm_t *pm,
            expect_true(arguments_ok, "模式传给控制函数的参数不正确。");
 }
 
-static bool test_release_modes(pmsm_t *pm)
+static bool test_release_modes(foc_t *foc)
 {
     static const mode_case_t cases[] = {
         {cst_mode, EVENT_CST, false},
@@ -265,11 +265,11 @@ static bool test_release_modes(pmsm_t *pm)
     };
     size_t index;
 
-    pm->mode.sys = release_mode;
+    foc->mode.sys = release_mode;
     for (index = 0U; index < (sizeof(cases) / sizeof(cases[0])); index++)
     {
-        pm->mode.release = (release_mode_e)cases[index].mode;
-        if (!expect_dispatch(pm, cases[index].event, cases[index].commits_pwm) ||
+        foc->mode.release = (release_mode_e)cases[index].mode;
+        if (!expect_dispatch(foc, cases[index].event, cases[index].commits_pwm) ||
             !expect_true(command_apply_count == 1U,
                          "发布模式必须先应用一次外部命令。"))
         {
@@ -279,19 +279,19 @@ static bool test_release_modes(pmsm_t *pm)
 
     reset_fakes();
     command_valid = false;
-    pm->mode.release = cst_mode;
+    foc->mode.release = cst_mode;
 
-    return expect_true(!drive_mode_step(pm),
+    return expect_true(!drive_mode_step(foc),
                        "无效发布命令必须终止本周期模式。") &&
            expect_true(event_count == 0U,
                        "无效发布命令不能进入控制算法。");
 }
 
-static bool test_halt_modes(pmsm_t *pm)
+static bool test_halt_modes(foc_t *foc)
 {
-    pm->mode.sys = halt_mode;
-    pm->mode.halt = quick_mode;
-    if (!expect_dispatch(pm, EVENT_QUICK_STOP, false))
+    foc->mode.sys = halt_mode;
+    foc->mode.halt = quick_mode;
+    if (!expect_dispatch(foc, EVENT_QUICK_STOP, false))
     {
         return false;
     }
@@ -299,7 +299,7 @@ static bool test_halt_modes(pmsm_t *pm)
     return true;
 }
 
-static bool test_debug_modes(pmsm_t *pm)
+static bool test_debug_modes(foc_t *foc)
 {
     static const mode_case_t cases[] = {
         {drag_vf, EVENT_FORCE_VOLTAGE, false},
@@ -311,11 +311,11 @@ static bool test_debug_modes(pmsm_t *pm)
     };
     size_t index;
 
-    pm->mode.sys = debug_mode;
+    foc->mode.sys = debug_mode;
     for (index = 0U; index < (sizeof(cases) / sizeof(cases[0])); index++)
     {
-        pm->mode.debug = (debug_mode_e)cases[index].mode;
-        if (!expect_dispatch(pm, cases[index].event, cases[index].commits_pwm))
+        foc->mode.debug = (debug_mode_e)cases[index].mode;
+        if (!expect_dispatch(foc, cases[index].event, cases[index].commits_pwm))
         {
             return false;
         }
@@ -323,23 +323,23 @@ static bool test_debug_modes(pmsm_t *pm)
 
     reset_fakes();
     foc_result_valid = false;
-    pm->mode.debug = volt_op;
-    const bool mode_valid = drive_mode_step(pm);
+    foc->mode.debug = volt_op;
+    const bool mode_valid = drive_mode_step(foc);
 
     return expect_true(!mode_valid, "无效 FOC 结果应报告本周期模式失败。") &&
            expect_true(event_count == 1U, "无效 FOC 结果仍应完成本模式计算。") &&
            expect_true(commit_count == 0U, "无效 FOC 结果不能提交 PWM。");
 }
 
-static bool test_diagnostic_mode(pmsm_t *pm)
+static bool test_diagnostic_mode(foc_t *foc)
 {
-    pm->mode.sys = calibrat_mode;
-    pm->mode.calibrat = iden_pm;
+    foc->mode.sys = calibrat_mode;
+    foc->mode.calibrat = iden_pm;
 
-    return expect_dispatch(pm, EVENT_IDENTIFICATION, false);
+    return expect_dispatch(foc, EVENT_IDENTIFICATION, false);
 }
 
-static bool test_unimplemented_modes_do_nothing(pmsm_t *pm)
+static bool test_unimplemented_modes_do_nothing(foc_t *foc)
 {
     static const release_mode_e release_modes[] = {
         mit_mode,
@@ -360,14 +360,14 @@ static bool test_unimplemented_modes_do_nothing(pmsm_t *pm)
     };
     size_t index;
 
-    pm->mode.sys = release_mode;
+    foc->mode.sys = release_mode;
     for (index = 0U; index < (sizeof(release_modes) / sizeof(release_modes[0])); index++)
     {
         reset_fakes();
-        pm->mode.release = release_modes[index];
-        if (!expect_true(!drive_mode_is_supported(pm),
+        foc->mode.release = release_modes[index];
+        if (!expect_true(!drive_mode_is_supported(foc),
                          "未验证的发布模式不能标记为正式支持。") ||
-            !expect_true(!drive_mode_step(pm),
+            !expect_true(!drive_mode_step(foc),
                          "未验证的发布模式必须明确返回失败。") ||
             !expect_true(event_count == 0U,
                          "未验证的发布模式不应调用算法实现。"))
@@ -376,14 +376,14 @@ static bool test_unimplemented_modes_do_nothing(pmsm_t *pm)
         }
     }
 
-    pm->mode.sys = calibrat_mode;
+    foc->mode.sys = calibrat_mode;
     for (index = 0U;
          index < (sizeof(calibration_modes) / sizeof(calibration_modes[0]));
          index++)
     {
         reset_fakes();
-        pm->mode.calibrat = calibration_modes[index];
-        const bool mode_valid = drive_mode_step(pm);
+        foc->mode.calibrat = calibration_modes[index];
+        const bool mode_valid = drive_mode_step(foc);
         if (!expect_true(!mode_valid,
                          "未实现的标定模式必须明确返回失败。") ||
             !expect_true(event_count == 0U,
@@ -394,22 +394,22 @@ static bool test_unimplemented_modes_do_nothing(pmsm_t *pm)
     }
 
     reset_fakes();
-    pm->mode.sys = halt_mode;
-    pm->mode.halt = fault_mode;
-    if (!expect_true(!drive_mode_is_supported(pm),
+    foc->mode.sys = halt_mode;
+    foc->mode.halt = fault_mode;
+    if (!expect_true(!drive_mode_is_supported(foc),
                      "故障停车由 Drive 故障链直接处理，不进入运行模式。") ||
-        !expect_true(!drive_mode_step(pm),
+        !expect_true(!drive_mode_step(foc),
                      "未接入的故障停车模式必须明确返回失败。"))
     {
         return false;
     }
 
-    pm->mode.sys = debug_mode;
+    foc->mode.sys = debug_mode;
     for (index = 0U; index < (sizeof(debug_modes) / sizeof(debug_modes[0])); index++)
     {
         reset_fakes();
-        pm->mode.debug = debug_modes[index];
-        const bool mode_valid = drive_mode_step(pm);
+        foc->mode.debug = debug_modes[index];
+        const bool mode_valid = drive_mode_step(foc);
         if (!expect_true(!mode_valid,
                          "未实现的调试模式必须明确返回失败。") ||
             !expect_true(event_count == 0U,
@@ -422,12 +422,12 @@ static bool test_unimplemented_modes_do_nothing(pmsm_t *pm)
     return true;
 }
 
-static bool test_unknown_system_mode_returns_failure(pmsm_t *pm)
+static bool test_unknown_system_mode_returns_failure(foc_t *foc)
 {
     reset_fakes();
-    pm->mode.sys = (sys_mode_e)99;
+    foc->mode.sys = (sys_mode_e)99;
 
-    return expect_true(!drive_mode_step(pm),
+    return expect_true(!drive_mode_step(foc),
                        "未知系统模式必须明确返回失败。") &&
            expect_true(event_count == 0U,
                        "未知系统模式不应调用任何实现。");
@@ -435,42 +435,42 @@ static bool test_unknown_system_mode_returns_failure(pmsm_t *pm)
 
 int main(void)
 {
-    pmsm_t pm = {0};
+    foc_t foc = {0};
 
-    pm.ctrl.vd_set = 1.1f;
-    pm.ctrl.vq_set = 1.2f;
-    pm.ctrl.id_set = 1.3f;
-    pm.ctrl.iq_set = 1.4f;
-    pm.ctrl.wr_set = 1.5f;
-    pm.ctrl.posr_set = 1.6f;
-    pm.foc.p_e = 1.7f;
+    foc.ctrl.vd_set = 1.1f;
+    foc.ctrl.vq_set = 1.2f;
+    foc.ctrl.id_set = 1.3f;
+    foc.ctrl.iq_set = 1.4f;
+    foc.ctrl.wr_set = 1.5f;
+    foc.ctrl.posr_set = 1.6f;
+    foc.sig.p_e = 1.7f;
 
-    if (!test_release_modes(&pm))
+    if (!test_release_modes(&foc))
     {
         return 1;
     }
 
-    if (!test_halt_modes(&pm))
+    if (!test_halt_modes(&foc))
     {
         return 2;
     }
 
-    if (!test_debug_modes(&pm))
+    if (!test_debug_modes(&foc))
     {
         return 3;
     }
 
-    if (!test_diagnostic_mode(&pm))
+    if (!test_diagnostic_mode(&foc))
     {
         return 4;
     }
 
-    if (!test_unimplemented_modes_do_nothing(&pm))
+    if (!test_unimplemented_modes_do_nothing(&foc))
     {
         return 5;
     }
 
-    if (!test_unknown_system_mode_returns_failure(&pm))
+    if (!test_unknown_system_mode_returns_failure(&foc))
     {
         return 6;
     }

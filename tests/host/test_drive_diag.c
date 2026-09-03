@@ -95,33 +95,33 @@ void diag_runtime_confirm_stopped(diag_runtime_t *runtime,
     }
 }
 
-bool foc_curr(pmsm_t *pm, float d_ref, float q_ref, float angle)
+bool foc_cur_step(foc_t *foc, float d_ref, float q_ref, float angle)
 {
     current_call_count++;
     captured_d = d_ref;
     captured_q = q_ref;
     captured_angle = angle;
-    pm->foc.v_d = 1.0f;
-    pm->foc.v_q = 0.5f;
-    pm->foc.vs = 12.0f;
+    foc->sig.v_d = 1.0f;
+    foc->sig.v_q = 0.5f;
+    foc->sig.vs = 12.0f;
     return true;
 }
 
-bool foc_volt(pmsm_t *pm, float d_ref, float q_ref, float angle)
+bool foc_volt_step(foc_t *foc, float d_ref, float q_ref, float angle)
 {
     voltage_call_count++;
     captured_d = d_ref;
     captured_q = q_ref;
     captured_angle = angle;
-    pm->foc.v_d = d_ref;
-    pm->foc.v_q = q_ref;
-    pm->foc.vs = 12.0f;
+    foc->sig.v_d = d_ref;
+    foc->sig.v_q = q_ref;
+    foc->sig.vs = 12.0f;
     return true;
 }
 
-bool drive_pwm_commit(pmsm_t *pm)
+bool drive_pwm_commit(foc_t *foc)
 {
-    (void)pm;
+    (void)foc;
     pwm_commit_count++;
     return true;
 }
@@ -142,40 +142,40 @@ static bool nearly_equal(float actual, float expected)
     return fabsf(actual - expected) < 1.0e-5f;
 }
 
-static pmsm_t make_motor(void)
+static foc_t make_motor(void)
 {
-    pmsm_t pm = {0};
+    foc_t foc = {0};
 
-    pm.state = DRIVE_STATE_STOP;
-    pm.foc.i_a = 1.0f;
-    pm.foc.i_b = -0.5f;
-    pm.foc.i_c = -0.5f;
-    pm.foc.p_e = 0.0f;
-    pm.foc.mp_r = 2.0f;
-    pm.foc.wr_f = 3.0f;
-    pm.foc.vbus = 24.0f;
-    pm.period.foc_ts = 0.00005f;
-    pm.pos_box.raw_1 = 1234;
-    return pm;
+    foc.state = DRIVE_STATE_STOP;
+    foc.sig.i_a = 1.0f;
+    foc.sig.i_b = -0.5f;
+    foc.sig.i_c = -0.5f;
+    foc.sig.p_e = 0.0f;
+    foc.sig.mp_r = 2.0f;
+    foc.sig.wr_f = 3.0f;
+    foc.sig.vbus = 24.0f;
+    foc.rate.foc_ts = 0.00005f;
+    foc.enc.raw_1 = 1234;
+    return foc;
 }
 
 static bool test_init_builds_independent_profile(void)
 {
-    pmsm_t pm = make_motor();
+    foc_t foc = make_motor();
 
     reset_fakes();
-    pm.para.Rs = 0.16f;
-    pm.para.pn = 10;
-    pm.pos_box.ma732.cpr = 16384U;
-    pm.pos_box.ma732.dir = 1;
-    pm.prot_cfg.under_voltage_v = 15.0f;
-    drive_diag_init(&pm);
+    foc.motor.Rs = 0.16f;
+    foc.motor.pn = 10;
+    foc.enc.ma732.cpr = 16384U;
+    foc.enc.ma732.dir = 1;
+    foc.prot_cfg.under_voltage_v = 15.0f;
+    drive_diag_init(&foc);
 
     return expect_true(nearly_equal(g_diag.profile.control_period_s,
-                                    pm.period.foc_ts),
+                                    foc.rate.foc_ts),
                        "诊断对象应取得当前快速控制周期。")
         && expect_true(nearly_equal(g_diag.profile.phase_resistance_ohm,
-                                    pm.para.Rs),
+                                    foc.motor.Rs),
                        "诊断对象应取得当前电机相电阻。")
         && expect_true(g_diag.profile.pole_pairs == 10U,
                        "诊断对象应取得当前电机极对数。")
@@ -193,28 +193,28 @@ static bool test_init_builds_independent_profile(void)
 
 static bool test_request_enters_diagnostic_mode(void)
 {
-    pmsm_t pm = make_motor();
+    foc_t foc = make_motor();
 
     g_diag.request = DIAG_REQUEST_START;
     g_diag.requested_job = DIAG_JOB_CURRENT_SWEEP;
-    drive_diag_poll_request(&pm);
+    drive_diag_poll_request(&foc);
 
     return expect_true(g_diag.request == DIAG_REQUEST_NONE,
                        "诊断请求应在读取后清零。")
-        && expect_true(pm.mode.sys == calibrat_mode,
+        && expect_true(foc.mode.sys == calibrat_mode,
                        "START 请求应选择标定系统模式。")
-        && expect_true(pm.mode.calibrat == iden_pm,
+        && expect_true(foc.mode.calibrat == iden_pm,
                        "START 请求应选择统一辨识入口。")
-        && expect_true(pm.req == DRIVE_REQ_START,
+        && expect_true(foc.req == DRIVE_REQ_START,
                        "START 请求应交给普通 Drive 状态机启动。");
 }
 
 static bool test_prepare_uses_stopped_platform(void)
 {
-    pmsm_t pm = make_motor();
+    foc_t foc = make_motor();
 
     reset_fakes();
-    if (!expect_true(drive_diag_prepare(&pm),
+    if (!expect_true(drive_diag_prepare(&foc),
                      "STOP 状态下应允许启动有效诊断任务。")
         || !expect_true(g_diag.active,
                         "算法启动成功后应记录为活动任务。")
@@ -226,7 +226,7 @@ static bool test_prepare_uses_stopped_platform(void)
 
     g_diag.active = false;
     fake_start_status = MC_INVALID_ARGUMENT;
-    return expect_true(!drive_diag_prepare(&pm),
+    return expect_true(!drive_diag_prepare(&foc),
                        "算法参数无效时不得启动 PWM。")
         && expect_true(g_diag.last_status == MC_INVALID_ARGUMENT,
                        "启动失败原因应保留给调试器查看。");
@@ -234,7 +234,7 @@ static bool test_prepare_uses_stopped_platform(void)
 
 static bool test_current_command_uses_fresh_feedback(void)
 {
-    pmsm_t pm = make_motor();
+    foc_t foc = make_motor();
 
     reset_fakes();
     g_diag.active = true;
@@ -245,7 +245,7 @@ static bool test_current_command_uses_fresh_feedback(void)
         .enable_request = true,
     };
 
-    if (!expect_true(drive_diag_step(&pm),
+    if (!expect_true(drive_diag_step(&foc),
                      "有效电流命令应完成一次 FOC 和 PWM 提交。"))
     {
         return false;
@@ -273,7 +273,7 @@ static bool test_current_command_uses_fresh_feedback(void)
 
 static bool test_openloop_voltage_uses_command_angle(void)
 {
-    pmsm_t pm = make_motor();
+    foc_t foc = make_motor();
 
     reset_fakes();
     g_diag.active = true;
@@ -286,7 +286,7 @@ static bool test_openloop_voltage_uses_command_angle(void)
         .enable_request = true,
     };
 
-    return expect_true(drive_diag_step(&pm),
+    return expect_true(drive_diag_step(&foc),
                        "有效开环电压命令应完成一次 PWM 提交。")
         && expect_true(voltage_call_count == 1U,
                        "开环电压命令应调用现有电压控制。")
@@ -298,8 +298,8 @@ static bool test_openloop_voltage_uses_command_angle(void)
 
 static bool test_finish_and_limit_return_to_stop(void)
 {
-    pmsm_t done_pm = make_motor();
-    pmsm_t limited_pm = make_motor();
+    foc_t done_pm = make_motor();
+    foc_t limited_pm = make_motor();
 
     reset_fakes();
     g_diag.active = true;
@@ -332,15 +332,15 @@ static bool test_finish_and_limit_return_to_stop(void)
 
 static bool test_stop_and_fault_close_runtime(void)
 {
-    pmsm_t pm = make_motor();
+    foc_t foc = make_motor();
 
     reset_fakes();
     g_diag.active = true;
     g_diag.request = DIAG_REQUEST_STOP;
-    drive_diag_poll_request(&pm);
+    drive_diag_poll_request(&foc);
     if (!expect_true(abort_count == 1U,
                      "显式 STOP 应中止活动算法。")
-        || !expect_true(pm.req == DRIVE_REQ_STOP,
+        || !expect_true(foc.req == DRIVE_REQ_STOP,
                         "显式 STOP 应交给 Drive 关闭 PWM。"))
     {
         return false;
@@ -357,7 +357,7 @@ static bool test_stop_and_fault_close_runtime(void)
     drive_diag_on_fault();
     return expect_true(abort_count == 2U,
                        "Drive 故障应中止活动算法。")
-        && expect_true(pm.req == DRIVE_REQ_STOP,
+        && expect_true(foc.req == DRIVE_REQ_STOP,
                        "故障处理不能让诊断任务继续运行。");
 }
 

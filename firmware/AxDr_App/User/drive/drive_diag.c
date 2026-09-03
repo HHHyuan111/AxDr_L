@@ -3,7 +3,7 @@
  * @brief 把诊断算法的通用采样和命令接入现有电机控制链。
  *
  * 数据流：当前电机反馈 -> mc_sample_t -> 诊断算法 -> mc_command_t
- *        -> 现有 foc_curr/foc_volt -> drive_pwm_commit。
+ *        -> 现有 foc_cur_step/foc_volt_step -> drive_pwm_commit。
  */
 
 #include "drive_diag.h"
@@ -18,18 +18,18 @@
 
 diag_runtime_t g_diag;
 
-void drive_diag_init(const pmsm_t *pm)
+void drive_diag_init(const foc_t *foc)
 {
-    const enc_para_t *encoder = (pm->pos_box.sensory1 == ENCODER_TYPE_MT6816)
-        ? &pm->pos_box.mt6816
-        : &pm->pos_box.ma732;
+    const encoder_data_t *encoder = (foc->enc.sensory1 == ENCODER_TYPE_MT6816)
+        ? &foc->enc.mt6816
+        : &foc->enc.ma732;
     const diag_seed_t seed = {
-        .control_period_s = pm->period.foc_ts,
-        .phase_resistance_ohm = pm->para.Rs,
-        .d_axis_inductance_h = pm->para.Ld,
-        .q_axis_inductance_h = pm->para.Lq,
-        .flux_linkage_wb = pm->para.flux,
-        .pole_pairs = (uint32_t)pm->para.pn,
+        .control_period_s = foc->rate.foc_ts,
+        .phase_resistance_ohm = foc->motor.Rs,
+        .d_axis_inductance_h = foc->motor.Ld,
+        .q_axis_inductance_h = foc->motor.Lq,
+        .flux_linkage_wb = foc->motor.flux,
+        .pole_pairs = (uint32_t)foc->motor.pn,
         .encoder_full_scale = encoder->cpr,
         .encoder_direction = (int8_t)encoder->dir,
     };
@@ -37,17 +37,17 @@ void drive_diag_init(const pmsm_t *pm)
     diag_runtime_init(&g_diag, &seed);
     g_diag.profile.current_limit_a = DRIVE_DIAG_CURRENT_LIMIT_A;
     g_diag.profile.voltage_limit_v = DRIVE_DIAG_VOLTAGE_LIMIT_V;
-    g_diag.profile.minimum_vbus_v = pm->prot_cfg.under_voltage_v;
+    g_diag.profile.minimum_vbus_v = foc->prot_cfg.under_voltage_v;
 }
 
-static _RAM_FUNC void drive_diag_build_sample(pmsm_t *pm,
+static _RAM_FUNC void drive_diag_build_sample(foc_t *foc,
                                                mc_sample_t *sample)
 {
     const foc_sample_t foc_sample = {
-        .i_a = pm->foc.i_a,
-        .i_b = pm->foc.i_b,
-        .i_c = pm->foc.i_c,
-        .theta = pm->foc.p_e,
+        .i_a = foc->sig.i_a,
+        .i_b = foc->sig.i_b,
+        .i_c = foc->sig.i_c,
+        .theta = foc->sig.p_e,
     };
     foc_frame_t frame;
 
@@ -55,30 +55,30 @@ static _RAM_FUNC void drive_diag_build_sample(pmsm_t *pm,
     foc_core_prepare(&foc_sample, &frame);
 
     *sample = (mc_sample_t){
-        .ia_a = pm->foc.i_a,
-        .ib_a = pm->foc.i_b,
-        .ic_a = pm->foc.i_c,
+        .ia_a = foc->sig.i_a,
+        .ib_a = foc->sig.i_b,
+        .ic_a = foc->sig.i_c,
         .i_alpha_a = frame.i_alpha,
         .i_beta_a = frame.i_beta,
         .id_a = frame.i_d,
         .iq_a = frame.i_q,
-        .vd_v = pm->foc.v_d,
-        .vq_v = pm->foc.v_q,
-        .theta_mech_rad = pm->foc.mp_r,
-        .theta_elec_rad = pm->foc.p_e,
-        .omega_mech_rad_s = pm->foc.wr_f,
-        .vbus_v = pm->foc.vbus,
-        .dt_s = pm->period.foc_ts,
+        .vd_v = foc->sig.v_d,
+        .vq_v = foc->sig.v_q,
+        .theta_mech_rad = foc->sig.mp_r,
+        .theta_elec_rad = foc->sig.p_e,
+        .omega_mech_rad_s = foc->sig.wr_f,
+        .vbus_v = foc->sig.vbus,
+        .dt_s = foc->rate.foc_ts,
         .current_limit_a = g_diag.profile.current_limit_a,
-        .encoder_raw = (uint32_t)pm->pos_box.raw_1,
+        .encoder_raw = (uint32_t)foc->enc.raw_1,
         .encoder_full_scale = g_diag.profile.encoder_full_scale,
-        .fault_code = pm->fault.all,
+        .fault_code = foc->fault.all,
         .voltage_saturated = g_diag.voltage_saturated,
     };
 }
 
 static _RAM_FUNC bool drive_diag_voltage_is_allowed(
-    const pmsm_t *pm,
+    const foc_t *foc,
     const mc_command_t *command)
 {
     float voltage_v;
@@ -89,7 +89,7 @@ static _RAM_FUNC bool drive_diag_voltage_is_allowed(
     }
     else
     {
-        voltage_v = hypotf(pm->foc.v_d, pm->foc.v_q);
+        voltage_v = hypotf(foc->sig.v_d, foc->sig.v_q);
     }
 
     return isfinite(voltage_v)
@@ -106,7 +106,7 @@ static _RAM_FUNC void drive_diag_abort_task(void)
     }
 }
 
-_RAM_FUNC void drive_diag_poll_request(pmsm_t *pm)
+_RAM_FUNC void drive_diag_poll_request(foc_t *foc)
 {
     const diag_request_e request = (diag_request_e)g_diag.request;
 
@@ -119,32 +119,32 @@ _RAM_FUNC void drive_diag_poll_request(pmsm_t *pm)
     if (request == DIAG_REQUEST_STOP)
     {
         drive_diag_abort_task();
-        pm->req = DRIVE_REQ_STOP;
+        foc->req = DRIVE_REQ_STOP;
         return;
     }
 
     if ((request == DIAG_REQUEST_START)
         && !g_diag.active
-        && !pm->pwm_active
-        && (pm->state == DRIVE_STATE_STOP)
-        && (pm->fault.all == 0U))
+        && !foc->pwm_active
+        && (foc->state == DRIVE_STATE_STOP)
+        && (foc->fault.all == 0U))
     {
-        pm->mode.sys = calibrat_mode;
-        pm->mode.calibrat = iden_pm;
-        pm->req = DRIVE_REQ_START;
+        foc->mode.sys = calibrat_mode;
+        foc->mode.calibrat = iden_pm;
+        foc->req = DRIVE_REQ_START;
         return;
     }
 
     g_diag.last_status = MC_REJECTED;
 }
 
-bool drive_diag_is_supported(const pmsm_t *pm)
+bool drive_diag_is_supported(const foc_t *foc)
 {
-    return (pm->mode.sys == calibrat_mode)
-        && (pm->mode.calibrat == iden_pm);
+    return (foc->mode.sys == calibrat_mode)
+        && (foc->mode.calibrat == iden_pm);
 }
 
-bool drive_diag_prepare(pmsm_t *pm)
+bool drive_diag_prepare(foc_t *foc)
 {
     mc_status_t status;
 
@@ -152,18 +152,18 @@ bool drive_diag_prepare(pmsm_t *pm)
     {
         return true;
     }
-    if (pm->pwm_active || (pm->state != DRIVE_STATE_STOP))
+    if (foc->pwm_active || (foc->state != DRIVE_STATE_STOP))
     {
         g_diag.last_status = MC_REJECTED;
         return false;
     }
 
-    status = diag_runtime_start(&g_diag, pm->foc.vbus, true);
+    status = diag_runtime_start(&g_diag, foc->sig.vbus, true);
     g_diag.last_status = status;
     return status == MC_OK;
 }
 
-_RAM_FUNC bool drive_diag_step(pmsm_t *pm)
+_RAM_FUNC bool drive_diag_step(foc_t *foc)
 {
     mc_sample_t sample;
     mc_command_t command;
@@ -171,31 +171,31 @@ _RAM_FUNC bool drive_diag_step(pmsm_t *pm)
     float control_angle_rad;
     bool foc_valid;
 
-    drive_diag_build_sample(pm, &sample);
+    drive_diag_build_sample(foc, &sample);
     status = diag_runtime_step(&g_diag, &sample, &command);
     if ((status != MC_BUSY)
         || command.disable_request
         || !command.enable_request)
     {
-        pm->req = DRIVE_REQ_STOP;
+        foc->req = DRIVE_REQ_STOP;
         return false;
     }
 
     control_angle_rad = command.openloop_enable
         ? command.openloop_theta_e_rad
-        : pm->foc.p_e;
+        : foc->sig.p_e;
 
     switch (command.mode)
     {
         case MC_CONTROL_CURRENT:
-            foc_valid = foc_curr(pm,
+            foc_valid = foc_cur_step(foc,
                                  command.id_ref_a,
                                  command.iq_ref_a,
                                  control_angle_rad);
             break;
 
         case MC_CONTROL_VOLTAGE:
-            foc_valid = foc_volt(pm,
+            foc_valid = foc_volt_step(foc,
                                  command.vd_ref_v,
                                  command.vq_ref_v,
                                  control_angle_rad);
@@ -207,21 +207,21 @@ _RAM_FUNC bool drive_diag_step(pmsm_t *pm)
             break;
     }
 
-    if (!foc_valid || !drive_diag_voltage_is_allowed(pm, &command))
+    if (!foc_valid || !drive_diag_voltage_is_allowed(foc, &command))
     {
         drive_diag_abort_task();
-        pm->req = DRIVE_REQ_STOP;
+        foc->req = DRIVE_REQ_STOP;
         return false;
     }
 
     g_diag.voltage_saturated =
-        (pm->foc.vs > 0.0f)
-        && (hypotf(pm->foc.v_d, pm->foc.v_q) >= (0.999f * pm->foc.vs));
+        (foc->sig.vs > 0.0f)
+        && (hypotf(foc->sig.v_d, foc->sig.v_q) >= (0.999f * foc->sig.vs));
 
-    if (!drive_pwm_commit(pm))
+    if (!drive_pwm_commit(foc))
     {
         drive_diag_abort_task();
-        pm->req = DRIVE_REQ_STOP;
+        foc->req = DRIVE_REQ_STOP;
         return false;
     }
 

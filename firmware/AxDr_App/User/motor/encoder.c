@@ -10,7 +10,7 @@
  *
  * 本函数只配置软件参数，不访问 SPI，也不读取编码器。
  */
-void encoder_init(pos_box_t *pos_box)
+void encoder_init(encoder_state_t *pos_box)
 {
     pos_box->ma732.dir = 1;
     pos_box->ma732.bit = 14;
@@ -75,7 +75,7 @@ _RAM_FUNC uint32_t read_mt6825_raw(void)
  * @param[in,out] enc 接收本次 14 位原始计数和新数据标志。
  * @return SPI 读取成功返回 true，否则返回 false。
  */
-_RAM_FUNC bool read_ma732_raw(enc_para_t *enc)
+_RAM_FUNC bool read_ma732_raw(encoder_data_t *enc)
 {
     uint16_t raw_count;
 
@@ -98,7 +98,7 @@ _RAM_FUNC bool read_ma732_raw(enc_para_t *enc)
  * 硬件通信由 target_encoder 完成；本函数只把结果交给上层已有的数据结构。
  * 显式传入 enc，避免函数暗中修改全局电机对象。
  */
-_RAM_FUNC bool read_mt6816_raw(enc_para_t *enc)
+_RAM_FUNC bool read_mt6816_raw(encoder_data_t *enc)
 {
     uint16_t raw_count;
 
@@ -149,7 +149,7 @@ _RAM_FUNC uint32_t send_mod_dm485enc(void)
  * factor 在初始化时设置为 2π/cpr，因此本函数只完成“计数 × 每计数弧度”。
  * 编码器校准 LUT 尚未接入这条运行链路，后续应通过独立节点实现。
  */
-_RAM_FUNC void encoder_update_angle(enc_para_t *enc)
+_RAM_FUNC void encoder_update_angle(encoder_data_t *enc)
 {
     enc->pos = (float)enc->raw * enc->factor;
     wrap_0_2pi(enc->pos);
@@ -157,14 +157,14 @@ _RAM_FUNC void encoder_update_angle(enc_para_t *enc)
 
 _RAM_FUNC void bsp_uart8_rxidle_isr(void)
 {
-    // if(pm.mode.sys == calibrat_mode && (pm.mode.calibrat == rotor_enc_mod||pm.mode.calibrat == output_enc_mod)) {
-    //     pm.modenc.result = (rx_dma_buff[1] << 8) | rx_dma_buff[0];
+    // if(g_foc.mode.sys == calibrat_mode && (g_foc.mode.calibrat == rotor_enc_mod||g_foc.mode.calibrat == output_enc_mod)) {
+    //     g_foc.modenc.result = (rx_dma_buff[1] << 8) | rx_dma_buff[0];
     // } else {
     //     // uint8_t crc = bsp_crc8_cal(rx_dma_buff, 3);
     //     //uint8_t crc = bsp_soft_crc8_calc(rx_dma_buff, 3);
     //     //if (crc == rx_dma_buff[3]) {
-    //         pm.pos_box.dm485enc.rev_flag = 1; // 设置标志位，表示接收到新数据
-    //         pm.pos_box.dm485enc.raw = (rx_dma_buff[2] << 16) | (rx_dma_buff[1] << 8) | (rx_dma_buff[0]);
+    //         g_foc.enc.dm485enc.rev_flag = 1; // 设置标志位，表示接收到新数据
+    //         g_foc.enc.dm485enc.raw = (rx_dma_buff[2] << 16) | (rx_dma_buff[1] << 8) | (rx_dma_buff[0]);
     //     //}
     // }
     //  //run_tick = read_csr(CSR_MCYCLE);

@@ -1,6 +1,6 @@
 /**
  * @file test_public_headers.c
- * @brief 验证 App 与 Drive 对外头文件不依赖完整 pmsm_t 定义。
+ * @brief 验证 App 与 Drive 对外头文件不依赖完整 foc_t 定义。
  */
 
 #include "fast_loop.h"
@@ -15,7 +15,7 @@
 
 int main(void)
 {
-    pmsm_t *motor = (pmsm_t *)0;
+    foc_t *motor = (foc_t *)0;
     control_cycle_input_t input = {0};
     control_cycle_output_t output = {0};
     drive_pwm_cmd_t cmd = {0};

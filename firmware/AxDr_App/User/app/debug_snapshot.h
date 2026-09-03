@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 
-#include "motor_fwd.h"
+#include "foc_fwd.h"
 
 /**
  * @brief 调试器观察用的单周期关键量镜像。
@@ -23,7 +23,7 @@ typedef struct
     uint32_t req;
     uint32_t state;
     uint32_t pwm_on;   /* Drive 的软件输出状态，不是定时器寄存器回读。 */
-    uint32_t fault;    /* pmsm_fault_t 的原始故障位图。 */
+    uint32_t fault;    /* foc_fault_t 的原始故障位图。 */
     uint32_t sys_mode;
     uint32_t op_mode;
 
@@ -93,12 +93,12 @@ extern volatile debug_snapshot_t g_debug_snapshot;
 /**
  * @brief 在快速周期结束时发布一份关键控制量快照。
  *
- * @param[in] pm 本周期已经完成采样、反馈更新和 Drive 执行的电机控制对象。
- * @pre pm 指向快速周期独占写入的有效对象；每个快速周期最多调用一次。
+ * @param[in] foc 本周期已经完成采样、反馈更新和 Drive 执行的电机控制对象。
+ * @pre foc 指向快速周期独占写入的有效对象；每个快速周期最多调用一次。
  *
- * 本函数只从 pm 复制标量，不修改 pm，不执行通信、动态分配或阻塞操作。seq 在
+ * 本函数只从 foc 复制标量，不修改 foc，不执行通信、动态分配或阻塞操作。seq 在
  * 最后写入，与本周期 pwm_cmd 和 pwm_commit 的 seq 使用同一快速周期编号。
  */
-void debug_snapshot_publish(const pmsm_t *pm);
+void debug_snapshot_publish(const foc_t *foc);
 
 #endif /* AXDR_DEBUG_SNAPSHOT_H */

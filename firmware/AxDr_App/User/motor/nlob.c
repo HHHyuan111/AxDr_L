@@ -3,39 +3,39 @@
 
 void nlob_init(void)
 {
-	memset(&pm.nlob, 0, sizeof(pm.nlob));
+	memset(&g_foc.nlob, 0, sizeof(g_foc.nlob));
 	
-	pm.nlob.i_alph = &pm.foc.i_alph;
-	pm.nlob.i_beta = &pm.foc.i_beta;
+	g_foc.nlob.i_alph = &g_foc.sig.i_alph;
+	g_foc.nlob.i_beta = &g_foc.sig.i_beta;
 	
-	pm.nlob.v_alph = &pm.foc.v_alph;
-	pm.nlob.v_beta = &pm.foc.v_beta;
+	g_foc.nlob.v_alph = &g_foc.sig.v_alph;
+	g_foc.nlob.v_beta = &g_foc.sig.v_beta;
 
-	pm.nlob.i_q  = &pm.foc.i_q;
+	g_foc.nlob.i_q  = &g_foc.sig.i_q;
 	
-	pm.nlob.Rs = &pm.para.Rs;
-	pm.nlob.Ls = &pm.para.Ls;
-	pm.nlob.flux = &pm.para.flux;
+	g_foc.nlob.Rs = &g_foc.motor.Rs;
+	g_foc.nlob.Ls = &g_foc.motor.Ls;
+	g_foc.nlob.flux = &g_foc.motor.flux;
 	
-	pm.nlob.flux_sqr  = pm.nlob.flux[0] * pm.nlob.flux[0];
-	pm.nlob.bw_factor = 1.0f / pm.nlob.flux_sqr;
-	pm.nlob.gain  = 1000.0f;
-	pm.nlob.gamma = 0.5f * (pm.nlob.gain * pm.nlob.bw_factor);
-	pm.nlob.id_gain = 1.0f;
-	pm.nlob.ts = 0.00005f;
-	pm.nlob.fs = 20000;
+	g_foc.nlob.flux_sqr  = g_foc.nlob.flux[0] * g_foc.nlob.flux[0];
+	g_foc.nlob.bw_factor = 1.0f / g_foc.nlob.flux_sqr;
+	g_foc.nlob.gain  = 1000.0f;
+	g_foc.nlob.gamma = 0.5f * (g_foc.nlob.gain * g_foc.nlob.bw_factor);
+	g_foc.nlob.id_gain = 1.0f;
+	g_foc.nlob.ts = 0.00005f;
+	g_foc.nlob.fs = 20000;
 	
-	pm.nlob.x1 = pm.nlob.flux[0];
-	pm.nlob.x2 = 0;
+	g_foc.nlob.x1 = g_foc.nlob.flux[0];
+	g_foc.nlob.x2 = 0;
 	
-    pm.nlob.pll.wn = 100 * 2 * AXDR_PI;  // 带宽
-	pm.nlob.pll.damp = 0.707f; 		// 阻尼系数
-	pm.nlob.pll.ts   = 0.00005f;
+    g_foc.nlob.pll.wn = 100 * 2 * AXDR_PI;  // 带宽
+	g_foc.nlob.pll.damp = 0.707f; 		// 阻尼系数
+	g_foc.nlob.pll.ts   = 0.00005f;
 	
-	pm.nlob.pll.kp = 2*pm.nlob.pll.damp*pm.nlob.pll.wn;
-	pm.nlob.pll.ki = pm.nlob.pll.wn*pm.nlob.pll.wn;
-    pm.nlob.pll.i_term_max = 333 * 2 * AXDR_PI * 2;
-    pm.nlob.pll.out_max = 333 * 2 * AXDR_PI * 2;
+	g_foc.nlob.pll.kp = 2*g_foc.nlob.pll.damp*g_foc.nlob.pll.wn;
+	g_foc.nlob.pll.ki = g_foc.nlob.pll.wn*g_foc.nlob.pll.wn;
+    g_foc.nlob.pll.i_term_max = 333 * 2 * AXDR_PI * 2;
+    g_foc.nlob.pll.out_max = 333 * 2 * AXDR_PI * 2;
 }
 
 

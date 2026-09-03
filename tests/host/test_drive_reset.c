@@ -22,14 +22,14 @@ static bool expect_true(bool condition, const char *message)
 
 int main(void)
 {
-    pmsm_t motor = {
-        .period = {
+    foc_t motor = {
+        .rate = {
             .cur_pid_cnt = 3U,
             .spd_pid_cnt = 4U,
             .pos_pid_cnt = 5U,
             .foc_ts = 0.00005f
         },
-        .para = {.pn = 7.0f},
+        .motor = {.pn = 7.0f},
         .ctrl = {
             .iq_set = 2.0f,
             .wr_set = 3.0f,
@@ -37,7 +37,7 @@ int main(void)
             .wm_acc = 20.0f,
             .pmax_iq = 6.0f
         },
-        .foc = {
+        .sig = {
             .p_e = 1.2f,
             .mp_r = 8.0f,
             .i_a = 0.3f,
@@ -60,20 +60,20 @@ int main(void)
 
     drive_control_reset(&motor);
 
-    return expect_true((motor.period.cur_pid_cnt == 0U) &&
-                       (motor.period.spd_pid_cnt == 0U) &&
-                       (motor.period.pos_pid_cnt == 0U),
+    return expect_true((motor.rate.cur_pid_cnt == 0U) &&
+                       (motor.rate.spd_pid_cnt == 0U) &&
+                       (motor.rate.pos_pid_cnt == 0U),
                        "复位必须清除三级控制环分频计数。") &&
            expect_true((motor.ctrl.iq_set == 0.0f) &&
                        (motor.ctrl.wr_set == 0.0f) &&
                        (motor.ctrl.posr_set == 0.0f),
                        "复位必须清除内部电流、速度和位置给定。") &&
-           expect_true((motor.foc.v_d == 0.0f) &&
-                       (motor.foc.v_q == 0.0f),
+           expect_true((motor.sig.v_d == 0.0f) &&
+                       (motor.sig.v_q == 0.0f),
                        "复位必须清除上一拍 dq 电压。") &&
-           expect_true((motor.foc.dtc_a == 0.5f) &&
-                       (motor.foc.dtc_b == 0.5f) &&
-                       (motor.foc.dtc_c == 0.5f),
+           expect_true((motor.sig.dtc_a == 0.5f) &&
+                       (motor.sig.dtc_b == 0.5f) &&
+                       (motor.sig.dtc_c == 0.5f),
                        "复位后的候选占空比应回到中性值。") &&
            expect_true((motor.id_pi.kp == 0.5f) &&
                        (motor.id_pi.out_max == 10.0f) &&
@@ -82,13 +82,13 @@ int main(void)
            expect_true((motor.elec_speed_diff.delta_angle_rad == 0.0f) &&
                        (motor.elec_speed_diff.previous_angle_rad == 1.2f),
                        "测速复位必须用当前电角度建立下一拍基准。") &&
-           expect_true((motor.period.foc_ts == 0.00005f) &&
-                       (motor.para.pn == 7.0f) &&
+           expect_true((motor.rate.foc_ts == 0.00005f) &&
+                       (motor.motor.pn == 7.0f) &&
                        (motor.ctrl.wm_acc == 20.0f) &&
                        (motor.ctrl.pmax_iq == 6.0f),
                        "复位不能覆盖周期、电机参数和限幅配置。") &&
-           expect_true((motor.foc.mp_r == 8.0f) &&
-                       (motor.foc.i_a == 0.3f),
+           expect_true((motor.sig.mp_r == 8.0f) &&
+                       (motor.sig.i_a == 0.3f),
                        "复位不能抹掉当前物理位置和电流反馈。")
         ? 0
         : 1;

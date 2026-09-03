@@ -30,7 +30,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "fast_loop.h"
-#include "common.h"
+#include "foc.h"
 #include "target_adc.h"
 #include "modlue.h"
 #include "lcd.h"
@@ -117,7 +117,7 @@ int main(void)
     Error_Handler();
   }
 
-  pmsm_init();
+  foc_init(&g_foc);
   fast_loop_enable();
   
   

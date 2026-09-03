@@ -16,45 +16,45 @@ static PLATFORM_FAST_CODE bool drive_cmd_range_valid(float lower, float upper)
     return isfinite(lower) && isfinite(upper) && (lower <= upper);
 }
 
-PLATFORM_FAST_CODE bool drive_cmd_apply(pmsm_t *pm)
+PLATFORM_FAST_CODE bool drive_cmd_apply(foc_t *foc)
 {
     float position_rad;
     float speed_rad_s;
     float torque_nm;
 
-    if (!isfinite(pm->cmd.torm_set) ||
-        !isfinite(pm->cmd.wm_set) ||
-        !isfinite(pm->cmd.posm_set) ||
-        !drive_cmd_range_valid(pm->app_ctrl.nmax_torm, pm->app_ctrl.pmax_torm) ||
-        !drive_cmd_range_valid(pm->app_ctrl.nmax_velm, pm->app_ctrl.pmax_velm) ||
-        !drive_cmd_range_valid(pm->app_ctrl.nmax_posm, pm->app_ctrl.pmax_posm))
+    if (!isfinite(foc->cmd.torm_set) ||
+        !isfinite(foc->cmd.wm_set) ||
+        !isfinite(foc->cmd.posm_set) ||
+        !drive_cmd_range_valid(foc->app.nmax_torm, foc->app.pmax_torm) ||
+        !drive_cmd_range_valid(foc->app.nmax_velm, foc->app.pmax_velm) ||
+        !drive_cmd_range_valid(foc->app.nmax_posm, foc->app.pmax_posm))
     {
         return false;
     }
 
-    torque_nm = control_limit(pm->cmd.torm_set,
-                              pm->app_ctrl.pmax_torm,
-                              pm->app_ctrl.nmax_torm);
-    speed_rad_s = control_limit(pm->cmd.wm_set,
-                                pm->app_ctrl.pmax_velm,
-                                pm->app_ctrl.nmax_velm);
-    position_rad = control_limit(pm->cmd.posm_set,
-                                 pm->app_ctrl.pmax_posm,
-                                 pm->app_ctrl.nmax_posm);
+    torque_nm = control_limit(foc->cmd.torm_set,
+                              foc->app.pmax_torm,
+                              foc->app.nmax_torm);
+    speed_rad_s = control_limit(foc->cmd.wm_set,
+                                foc->app.pmax_velm,
+                                foc->app.nmax_velm);
+    position_rad = control_limit(foc->cmd.posm_set,
+                                 foc->app.pmax_posm,
+                                 foc->app.nmax_posm);
 
-    if (pm->app_ctrl.polarity == motor_polarity_n)
+    if (foc->app.polarity == motor_polarity_n)
     {
         torque_nm = -torque_nm;
         speed_rad_s = -speed_rad_s;
         position_rad = -position_rad;
     }
-    else if (pm->app_ctrl.polarity != motor_polarity_p)
+    else if (foc->app.polarity != motor_polarity_p)
     {
         return false;
     }
 
-    pm->ctrl.torm_set = torque_nm;
-    pm->ctrl.wm_set = speed_rad_s;
-    pm->ctrl.posm_set = position_rad;
+    foc->ctrl.torm_set = torque_nm;
+    foc->ctrl.wm_set = speed_rad_s;
+    foc->ctrl.posm_set = position_rad;
     return true;
 }

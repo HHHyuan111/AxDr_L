@@ -14,7 +14,7 @@ static bool drive_called;
 static bool input_visible;
 static float received_bus_voltage_v;
 
-void foc_feedback_update(pmsm_t *motor, float bus_voltage_v)
+void ctrl_fb_update(foc_t *motor, float bus_voltage_v)
 {
     feedback_called = true;
     received_bus_voltage_v = bus_voltage_v;
@@ -22,16 +22,16 @@ void foc_feedback_update(pmsm_t *motor, float bus_voltage_v)
                     motor->fb_status.i_valid &&
                     motor->fb_status.vbus_valid &&
                     motor->fb_status.pos_valid &&
-                    (motor->foc.i_a == 1.0f) &&
-                    (motor->foc.i_b == -2.0f) &&
-                    (motor->foc.i_c == 3.0f) &&
-                    (motor->foc.p_e == 0.25f) &&
-                    (motor->foc.mp_r == 4.0f) &&
-                    (motor->foc.mp_m == 5.0f);
-    motor->foc.vbus = bus_voltage_v;
+                    (motor->sig.i_a == 1.0f) &&
+                    (motor->sig.i_b == -2.0f) &&
+                    (motor->sig.i_c == 3.0f) &&
+                    (motor->sig.p_e == 0.25f) &&
+                    (motor->sig.mp_r == 4.0f) &&
+                    (motor->sig.mp_m == 5.0f);
+    motor->sig.vbus = bus_voltage_v;
 }
 
-void drive_fast_step(pmsm_t *motor)
+void drive_fast_step(foc_t *motor)
 {
     drive_called = feedback_called;
     motor->state = DRIVE_STATE_RUN;
@@ -59,7 +59,7 @@ static bool expect_true(bool condition, const char *message)
 
 int main(void)
 {
-    pmsm_t motor = {0};
+    foc_t motor = {0};
     const control_cycle_input_t input = {
         .seq = 42U,
         .i_valid = true,

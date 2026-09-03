@@ -11,26 +11,26 @@
 
 volatile debug_snapshot_t g_debug_snapshot;
 
-_RAM_FUNC void debug_snapshot_publish(const pmsm_t *pm)
+_RAM_FUNC void debug_snapshot_publish(const foc_t *foc)
 {
     uint32_t op_mode;
 
-    switch (pm->mode.sys)
+    switch (foc->mode.sys)
     {
         case debug_mode:
-            op_mode = (uint32_t)pm->mode.debug;
+            op_mode = (uint32_t)foc->mode.debug;
             break;
 
         case release_mode:
-            op_mode = (uint32_t)pm->mode.release;
+            op_mode = (uint32_t)foc->mode.release;
             break;
 
         case calibrat_mode:
-            op_mode = (uint32_t)pm->mode.calibrat;
+            op_mode = (uint32_t)foc->mode.calibrat;
             break;
 
         case halt_mode:
-            op_mode = (uint32_t)pm->mode.halt;
+            op_mode = (uint32_t)foc->mode.halt;
             break;
 
         default:
@@ -38,18 +38,18 @@ _RAM_FUNC void debug_snapshot_publish(const pmsm_t *pm)
             break;
     }
 
-    g_debug_snapshot.req = (uint32_t)pm->req;
-    g_debug_snapshot.state = (uint32_t)pm->state;
-    g_debug_snapshot.pwm_on = (uint32_t)pm->pwm_active;
-    g_debug_snapshot.fault = pm->fault.all;
-    g_debug_snapshot.sys_mode = (uint32_t)pm->mode.sys;
+    g_debug_snapshot.req = (uint32_t)foc->req;
+    g_debug_snapshot.state = (uint32_t)foc->state;
+    g_debug_snapshot.pwm_on = (uint32_t)foc->pwm_active;
+    g_debug_snapshot.fault = foc->fault.all;
+    g_debug_snapshot.sys_mode = (uint32_t)foc->mode.sys;
     g_debug_snapshot.op_mode = op_mode;
-    g_debug_snapshot.pwm_cmd_seq = pm->pwm_cmd.seq;
-    g_debug_snapshot.pwm_commit_seq = pm->pwm_commit.seq;
-    g_debug_snapshot.pwm_cmd_valid = (uint32_t)pm->pwm_cmd.valid;
+    g_debug_snapshot.pwm_cmd_seq = foc->pwm_cmd.seq;
+    g_debug_snapshot.pwm_commit_seq = foc->pwm_commit.seq;
+    g_debug_snapshot.pwm_cmd_valid = (uint32_t)foc->pwm_cmd.valid;
     g_debug_snapshot.pwm_committed =
-        (uint32_t)(pm->pwm_commit.valid &&
-                   (pm->pwm_commit.seq == pm->fast_seq));
+        (uint32_t)(foc->pwm_commit.valid &&
+                   (foc->pwm_commit.seq == foc->fast_seq));
     g_debug_snapshot.diag_req = g_diag.request;
     g_debug_snapshot.diag_job = (uint32_t)g_diag.active_job;
     g_debug_snapshot.diag_state = (uint32_t)g_diag.manager.state;
@@ -57,41 +57,41 @@ _RAM_FUNC void debug_snapshot_publish(const pmsm_t *pm)
     g_debug_snapshot.diag_active = (uint32_t)g_diag.active;
     g_debug_snapshot.diag_v_sat = (uint32_t)g_diag.voltage_saturated;
 
-    g_debug_snapshot.v_bus = pm->foc.vbus;
-    g_debug_snapshot.i_a = pm->foc.i_a;
-    g_debug_snapshot.i_b = pm->foc.i_b;
-    g_debug_snapshot.i_c = pm->foc.i_c;
-    g_debug_snapshot.theta_e = pm->foc.p_e;
+    g_debug_snapshot.v_bus = foc->sig.vbus;
+    g_debug_snapshot.i_a = foc->sig.i_a;
+    g_debug_snapshot.i_b = foc->sig.i_b;
+    g_debug_snapshot.i_c = foc->sig.i_c;
+    g_debug_snapshot.theta_e = foc->sig.p_e;
 
-    g_debug_snapshot.pos_r_ref = pm->ctrl.posr_set;
-    g_debug_snapshot.pos_r_fbk = pm->foc.mp_r;
-    g_debug_snapshot.vel_r_ref = pm->ctrl.wr_set;
-    g_debug_snapshot.vel_r_fbk = pm->foc.wr_f;
+    g_debug_snapshot.pos_r_ref = foc->ctrl.posr_set;
+    g_debug_snapshot.pos_r_fbk = foc->sig.mp_r;
+    g_debug_snapshot.vel_r_ref = foc->ctrl.wr_set;
+    g_debug_snapshot.vel_r_fbk = foc->sig.wr_f;
 
-    g_debug_snapshot.i_d_ref = pm->ctrl.id_set;
-    g_debug_snapshot.i_d_fbk = pm->foc.i_d;
-    g_debug_snapshot.i_q_ref = pm->ctrl.iq_set;
-    g_debug_snapshot.i_q_lim = pm->ctrl.iq_lim;
-    g_debug_snapshot.i_q_fbk = pm->foc.i_q;
+    g_debug_snapshot.i_d_ref = foc->ctrl.id_set;
+    g_debug_snapshot.i_d_fbk = foc->sig.i_d;
+    g_debug_snapshot.i_q_ref = foc->ctrl.iq_set;
+    g_debug_snapshot.i_q_lim = foc->ctrl.iq_lim;
+    g_debug_snapshot.i_q_fbk = foc->sig.i_q;
 
-    g_debug_snapshot.v_d_cmd = pm->foc.v_d;
-    g_debug_snapshot.v_q_cmd = pm->foc.v_q;
+    g_debug_snapshot.v_d_cmd = foc->sig.v_d;
+    g_debug_snapshot.v_q_cmd = foc->sig.v_q;
     g_debug_snapshot.diag_id_ref = g_diag.command.id_ref_a;
     g_debug_snapshot.diag_iq_ref = g_diag.command.iq_ref_a;
     g_debug_snapshot.diag_vd_ref = g_diag.command.vd_ref_v;
     g_debug_snapshot.diag_vq_ref = g_diag.command.vq_ref_v;
     g_debug_snapshot.diag_freq = g_diag.sweep.active_frequency_hz;
-    g_debug_snapshot.duty_a = pm->foc.dtc_a;
-    g_debug_snapshot.duty_b = pm->foc.dtc_b;
-    g_debug_snapshot.duty_c = pm->foc.dtc_c;
+    g_debug_snapshot.duty_a = foc->sig.dtc_a;
+    g_debug_snapshot.duty_b = foc->sig.dtc_b;
+    g_debug_snapshot.duty_c = foc->sig.dtc_c;
 
-    g_debug_snapshot.duty_cmd_a = pm->pwm_cmd.duty_a;
-    g_debug_snapshot.duty_cmd_b = pm->pwm_cmd.duty_b;
-    g_debug_snapshot.duty_cmd_c = pm->pwm_cmd.duty_c;
-    g_debug_snapshot.duty_commit_a = pm->pwm_commit.duty_a;
-    g_debug_snapshot.duty_commit_b = pm->pwm_commit.duty_b;
-    g_debug_snapshot.duty_commit_c = pm->pwm_commit.duty_c;
+    g_debug_snapshot.duty_cmd_a = foc->pwm_cmd.duty_a;
+    g_debug_snapshot.duty_cmd_b = foc->pwm_cmd.duty_b;
+    g_debug_snapshot.duty_cmd_c = foc->pwm_cmd.duty_c;
+    g_debug_snapshot.duty_commit_a = foc->pwm_commit.duty_a;
+    g_debug_snapshot.duty_commit_b = foc->pwm_commit.duty_b;
+    g_debug_snapshot.duty_commit_c = foc->pwm_commit.duty_c;
 
     /* 最后更新序号，表示上面各字段已经完成本周期发布。 */
-    g_debug_snapshot.seq = pm->fast_seq;
+    g_debug_snapshot.seq = foc->fast_seq;
 }

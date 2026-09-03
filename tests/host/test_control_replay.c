@@ -36,36 +36,36 @@ void target_pwm_set_duty_ratios(float duty_a, float duty_b, float duty_c)
     target_duty_c = duty_c;
 }
 
-void foc_feedback_update(pmsm_t *motor, float bus_voltage_v)
+void ctrl_fb_update(foc_t *motor, float bus_voltage_v)
 {
-    motor->foc.vbus = bus_voltage_v;
-    motor->foc.wr_f = 0.0f;
+    motor->sig.vbus = bus_voltage_v;
+    motor->sig.wr_f = 0.0f;
 }
 
-void drive_control_reset(pmsm_t *motor)
+void drive_control_reset(foc_t *motor)
 {
     motor->ctrl.vd_set = 0.0f;
     motor->ctrl.vq_set = 0.0f;
 }
 
-void drive_diag_poll_request(pmsm_t *motor)
+void drive_diag_poll_request(foc_t *motor)
 {
     (void)motor;
 }
 
-bool drive_diag_is_supported(const pmsm_t *motor)
-{
-    (void)motor;
-    return false;
-}
-
-bool drive_diag_prepare(pmsm_t *motor)
+bool drive_diag_is_supported(const foc_t *motor)
 {
     (void)motor;
     return false;
 }
 
-bool drive_diag_step(pmsm_t *motor)
+bool drive_diag_prepare(foc_t *motor)
+{
+    (void)motor;
+    return false;
+}
+
+bool drive_diag_step(foc_t *motor)
 {
     (void)motor;
     return false;
@@ -79,37 +79,37 @@ void drive_diag_on_fault(void)
 {
 }
 
-void force_volt_mode(pmsm_t *motor)
+void open_volt_step(foc_t *motor)
 {
     (void)motor;
 }
 
-void force_curr_mode(pmsm_t *motor)
+void open_cur_step(foc_t *motor)
 {
     (void)motor;
 }
 
-void cst_tor_mode(pmsm_t *motor)
+void cst_step(foc_t *motor)
 {
     (void)motor;
 }
 
-void csv_vel_mode(pmsm_t *motor)
+void csv_step(foc_t *motor)
 {
     (void)motor;
 }
 
-void csp_pos_mode(pmsm_t *motor)
+void csp_step(foc_t *motor)
 {
     (void)motor;
 }
 
-void pmsm_quick_stop_mode(pmsm_t *motor)
+void quick_stop_step(foc_t *motor)
 {
     (void)motor;
 }
 
-bool foc_volt(pmsm_t *motor, float voltage_d_v, float voltage_q_v, float angle_rad)
+bool foc_volt_step(foc_t *motor, float voltage_d_v, float voltage_q_v, float angle_rad)
 {
     (void)motor;
     (void)voltage_d_v;
@@ -118,19 +118,19 @@ bool foc_volt(pmsm_t *motor, float voltage_d_v, float voltage_q_v, float angle_r
     return false;
 }
 
-bool foc_curr(pmsm_t *motor, float current_d_a, float current_q_a, float angle_rad)
+bool foc_cur_step(foc_t *motor, float current_d_a, float current_q_a, float angle_rad)
 {
     (void)current_d_a;
     (void)current_q_a;
     (void)angle_rad;
 
-    motor->foc.dtc_a = 0.2f;
-    motor->foc.dtc_b = 0.4f;
-    motor->foc.dtc_c = 0.6f;
+    motor->sig.dtc_a = 0.2f;
+    motor->sig.dtc_b = 0.4f;
+    motor->sig.dtc_c = 0.6f;
     return true;
 }
 
-bool foc_vel(pmsm_t *motor, float speed_rad_s, float current_limit_a, float angle_rad)
+bool foc_spd_step(foc_t *motor, float speed_rad_s, float current_limit_a, float angle_rad)
 {
     (void)motor;
     (void)speed_rad_s;
@@ -139,7 +139,7 @@ bool foc_vel(pmsm_t *motor, float speed_rad_s, float current_limit_a, float angl
     return false;
 }
 
-bool foc_pos(pmsm_t *motor,
+bool foc_pos_step(foc_t *motor,
              float position_rad,
              float speed_limit_rad_s,
              float current_limit_a,
@@ -183,11 +183,11 @@ static control_cycle_input_t replay_sample(uint32_t seq)
 
 int main(void)
 {
-    pmsm_t motor = {
+    foc_t motor = {
         .mode = {.sys = debug_mode, .debug = curr_cl},
         .req = DRIVE_REQ_STOP,
         .state = DRIVE_STATE_STOP,
-        .para = {.phase_order = PHASE_ORDER_ABC},
+        .motor = {.phase_order = PHASE_ORDER_ABC},
         .prot_cfg = {.invalid_position_samples = 1U}
     };
     control_cycle_input_t input = replay_sample(1U);

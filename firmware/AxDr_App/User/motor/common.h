@@ -16,9 +16,9 @@
 #include "drive_io.h"
 #include "drive_protection.h"
 #include "encoder_type.h"
+#include "foc.h"
 #include "main.h"
 #include "bsp.h"
-#include "motor_fwd.h"
 #include "phase_order.h"
 
 #define _RAM_FUNC PLATFORM_FAST_CODE
@@ -239,7 +239,7 @@ typedef struct
     float dtc_a;
     float dtc_b;
     float dtc_c;
-} pmsm_foc_t;
+} foc_sig_t;
 
 /* Drive 请求：STOP 保持禁能，START 执行一次启动，RUN 持续运行当前模式。 */
 typedef enum
@@ -398,7 +398,7 @@ typedef struct
     float pnd_2pi; // pn/2pi
     float div_Gr; // 1/Gr
     float div_pn; // 1/pn
-} pmsm_para_t;
+} motor_cfg_t;
 
 // PMSM control structure
 typedef struct
@@ -448,7 +448,7 @@ typedef struct
     float nmax_tor;              // 反向最大转矩限制
     float nmax_iq;               // 反向最大电流限制
     float nmax_tor_vel;          // 转矩模式反向最大速度限制
-} pmsm_ctrl_t;
+} ctrl_state_t;
 
 typedef struct
 {
@@ -458,7 +458,7 @@ typedef struct
     float posm_set; // Position setpoint
     float kp;
     float kd;
-} pmsm_cmd_t;
+} foc_cmd_t;
 
 // APP控制参数结构体
 typedef struct
@@ -498,7 +498,7 @@ typedef struct
     bool pos_set_immediate;       // 位置设定是否及时更新
     bool pos_set_by_flag;         // 位置设定是否按标志位更新
 
-} pmsm_app_ctrl_t;
+} app_ctrl_t;
 
 // Period structure
 typedef struct
@@ -535,7 +535,7 @@ typedef struct
     uint8_t spd_pid_cnt_val;
     uint8_t pos_pid_cnt_val;
     uint8_t spd_mea_cnt_val;
-} period_t;
+} ctrl_rate_cfg_t;
 
 // ADC value structure for PMSM
 typedef struct
@@ -559,7 +559,7 @@ typedef struct
     float ib_off;
     float ic_off;
 
-} pmsm_adc_val_t;
+} adc_data_t;
 
 // Board parameter structure for PMSM
 typedef struct
@@ -590,7 +590,7 @@ typedef struct
     float Rt_rotor_Ka;
 
     float dead_time;
-} pmsm_board_t;
+} board_cfg_t;
 
 // Fault status structure for PMSM
 typedef union
@@ -611,7 +611,7 @@ typedef union
     } bit;
 
     uint32_t all;
-} pmsm_fault_t;
+} foc_fault_t;
 
 typedef union
 {
@@ -637,7 +637,7 @@ typedef union
         uint32_t general           : 1;      // 通用标志
     } bit;
     uint32_t all;
-} pmsm_flag_t;
+} foc_flag_t;
 
 // Encoder parameter structure
 typedef struct
@@ -656,7 +656,7 @@ typedef struct
     uint8_t shift_bit;
     float factor;
 
-} enc_para_t;
+} encoder_data_t;
 
 // Calibration state enumeration
 typedef enum
@@ -1221,10 +1221,10 @@ typedef struct
     encoder_type_t sensory2;   // 第二编码器类型（如有）
 
     // 编码器参数
-    enc_para_t ma732;
-    enc_para_t mt6816;
-    enc_para_t mt6825;
-    enc_para_t dm485enc;
+    encoder_data_t ma732;
+    encoder_data_t mt6816;
+    encoder_data_t mt6825;
+    encoder_data_t dm485enc;
 
     int8_t  dir_1;
     int32_t raw_1;
@@ -1237,7 +1237,7 @@ typedef struct
     uint8_t bit_2;
     float pos_2;
     uint16_t result_2;
-} pos_box_t;
+} encoder_state_t;
 
 typedef struct
 {
@@ -1245,10 +1245,10 @@ typedef struct
     float enc_table[256];
     float aco_lut;
     float aco_table[3840];
-} pmsm_map_t;
+} foc_map_t;
 
-// PMSM structure
-struct pmsm
+/* FOC 总对象：按硬件配置、控制状态、实时信号和位置反馈分组。 */
+struct foc
 {
     uint32_t fast_seq;
     mode_ctrl_e mode;
@@ -1259,20 +1259,20 @@ struct pmsm
     drive_pwm_cmd_t pwm_cmd;
     drive_pwm_commit_t pwm_commit;
 
-    pmsm_board_t board;
-    pmsm_adc_val_t adc;
-    pmsm_para_t para;
-    pmsm_ctrl_t ctrl;
-    pmsm_cmd_t cmd;
-    pmsm_app_ctrl_t app_ctrl;
-    pmsm_foc_t foc;
-    period_t period;
-    pmsm_fault_t fault;
-    pmsm_flag_t flag;
+    board_cfg_t board;
+    adc_data_t adc;
+    motor_cfg_t motor;
+    ctrl_state_t ctrl;
+    foc_cmd_t cmd;
+    app_ctrl_t app;
+    foc_sig_t sig;
+    ctrl_rate_cfg_t rate;
+    foc_fault_t fault;
+    foc_flag_t flag;
     drive_protection_config_t prot_cfg;
     drive_protection_state_t prot_state;
 
-    pos_box_t pos_box;
+    encoder_state_t enc;
 
     cali_t calibr;
     idpm_t idpm;
@@ -1303,15 +1303,13 @@ struct pmsm
 
     traj_t traj;
 
-    pmsm_map_t map;
+    foc_map_t map;
 };
-
-extern pmsm_t pm;
 
 extern eh_vobs_t eh_vobs;
 extern eh_tobs_t eh_tobs;
 
-void temp_calc(void);
+void temp_update(foc_t *foc);
 
 /* Utility functions */
 float fast_atan2(float y, float x);
@@ -1338,59 +1336,58 @@ void pll_calc(pll_t* pll, float pos);
 void ort_pll_calc(pll_t* pll, float alpha, float beta, float gain);
 
 /* FOC drive functions */
-void pmsm_init(void);
-void pmsm_peroid_init(void);
-void pmsm_protect_init(void);
-void pmsm_lpf_init(void);
-void foc_feedback_update(pmsm_t *pm, float bus_voltage_v);
-void foc_clear(pmsm_t* pm);
-bool foc_adc_sample(pmsm_t* pm);
-void foc_get_curr_off(void);
+void ctrl_fb_update(foc_t *foc, float bus_voltage_v);
+void foc_clear(foc_t *foc);
+bool foc_adc_sample(foc_t *foc);
+void cur_offset_init(foc_t *foc);
 
-void foc_cur_pi_calc(pmsm_t* pm);
-void foc_spd_pi_calc(pmsm_t* pm);
+void cur_pi_init(foc_t *foc);
+void spd_pi_init(foc_t *foc);
 
-bool foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos);
-bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos);
-bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos);
-bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos);
+bool foc_volt_step(foc_t *foc, float v_d_ref, float v_q_ref, float angle);
+bool foc_cur_step(foc_t *foc, float i_d_ref, float i_q_ref, float angle);
+bool foc_spd_step(foc_t *foc, float spd_ref, float cur_lim, float angle);
+bool foc_pos_step(foc_t *foc,
+                  float pos_ref,
+                  float spd_lim,
+                  float cur_lim,
+                  float angle);
 
 /* FOC control functions */
-void pmsm_observe(pmsm_t* pm);
-void pmsm_slow_down(pmsm_t* pm, float dec);
-void pmsm_quick_stop_mode(pmsm_t* pm);
-void pmsm_fault_stop_mode(pmsm_t* pm);
+void stop_ramp_step(foc_t *foc, float dec);
+void quick_stop_step(foc_t *foc);
+void fault_stop_step(foc_t *foc);
 
-void force_volt_mode(pmsm_t* pm);
-void open_volt_mode(pmsm_t* pm);
-void force_curr_mode(pmsm_t* pm);
+void open_volt_step(foc_t *foc);
+void open_volt_mode(foc_t *foc);
+void open_cur_step(foc_t *foc);
 
-void sensory_pos_calc(pmsm_t* pm);
-void senless_pos_calc(pmsm_t* pm);
+void sensory_pos_calc(foc_t *foc);
+void senless_pos_calc(foc_t *foc);
 
-void pm_mit_mode(pmsm_t* pm);
-void pt_tor_mode(pmsm_t* pm);
-void pv_vel_mode(pmsm_t* pm);
-void pp_pos_mode(pmsm_t* pm);
+void pm_mit_mode(foc_t *foc);
+void pt_tor_mode(foc_t *foc);
+void pv_vel_mode(foc_t *foc);
+void pp_pos_mode(foc_t *foc);
 
-void cst_tor_mode(pmsm_t* pm);
-void csv_vel_mode(pmsm_t* pm);
-void csp_pos_mode(pmsm_t* pm);
+void cst_step(foc_t *foc);
+void csv_step(foc_t *foc);
+void csp_step(foc_t *foc);
 
 /* Encoder functions */
-void encoder_init(pos_box_t *pos_box);
+void encoder_init(encoder_state_t *enc);
 uint32_t read_mt6825_raw(void);
-bool read_mt6816_raw(enc_para_t *enc);
-bool read_ma732_raw(enc_para_t *enc);
+bool read_mt6816_raw(encoder_data_t *enc);
+bool read_ma732_raw(encoder_data_t *enc);
 uint32_t read_dm485enc_raw(void);
 uint32_t send_mod_dm485enc(void);
 
-bool position_update(pmsm_t *pm);
-bool encoder_sample(pos_box_t *pos_box);
-void encoder_update_angle(enc_para_t *enc);
-void position_update_single_encoder(pmsm_t *pm);
-void sensory2_pos_calc(pmsm_t* pm);
-void senless_pos_calc(pmsm_t* pm);
+bool position_update(foc_t *foc);
+bool encoder_sample(encoder_state_t *enc);
+void encoder_update_angle(encoder_data_t *enc);
+void position_update_single_encoder(foc_t *foc);
+void sensory2_pos_calc(foc_t *foc);
+void senless_pos_calc(foc_t *foc);
 float spd_measure(float pos, float fs, float filt_bw);
 
 /* PMSM identification functions */
@@ -1414,13 +1411,13 @@ void iden_JB(idpm_t *x);
 void iden_JB_reset(idpm_t *x);
 
 /* Calibration functions */
-void cali_init(void);
-void cali_mag_encoder(pmsm_t *pm);
+void cali_init(foc_t *foc);
+void cali_mag_encoder(foc_t *foc);
 void cali_reset_state(cali_t *x);
-void modulation_encoder(pmsm_t *pm);
+void modulation_encoder(foc_t *foc);
 
-void anticog_init(void);
-void anticogging_calibration(pmsm_t *pm);
+void anticog_init(foc_t *foc);
+void anticogging_calibration(foc_t *foc);
 
 /* Nonlinear observer functions */
 void nlob_init(void);

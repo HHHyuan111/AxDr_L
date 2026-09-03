@@ -45,14 +45,14 @@ _RAM_FUNC void hfsi_input(void)
 //		hfsi.polar *= -1;
 		hfsi.vdh = hfsi.vdh * -1.0f;
 //  }
-	hfsi.ialph_h = (pm.foc.v_alph - hfsi.ialph_lst)*0.5f;
-	hfsi.ibeta_h = (pm.foc.v_beta - hfsi.ibeta_lst)*0.5f;
+	hfsi.ialph_h = (g_foc.sig.v_alph - hfsi.ialph_lst)*0.5f;
+	hfsi.ibeta_h = (g_foc.sig.v_beta - hfsi.ibeta_lst)*0.5f;
 	
 	hfsi.dialph_h = hfsi.ialph_h - hfsi.ialph_h_lst;
 	hfsi.dibeta_h = hfsi.ibeta_h - hfsi.ibeta_h_lst;
 	
-	hfsi.id_f = (pm.foc.i_d + hfsi.id_lst)*0.5f;
-	hfsi.iq_f = (pm.foc.i_q + hfsi.iq_lst)*0.5f;
+	hfsi.id_f = (g_foc.sig.i_d + hfsi.id_lst)*0.5f;
+	hfsi.iq_f = (g_foc.sig.i_q + hfsi.iq_lst)*0.5f;
 	
 	//极性辨识
 	if(SQ_HFI_POLE_START_CNT != 10000)
@@ -66,8 +66,8 @@ _RAM_FUNC void hfsi_input(void)
 	#if 1       //一次判断
 	if(SQ_HFI_POLE_JUDGE_FLAG == 1)
 	{
-		Ialph_L = (pm.foc.i_alph + hfsi.ialph_lst)*0.5f;
-		Ibeta_L = (pm.foc.i_beta + hfsi.ibeta_lst)*0.5f;
+		Ialph_L = (g_foc.sig.i_alph + hfsi.ialph_lst)*0.5f;
+		Ibeta_L = (g_foc.sig.i_beta + hfsi.ibeta_lst)*0.5f;
 		SQ_HFI_POLE_CNT++;
 		if(SQ_HFI_POLE_CNT>0 && SQ_HFI_POLE_CNT<=(SQ_HFI_POLE_TIME-5))
 		{
@@ -158,10 +158,10 @@ _RAM_FUNC void hfsi_input(void)
 	hfsi.ialph_h_lst = hfsi.ialph_h;
 	hfsi.ibeta_h_lst = hfsi.ibeta_h;
 	
-	hfsi.ialph_lst = pm.foc.i_alph;
-	hfsi.ibeta_lst  = pm.foc.i_beta;
+	hfsi.ialph_lst = g_foc.sig.i_alph;
+	hfsi.ibeta_lst  = g_foc.sig.i_beta;
 	
-	hfsi.id_lst = pm.foc.i_d;
-	hfsi.iq_lst = pm.foc.i_q;
+	hfsi.id_lst = g_foc.sig.i_d;
+	hfsi.iq_lst = g_foc.sig.i_q;
 }
 

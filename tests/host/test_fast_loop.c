@@ -23,12 +23,12 @@ typedef enum
 #define EVENT_COUNT_PER_CYCLE (6U)
 #define EVENT_CAPACITY        (18U)
 
-pmsm_t pm;
+foc_t g_foc;
 
 static fast_event_e events[EVENT_CAPACITY];
 static size_t event_count;
-static const pmsm_t *last_motor;
-static pos_box_t *last_pos_box;
+static const foc_t *last_motor;
+static encoder_state_t *last_pos_box;
 static bool encoder_valid = true;
 static bool current_valid = true;
 
@@ -40,41 +40,41 @@ static void log_event(fast_event_e event)
     event_count++;
 }
 
-bool encoder_sample(pos_box_t *pos_box)
+bool encoder_sample(encoder_state_t *pos_box)
 {
     last_pos_box = pos_box;
     log_event(EVENT_ENCODER_SAMPLE);
     return encoder_valid;
 }
 
-bool position_update(pmsm_t *motor)
+bool position_update(foc_t *motor)
 {
     last_motor = motor;
     log_event(EVENT_POSITION_UPDATE);
     return true;
 }
 
-bool foc_adc_sample(pmsm_t *motor)
+bool foc_adc_sample(foc_t *motor)
 {
     last_motor = motor;
     log_event(EVENT_ADC_SAMPLE);
     return current_valid;
 }
 
-void foc_feedback_update(pmsm_t *motor, float bus_voltage_v)
+void ctrl_fb_update(foc_t *motor, float bus_voltage_v)
 {
     (void)bus_voltage_v;
     last_motor = motor;
     log_event(EVENT_FEEDBACK_UPDATE);
 }
 
-void drive_fast_step(pmsm_t *motor)
+void drive_fast_step(foc_t *motor)
 {
     last_motor = motor;
     log_event(EVENT_DRIVE_STEP);
 }
 
-void debug_snapshot_publish(const pmsm_t *motor)
+void debug_snapshot_publish(const foc_t *motor)
 {
     last_motor = motor;
     log_event(EVENT_SNAPSHOT_PUBLISH);
@@ -115,7 +115,7 @@ static bool expect_cycle_events(size_t first_event)
     return true;
 }
 
-static bool test_not_ready_does_nothing(pmsm_t *motor)
+static bool test_not_ready_does_nothing(foc_t *motor)
 {
     motor->fast_seq = 7U;
     event_count = 0U;
@@ -128,7 +128,7 @@ static bool test_not_ready_does_nothing(pmsm_t *motor)
                        "快速控制未放行时不应增加周期编号。");
 }
 
-static bool test_explicit_motor_cycle(pmsm_t *motor)
+static bool test_explicit_motor_cycle(foc_t *motor)
 {
     encoder_valid = true;
     current_valid = true;
@@ -146,7 +146,7 @@ static bool test_explicit_motor_cycle(pmsm_t *motor)
                      "放行后的快速周期应增加一次周期编号。") ||
         !expect_true(last_motor == motor,
                      "各步骤必须使用调用者传入的同一个电机对象。") ||
-        !expect_true(last_pos_box == &motor->pos_box,
+        !expect_true(last_pos_box == &motor->enc,
                      "编码器采样必须写入当前电机对象的位置成员。"))
     {
         return false;
@@ -161,7 +161,7 @@ static bool test_explicit_motor_cycle(pmsm_t *motor)
                        "第二次快速周期应继续增加周期编号。");
 }
 
-static bool test_sample_validity_is_forwarded(pmsm_t *motor)
+static bool test_sample_validity_is_forwarded(foc_t *motor)
 {
     encoder_valid = false;
     current_valid = false;
@@ -183,7 +183,7 @@ static bool test_hal_callback_uses_firmware_motor(void)
 {
     encoder_valid = true;
     current_valid = true;
-    pm.fast_seq = 20U;
+    g_foc.fast_seq = 20U;
     event_count = 0U;
     last_motor = NULL;
     last_pos_box = NULL;
@@ -193,17 +193,17 @@ static bool test_hal_callback_uses_firmware_motor(void)
     return expect_true(event_count == EVENT_COUNT_PER_CYCLE,
                        "ADC 回调应触发一次完整快速周期。") &&
            expect_cycle_events(0U) &&
-           expect_true(pm.fast_seq == 21U,
+           expect_true(g_foc.fast_seq == 21U,
                        "ADC 回调应更新固件全局电机对象的周期编号。") &&
-           expect_true(last_motor == &pm,
+           expect_true(last_motor == &g_foc,
                        "只有硬件回调边界应选择固件全局电机对象。") &&
-           expect_true(last_pos_box == &pm.pos_box,
+           expect_true(last_pos_box == &g_foc.enc,
                        "硬件回调应采样固件全局电机的位置对象。");
 }
 
 int main(void)
 {
-    pmsm_t motor = {0};
+    foc_t motor = {0};
 
     if (!test_not_ready_does_nothing(&motor))
     {

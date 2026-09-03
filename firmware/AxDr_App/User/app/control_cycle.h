@@ -9,13 +9,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "motor_fwd.h"
+#include "foc_fwd.h"
 
 /**
  * @brief 一个控制周期使用的物理反馈输入。
  *
  * 电流单位 A，电压单位 V，角度和位置单位 rad。Drive 模式、给定值、控制参数和
- * 算法历史状态属于 motor 上下文，不在每个周期重复复制。
+ * 算法历史状态属于 foc 上下文，不在每个周期重复复制。
  */
 typedef struct
 {
@@ -53,7 +53,7 @@ typedef struct
 /**
  * @brief 使用显式反馈输入执行一次反馈更新和 Drive 控制。
  *
- * @param[in,out] motor 已初始化的控制器上下文和历史状态，本周期独占写入。
+ * @param[in,out] foc 已初始化的控制器上下文和历史状态，本周期独占写入。
  * @param[in] input 本周期物理反馈，所有浮点输入应为有限值，母线电压应不小于 0 V。
  * @param[out] output 本周期 Drive 状态和逻辑 PWM 命令。
  * @pre 三个指针有效且对象互不重叠。
@@ -61,7 +61,7 @@ typedef struct
  * 本函数不采集硬件，也不等待外设。真实板卡、离线回放和 HIL 可以用不同方式生成
  * input，但共用相同的控制器上下文和本周期执行入口。
  */
-void control_cycle_step(pmsm_t *motor,
+void control_cycle_step(foc_t *foc,
                         const control_cycle_input_t *input,
                         control_cycle_output_t *output);
 

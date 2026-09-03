@@ -27,10 +27,10 @@ _RAM_FUNC bool drive_pwm_stop(void)
     return target_pwm_stop_phase_outputs();
 }
 
-_RAM_FUNC void drive_pwm_set_neutral(pmsm_t *pm)
+_RAM_FUNC void drive_pwm_set_neutral(foc_t *foc)
 {
-    pm->pwm_cmd = (drive_pwm_cmd_t){
-        .seq = pm->fast_seq,
+    foc->pwm_cmd = (drive_pwm_cmd_t){
+        .seq = foc->fast_seq,
         .valid = true,
         .duty_a = 0.5f,
         .duty_b = 0.5f,
@@ -39,8 +39,8 @@ _RAM_FUNC void drive_pwm_set_neutral(pmsm_t *pm)
 
     target_pwm_set_duty_ratios(0.5f, 0.5f, 0.5f);
 
-    pm->pwm_commit = (drive_pwm_commit_t){
-        .seq = pm->fast_seq,
+    foc->pwm_commit = (drive_pwm_commit_t){
+        .seq = foc->fast_seq,
         .valid = true,
         .duty_a = 0.5f,
         .duty_b = 0.5f,
@@ -48,58 +48,58 @@ _RAM_FUNC void drive_pwm_set_neutral(pmsm_t *pm)
     };
 }
 
-_RAM_FUNC bool drive_pwm_commit(pmsm_t *pm)
+_RAM_FUNC bool drive_pwm_commit(foc_t *foc)
 {
-    pm->pwm_cmd = (drive_pwm_cmd_t){
-        .seq = pm->fast_seq,
+    foc->pwm_cmd = (drive_pwm_cmd_t){
+        .seq = foc->fast_seq,
         .valid = false,
-        .duty_a = pm->foc.dtc_a,
-        .duty_b = pm->foc.dtc_b,
-        .duty_c = pm->foc.dtc_c
+        .duty_a = foc->sig.dtc_a,
+        .duty_b = foc->sig.dtc_b,
+        .duty_c = foc->sig.dtc_c
     };
 
-    if (!drive_pwm_duty_is_valid(pm->foc.dtc_a) ||
-        !drive_pwm_duty_is_valid(pm->foc.dtc_b) ||
-        !drive_pwm_duty_is_valid(pm->foc.dtc_c))
+    if (!drive_pwm_duty_is_valid(foc->sig.dtc_a) ||
+        !drive_pwm_duty_is_valid(foc->sig.dtc_b) ||
+        !drive_pwm_duty_is_valid(foc->sig.dtc_c))
     {
         if (target_pwm_stop_phase_outputs())
         {
-            pm->pwm_active = false;
+            foc->pwm_active = false;
         }
         return false;
     }
 
-    switch (pm->para.phase_order)
+    switch (foc->motor.phase_order)
     {
         case PHASE_ORDER_ABC:
-            target_pwm_set_duty_ratios(pm->foc.dtc_a,
-                                       pm->foc.dtc_b,
-                                       pm->foc.dtc_c);
+            target_pwm_set_duty_ratios(foc->sig.dtc_a,
+                                       foc->sig.dtc_b,
+                                       foc->sig.dtc_c);
             break;
 
         case PHASE_ORDER_ACB:
-            target_pwm_set_duty_ratios(pm->foc.dtc_a,
-                                       pm->foc.dtc_c,
-                                       pm->foc.dtc_b);
+            target_pwm_set_duty_ratios(foc->sig.dtc_a,
+                                       foc->sig.dtc_c,
+                                       foc->sig.dtc_b);
             break;
 
         default:
             /* 无法确定物理相序时立即撤销功率输出，不能继续沿用上一拍占空比。 */
             if (target_pwm_stop_phase_outputs())
             {
-                pm->pwm_active = false;
+                foc->pwm_active = false;
             }
             return false;
     }
 
-    pm->pwm_cmd.valid = true;
+    foc->pwm_cmd.valid = true;
 
-    pm->pwm_commit = (drive_pwm_commit_t){
-        .seq = pm->fast_seq,
+    foc->pwm_commit = (drive_pwm_commit_t){
+        .seq = foc->fast_seq,
         .valid = true,
-        .duty_a = pm->foc.dtc_a,
-        .duty_b = pm->foc.dtc_b,
-        .duty_c = pm->foc.dtc_c
+        .duty_a = foc->sig.dtc_a,
+        .duty_b = foc->sig.dtc_b,
+        .duty_c = foc->sig.dtc_c
     };
 
     return true;

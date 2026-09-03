@@ -6,31 +6,31 @@
 #include "common.h"
 #include "drive_pwm.h"
 
-void anticog_init(void)
+void anticog_init(foc_t *foc)
 {
-    pm.anticog.map_num = 3840;
+    foc->anticog.map_num = 3840;
 
-    pm.anticog.wr_set = 10.0f;
-    pm.anticog.step_value = 800;
-    pm.anticog.gap_number = 100;
+    foc->anticog.wr_set = 10.0f;
+    foc->anticog.step_value = 800;
+    foc->anticog.gap_number = 100;
 
-    pm.anticog.delta_p = M_2PI / (float)pm.anticog.map_num;
+    foc->anticog.delta_p = M_2PI / (float)foc->anticog.map_num;
 }
 
-_RAM_FUNC void anticogging_calibration(pmsm_t *pm)
+_RAM_FUNC void anticogging_calibration(foc_t *foc)
 {
-    anticog_t *x = &pm->anticog;
+    anticog_t *x = &foc->anticog;
     x->wr_set = 10.0f; // 转速，建议不要太大
-    pm->ctrl.posr_set = x->posr_set;
-    pm->ctrl.wr_set   = x->wr_set;
-    pm->ctrl.iq_set   = 0.0f;
+    foc->ctrl.posr_set = x->posr_set;
+    foc->ctrl.wr_set   = x->wr_set;
+    foc->ctrl.iq_set   = 0.0f;
 
-    if (foc_pos(pm,
-                pm->ctrl.posr_set,
-                pm->ctrl.wr_set,
-                pm->ctrl.iq_set,
-                pm->foc.p_e)) {
-        drive_pwm_commit(pm);
+    if (foc_pos_step(foc,
+                foc->ctrl.posr_set,
+                foc->ctrl.wr_set,
+                foc->ctrl.iq_set,
+                foc->sig.p_e)) {
+        drive_pwm_commit(foc);
     }
 
     if (++x->count < 700) {
@@ -53,23 +53,23 @@ _RAM_FUNC void anticogging_calibration(pmsm_t *pm)
         uint16_t index = (uint16_t)(pos_mod * div_M_2PI * (float)x->map_num + 0.5f);
         if (index >= x->map_num) index = 0;
 
-        pm->map.aco_table[index] = pm->foc.i_q; // 记录正向电流
-        pm->map.aco_lut = pm->foc.i_q;
+        foc->map.aco_table[index] = foc->sig.i_q; // 记录正向电流
+        foc->map.aco_lut = foc->sig.i_q;
 
         x->posr_set += x->delta_p;
     }
     else
     {
         x->wr_set = 0.0f;  // 停止电机
-        pm->flag.bit.anticog_done = 1; // 置完成标志
-        pm->req = DRIVE_REQ_STOP;
-        pm->mode.sys = release_mode;
+        foc->flag.bit.anticog_done = 1; // 置完成标志
+        foc->req = DRIVE_REQ_STOP;
+        foc->mode.sys = release_mode;
     }
 }
 
 
 //     // 计算 index
-//     float index_f = pm->foc.sp_r * div_M_2PI * (float)COGGING_MAP_NUM;
+//     float index_f = foc->sig.sp_r * div_M_2PI * (float)COGGING_MAP_NUM;
 //     uint16_t index0 = (uint16_t)index_f;
 //     // 将补偿电流加入目标
-//     pm->ctrl.iq_lim += map[index0];
+//     foc->ctrl.iq_lim += map[index0];

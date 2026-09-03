@@ -20,59 +20,59 @@ extern uint16_t adc2_buff[4];
 _RAM_FUNC void vofa_start(void)
 {
 	
-//	vofa_send_data(0, pm.ctrl.drag_pe);
-//	vofa_send_data(1, pm.foc.p_e);
-	vofa_send_data(1, pm.adc.ia);
-	vofa_send_data(2, pm.adc.ib);
-	vofa_send_data(3, pm.adc.ic);
+//	vofa_send_data(0, g_foc.ctrl.drag_pe);
+//	vofa_send_data(1, g_foc.sig.p_e);
+	vofa_send_data(1, g_foc.adc.ia);
+	vofa_send_data(2, g_foc.adc.ib);
+	vofa_send_data(3, g_foc.adc.ic);
 	
-//	vofa_send_data(1, pm.foc.wr_f);
-//	vofa_send_data(2, pm.foc.i_q);
-//	vofa_send_data(2, pm.foc.i_b);
-//	vofa_send_data(3, pm.foc.i_c);
+//	vofa_send_data(1, g_foc.sig.wr_f);
+//	vofa_send_data(2, g_foc.sig.i_q);
+//	vofa_send_data(2, g_foc.sig.i_b);
+//	vofa_send_data(3, g_foc.sig.i_c);
 
 	// calibr
-//	vofa_send_data(0, pm.calibr.pos);
-//	vofa_send_data(1, pm.calibr.pr_set);
-//	vofa_send_data(2, pm.calibr.pos_err);
-//	vofa_send_data(3, pm.map.enc_lut);
-//	vofa_send_data(3, pm.calibr.pn);
-//	vofa_send_data(3, pm.calibr.e_off);
-//	vofa_send_data(3, pm.calibr.r_off);
-//	vofa_send_data(3, pm.para.phase_order);
+//	vofa_send_data(0, g_foc.calibr.pos);
+//	vofa_send_data(1, g_foc.calibr.pr_set);
+//	vofa_send_data(2, g_foc.calibr.pos_err);
+//	vofa_send_data(3, g_foc.map.enc_lut);
+//	vofa_send_data(3, g_foc.calibr.pn);
+//	vofa_send_data(3, g_foc.calibr.e_off);
+//	vofa_send_data(3, g_foc.calibr.r_off);
+//	vofa_send_data(3, g_foc.motor.phase_order);
 	
 	// idpm
-//	vofa_send_data(0, pm.idpm.Rs);
-//	vofa_send_data(2, pm.idpm.Ld);
-//	vofa_send_data(3, pm.idpm.Lq);
-//	vofa_send_data(5, pm.idpm.flux);
-//	vofa_send_data(6, pm.idpm.Js);
-//	vofa_send_data(7, pm.foc.i_q);
-//	vofa_send_data(8, pm.foc.wr_f);
-//	vofa_send_data(9,  pm.id_pi.kp);
-//	vofa_send_data(10, pm.id_pi.ki);
-//	vofa_send_data(11, pm.iq_pi.kp);
-//	vofa_send_data(12, pm.iq_pi.ki);
-//	vofa_send_data(13, pm.spd_pi.kp);
-//	vofa_send_data(14, pm.spd_pi.ki);
+//	vofa_send_data(0, g_foc.idpm.Rs);
+//	vofa_send_data(2, g_foc.idpm.Ld);
+//	vofa_send_data(3, g_foc.idpm.Lq);
+//	vofa_send_data(5, g_foc.idpm.flux);
+//	vofa_send_data(6, g_foc.idpm.Js);
+//	vofa_send_data(7, g_foc.sig.i_q);
+//	vofa_send_data(8, g_foc.sig.wr_f);
+//	vofa_send_data(9,  g_foc.id_pi.kp);
+//	vofa_send_data(10, g_foc.id_pi.ki);
+//	vofa_send_data(11, g_foc.iq_pi.kp);
+//	vofa_send_data(12, g_foc.iq_pi.ki);
+//	vofa_send_data(13, g_foc.spd_pi.kp);
+//	vofa_send_data(14, g_foc.spd_pi.ki);
 
-//	vofa_send_data(0, pm.foc.i_d);
-//	vofa_send_data(1, pm.ctrl.id_set);
-//	vofa_send_data(2, pm.foc.i_q);
-//	vofa_send_data(3, pm.ctrl.iq_set);
-//	vofa_send_data(4, pm.foc.wr_f);
+//	vofa_send_data(0, g_foc.sig.i_d);
+//	vofa_send_data(1, g_foc.ctrl.id_set);
+//	vofa_send_data(2, g_foc.sig.i_q);
+//	vofa_send_data(3, g_foc.ctrl.iq_set);
+//	vofa_send_data(4, g_foc.sig.wr_f);
 
 	
-//	vofa_send_data(4, pm.foc.wr_f);
-//	vofa_send_data(4, pm.ctrl.wm_set);
-//	vofa_send_data(4, pm.traj.spd_step);
-//	vofa_send_data(4, pm.foc.sp_m);
+//	vofa_send_data(4, g_foc.sig.wr_f);
+//	vofa_send_data(4, g_foc.ctrl.wm_set);
+//	vofa_send_data(4, g_foc.traj.spd_step);
+//	vofa_send_data(4, g_foc.sig.sp_m);
 //	
-//	vofa_send_data(4, pm.foc.mp_m);
-//	vofa_send_data(4, pm.ctrl.posm_set);
-//	vofa_send_data(4, pm.ctrl.posr_set);
+//	vofa_send_data(4, g_foc.sig.mp_m);
+//	vofa_send_data(4, g_foc.ctrl.posm_set);
+//	vofa_send_data(4, g_foc.ctrl.posr_set);
 //	
-//	vofa_send_data(4, pm.foc.rev);
+//	vofa_send_data(4, g_foc.sig.rev);
 	
 	vofa_sendframetail();
 }

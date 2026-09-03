@@ -9,9 +9,9 @@ float A2,B2,C2,F2;
 
 _RAM_FUNC void traj_init(void)
 {
-    memset(&pm.traj, 0, sizeof(traj_t));
+    memset(&g_foc.traj, 0, sizeof(traj_t));
 
-    pm.traj.ts = pm.period.foc_ts; // 20kHz
+    g_foc.traj.ts = g_foc.rate.foc_ts; // 20kHz
 }
 
 _RAM_FUNC float sign_hard(float val)

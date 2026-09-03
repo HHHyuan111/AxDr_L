@@ -10,23 +10,23 @@
 /**
  * @brief 初始化正式使用的 MA732 和 MT6816 参数。
  *
- * @param[in,out] pos_box 位置反馈对象；写入位宽、每圈计数和弧度换算系数。
+ * @param[in,out] enc 位置反馈对象；写入位宽、每圈计数和弧度换算系数。
  */
-void encoder_init(pos_box_t *pos_box)
+void encoder_init(encoder_state_t *enc)
 {
-    pos_box->ma732.dir = MA732_DIRECTION;
-    pos_box->ma732.bit = MA732_RESOLUTION_BITS;
-    pos_box->ma732.cpr = MA732_COUNTS_PER_REV;
-    pos_box->ma732.shift_bit = (uint8_t)log2f(
-        (float)pos_box->ma732.cpr / 256.0f);
-    pos_box->ma732.factor = M_2PI / (float)pos_box->ma732.cpr;
+    enc->ma732.dir = MA732_DIRECTION;
+    enc->ma732.bit = MA732_RESOLUTION_BITS;
+    enc->ma732.cpr = MA732_COUNTS_PER_REV;
+    enc->ma732.shift_bit = (uint8_t)log2f(
+        (float)enc->ma732.cpr / 256.0f);
+    enc->ma732.factor = M_2PI / (float)enc->ma732.cpr;
 
-    pos_box->mt6816.dir = MT6816_DIRECTION;
-    pos_box->mt6816.bit = MT6816_RESOLUTION_BITS;
-    pos_box->mt6816.cpr = MT6816_COUNTS_PER_REV;
-    pos_box->mt6816.shift_bit = (uint8_t)log2f(
-        (float)pos_box->mt6816.cpr / 256.0f);
-    pos_box->mt6816.factor = M_2PI / (float)pos_box->mt6816.cpr;
+    enc->mt6816.dir = MT6816_DIRECTION;
+    enc->mt6816.bit = MT6816_RESOLUTION_BITS;
+    enc->mt6816.cpr = MT6816_COUNTS_PER_REV;
+    enc->mt6816.shift_bit = (uint8_t)log2f(
+        (float)enc->mt6816.cpr / 256.0f);
+    enc->mt6816.factor = M_2PI / (float)enc->mt6816.cpr;
 }
 
 /**
@@ -35,7 +35,7 @@ void encoder_init(pos_box_t *pos_box)
  * @param[in,out] enc 编码器对象；成功时更新原始计数和新数据标志。
  * @return SPI 读取成功返回 true，否则保持旧原始计数并返回 false。
  */
-_RAM_FUNC bool read_ma732_raw(enc_para_t *enc)
+_RAM_FUNC bool read_ma732_raw(encoder_data_t *enc)
 {
     uint16_t raw_count;
 
@@ -56,7 +56,7 @@ _RAM_FUNC bool read_ma732_raw(enc_para_t *enc)
  * @param[in,out] enc 编码器对象；成功时更新原始计数和新数据标志。
  * @return 两帧 SPI 读取都成功返回 true，否则保持旧原始计数并返回 false。
  */
-_RAM_FUNC bool read_mt6816_raw(enc_para_t *enc)
+_RAM_FUNC bool read_mt6816_raw(encoder_data_t *enc)
 {
     uint16_t raw_count;
 
@@ -76,7 +76,7 @@ _RAM_FUNC bool read_mt6816_raw(enc_para_t *enc)
  *
  * @param[in,out] enc 编码器对象；输入 raw 和 factor，输出 pos，单位为弧度。
  */
-_RAM_FUNC void encoder_update_angle(enc_para_t *enc)
+_RAM_FUNC void encoder_update_angle(encoder_data_t *enc)
 {
     enc->pos = (float)enc->raw * enc->factor;
     wrap_0_2pi(enc->pos);

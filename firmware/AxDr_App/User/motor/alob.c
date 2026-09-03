@@ -8,18 +8,18 @@ void alob_init(void)
     memset(&alob, 0, sizeof(alob));
     
     // Assign pointers to the FOC parameters
-    alob.v_alph = &pm.foc.v_alph;
-    alob.v_beta = &pm.foc.v_beta;
-    alob.i_alph = &pm.foc.i_alph;
-    alob.i_beta = &pm.foc.i_beta;
-    alob.i_q    = &pm.foc.i_q;
+    alob.v_alph = &g_foc.sig.v_alph;
+    alob.v_beta = &g_foc.sig.v_beta;
+    alob.i_alph = &g_foc.sig.i_alph;
+    alob.i_beta = &g_foc.sig.i_beta;
+    alob.i_q    = &g_foc.sig.i_q;
     
     // Assign pointers to the motor parameters
-    alob.Rs = &pm.para.Rs;
-    alob.Ls = &pm.para.Ls;
-    alob.Ld = &pm.para.Ls;
-    alob.Lq = &pm.para.Ls;
-    alob.flux = &pm.para.flux;
+    alob.Rs = &g_foc.motor.Rs;
+    alob.Ls = &g_foc.motor.Ls;
+    alob.Ld = &g_foc.motor.Ls;
+    alob.Lq = &g_foc.motor.Ls;
+    alob.flux = &g_foc.motor.flux;
     
     // Set observer gains
     alob.id_gain = 0.1f;
