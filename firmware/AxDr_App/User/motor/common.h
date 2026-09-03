@@ -69,7 +69,7 @@ typedef enum
 } foc_mode_e;
 
 /**
- * @brief 本周期 FOC 输入、反馈和中间结果。
+ * @brief 当前采样和由采样计算出的反馈。
  *
  * 实时物理量采用控制领域常用短名：i/v 表示电流/电压，theta/pos/spd 表示
  * 角度/位置/速度，e/r/m 表示电气侧/转子侧/输出侧。电流单位 A、电压单位 V，
@@ -77,8 +77,9 @@ typedef enum
  */
 typedef struct
 {
-    foc_mode_e mode;
-    float vs;
+    bool i_valid;
+    bool vbus_valid;
+    bool pos_valid;
     float vbus;
     float inv_vbus;
 
@@ -99,16 +100,13 @@ typedef struct
     float spd_r;
     float spd_m;
 
-    float tor_r;
-    float tor_rf;
-    float tor_m;
-    float tor_mf;
-    float Tcoil;
-    float Tmos;
+    float torq_r;
+    float torq_r_f;
+    float torq_m;
+    float torq_m_f;
+    float temp_coil;
+    float temp_mos;
 
-    float theta;
-    float sin_val;
-    float cos_val;
     float ia;
     float ib;
     float ic;
@@ -117,6 +115,15 @@ typedef struct
     float id;
     float iq;
     float iq_f;
+} foc_fb_state_t;
+
+/** @brief 本周期 FOC 计算中间量和输出。 */
+typedef struct
+{
+    foc_mode_e mode;
+    float theta;
+    float sin;
+    float cos;
     float va;
     float vb;
     float vc;
@@ -127,7 +134,7 @@ typedef struct
     float duty_a;
     float duty_b;
     float duty_c;
-} foc_sig_t;
+} foc_out_state_t;
 
 typedef enum
 {
@@ -264,38 +271,39 @@ typedef struct
     float div_pn;
 } motor_cfg_t;
 
-/** @brief 当前模式已经应用的工作参考和内部限制。 */
+/** @brief 当前模式已经应用的参考、轨迹结果和限制。 */
 typedef struct
 {
-    float drag_pe;
-    float pos_acc;
-    float vd_set;
-    float vq_set;
-    float id_set;
-    float iq_set;
+    float theta_e;
+    float theta_step;
+    float vd;
+    float vq;
+    float id;
+    float iq;
     float iq_lim;
-    float torm_set;
-    float tor_set;
-    float we_set;
-    float wr_set;
-    float wr_lim;
-    float wm_set;
-    float wm_ref;
-    float wm_acc;
-    float wm_dec;
-    float posm_set;
-    float posm_ref;
-    float posr_set;
-    float posm_lst;
-    float mit_tor_set;
-    float mit_tor_out;
+    float v_lim;
+    float torq_m;
+    float torq_r;
+    float spd_e;
+    float spd_r;
+    float spd_r_lim;
+    float spd_m;
+    float spd_m_ramp;
+    float acc_m;
+    float dec_m;
+    float pos_m;
+    float pos_m_ramp;
+    float pos_r;
+    float pos_m_last;
+    float torq_ff;
+    float torq_mit;
     float kp;
     float kd;
-    float pmax_iq;
-    float nmax_iq;
-    float pmax_vel;
-    float nmax_vel;
-} ctrl_state_t;
+    float iq_max;
+    float iq_min;
+    float spd_max;
+    float spd_min;
+} foc_ref_state_t;
 
 /** @brief 上层可写命令；单位依次为 N·m、rad/s 和 rad。 */
 typedef struct
@@ -440,17 +448,17 @@ struct foc
     drive_req_e req;
     drive_state_e state;
     bool pwm_active;
-    drive_feedback_status_t fb_status;
     drive_pwm_cmd_t pwm_cmd;
     drive_pwm_commit_t pwm_commit;
 
     board_cfg_t board;
     adc_data_t adc;
     motor_cfg_t motor;
-    ctrl_state_t ctrl;
+    foc_ref_state_t ref;
     foc_cmd_t cmd;
     app_ctrl_t app;
-    foc_sig_t sig;
+    foc_fb_state_t fb;
+    foc_out_state_t out;
     ctrl_rate_cfg_t rate;
     foc_fault_t fault;
     drive_protection_config_t prot_cfg;

@@ -31,12 +31,12 @@ int main(void)
     obs_init(&foc);
 
     foc.pwm_active = true;
-    foc.sig.id = 0.0f;
-    foc.sig.iq = 1.0f;
-    foc.sig.vd = 0.0f;
-    foc.sig.vq = 1.1f;
-    foc.sig.spd_r = 50.0f;
-    foc.sig.vs = 12.0f;
+    foc.fb.id = 0.0f;
+    foc.fb.iq = 1.0f;
+    foc.out.vd = 0.0f;
+    foc.out.vq = 1.1f;
+    foc.fb.spd_r = 50.0f;
+    foc.ref.v_lim = 12.0f;
     obs_step(&foc);
 
     if (!expect_true(g_obs.status == MC_OK,

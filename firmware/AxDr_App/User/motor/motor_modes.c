@@ -17,15 +17,15 @@
  */
 _RAM_FUNC void open_volt_step(foc_t *foc)
 {
-    foc->ctrl.we_set = foc->ctrl.wr_set * foc->motor.pn;
-    foc->ctrl.pos_acc = foc->ctrl.we_set * foc->rate.foc_ts;
-    foc->ctrl.drag_pe += foc->ctrl.pos_acc;
-    wrap_0_2pi(foc->ctrl.drag_pe);
+    foc->ref.spd_e = foc->ref.spd_r * foc->motor.pn;
+    foc->ref.theta_step = foc->ref.spd_e * foc->rate.foc_ts;
+    foc->ref.theta_e += foc->ref.theta_step;
+    wrap_0_2pi(foc->ref.theta_e);
 
     if (foc_volt_step(foc,
-                 foc->ctrl.vd_set,
-                 foc->ctrl.vq_set,
-                 foc->ctrl.drag_pe))
+                 foc->ref.vd,
+                 foc->ref.vq,
+                 foc->ref.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -36,15 +36,15 @@ _RAM_FUNC void open_volt_step(foc_t *foc)
  */
 _RAM_FUNC void open_cur_step(foc_t *foc)
 {
-    foc->ctrl.we_set = foc->ctrl.wr_set * foc->motor.pn;
-    foc->ctrl.pos_acc = foc->ctrl.we_set * foc->rate.foc_ts;
-    foc->ctrl.drag_pe += foc->ctrl.pos_acc;
-    wrap_0_2pi(foc->ctrl.drag_pe);
+    foc->ref.spd_e = foc->ref.spd_r * foc->motor.pn;
+    foc->ref.theta_step = foc->ref.spd_e * foc->rate.foc_ts;
+    foc->ref.theta_e += foc->ref.theta_step;
+    wrap_0_2pi(foc->ref.theta_e);
 
     if (foc_cur_step(foc,
-                 foc->ctrl.id_set,
-                 foc->ctrl.iq_set,
-                 foc->ctrl.drag_pe))
+                 foc->ref.id,
+                 foc->ref.iq,
+                 foc->ref.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -56,27 +56,27 @@ _RAM_FUNC void open_cur_step(foc_t *foc)
 _RAM_FUNC void mit_step(foc_t *foc)
 {
     const control_mit_input_t input = {
-        .position_ref_rad = foc->ctrl.posm_set,
-        .position_feedback_rad = foc->sig.pos_m,
-        .speed_ref_rad_s = foc->ctrl.wm_set,
-        .speed_feedback_rad_s = foc->sig.spd_m,
-        .torque_feedforward_nm = foc->ctrl.mit_tor_set,
-        .position_gain_nm_per_rad = foc->ctrl.kp,
-        .speed_gain_nm_s_per_rad = foc->ctrl.kd,
+        .position_ref_rad = foc->ref.pos_m,
+        .position_feedback_rad = foc->fb.pos_m,
+        .speed_ref_rad_s = foc->ref.spd_m,
+        .speed_feedback_rad_s = foc->fb.spd_m,
+        .torque_feedforward_nm = foc->ref.torq_ff,
+        .position_gain_nm_per_rad = foc->ref.kp,
+        .speed_gain_nm_s_per_rad = foc->ref.kd,
     };
     control_mit_output_t output;
 
     control_mit_step(&input, &output);
-    foc->ctrl.mit_tor_out = control_limit(output.torque_cmd_nm,
+    foc->ref.torq_mit = control_limit(output.torque_cmd_nm,
                                           foc->app.pmax_torm,
                                           foc->app.nmax_torm);
-    foc->ctrl.tor_set = foc->ctrl.mit_tor_out * foc->motor.div_Gr;
-    foc->ctrl.iq_set = foc->ctrl.tor_set * foc->motor.div_Kt;
+    foc->ref.torq_r = foc->ref.torq_mit * foc->motor.div_Gr;
+    foc->ref.iq = foc->ref.torq_r * foc->motor.div_Kt;
 
     if (foc_cur_step(foc,
-                     foc->ctrl.id_set,
-                     foc->ctrl.iq_set,
-                     foc->sig.theta_e))
+                     foc->ref.id,
+                     foc->ref.iq,
+                     foc->fb.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -87,20 +87,20 @@ _RAM_FUNC void mit_step(foc_t *foc)
  */
 _RAM_FUNC void pv_step(foc_t *foc)
 {
-    foc->ctrl.wm_ref = traj_spd_step(&foc->spd_traj,
-                                     foc->ctrl.wm_set,
-                                     foc->ctrl.wm_acc,
-                                     foc->ctrl.wm_dec,
+    foc->ref.spd_m_ramp = traj_spd_step(&foc->spd_traj,
+                                     foc->ref.spd_m,
+                                     foc->ref.acc_m,
+                                     foc->ref.dec_m,
                                      foc->rate.foc_ts);
-    foc->ctrl.wr_set = foc->ctrl.wm_ref * foc->motor.Gr;
-    foc->ctrl.tor_set = foc->ctrl.torm_set * foc->motor.div_Gr;
-    foc->ctrl.iq_set = foc->ctrl.tor_set * foc->motor.div_Kt;
-    foc->app.vel_reached = (foc->ctrl.wm_ref == foc->ctrl.wm_set);
+    foc->ref.spd_r = foc->ref.spd_m_ramp * foc->motor.Gr;
+    foc->ref.torq_r = foc->ref.torq_m * foc->motor.div_Gr;
+    foc->ref.iq = foc->ref.torq_r * foc->motor.div_Kt;
+    foc->app.vel_reached = (foc->ref.spd_m_ramp == foc->ref.spd_m);
 
     if (foc_spd_step(foc,
-                     foc->ctrl.wr_set,
-                     foc->ctrl.iq_set,
-                     foc->sig.theta_e))
+                     foc->ref.spd_r,
+                     foc->ref.iq,
+                     foc->fb.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -123,19 +123,19 @@ _RAM_FUNC void pp_step(foc_t *foc)
 
     if (foc->app.pos_ctrl_mode == abs_pos_mode)
     {
-        foc->app.abs_pos_ref = foc->ctrl.posm_set;
+        foc->app.abs_pos_ref = foc->ref.pos_m;
         target = foc->app.abs_pos_ref;
     }
     else if (foc->app.pos_ctrl_mode == rel_pos_mode)
     {
-        const bool new_command = (foc->ctrl.posm_set != foc->ctrl.posm_lst)
+        const bool new_command = (foc->ref.pos_m != foc->ref.pos_m_last)
             || foc->app.pos_set_by_flag
             || foc->app.last_pos_pause;
 
         if (new_command)
         {
-            foc->app.rel_pos_ref = foc->sig.pos_m + foc->ctrl.posm_set;
-            foc->ctrl.posm_lst = foc->ctrl.posm_set;
+            foc->app.rel_pos_ref = foc->fb.pos_m + foc->ref.pos_m;
+            foc->ref.pos_m_last = foc->ref.pos_m;
             foc->app.pos_set_by_flag = false;
         }
         target = foc->app.rel_pos_ref;
@@ -145,30 +145,30 @@ _RAM_FUNC void pp_step(foc_t *foc)
         return;
     }
 
-    spd_lim = fabsf(foc->ctrl.wm_set);
+    spd_lim = fabsf(foc->ref.spd_m);
     if (spd_lim == 0.0f)
     {
         spd_lim = foc->app.pmax_velm;
     }
 
-    foc->ctrl.posm_ref = traj_pos_step(&foc->pos_traj,
+    foc->ref.pos_m_ramp = traj_pos_step(&foc->pos_traj,
                                        target,
                                        spd_lim,
-                                       foc->ctrl.wm_acc,
-                                       foc->ctrl.wm_dec,
+                                       foc->ref.acc_m,
+                                       foc->ref.dec_m,
                                        foc->rate.foc_ts);
-    foc->ctrl.posr_set = foc->ctrl.posm_ref * foc->motor.Gr;
-    foc->ctrl.wr_set = spd_lim * foc->motor.Gr;
-    foc->ctrl.tor_set = foc->ctrl.torm_set * foc->motor.div_Gr;
-    foc->ctrl.iq_set = foc->ctrl.tor_set * foc->motor.div_Kt;
+    foc->ref.pos_r = foc->ref.pos_m_ramp * foc->motor.Gr;
+    foc->ref.spd_r = spd_lim * foc->motor.Gr;
+    foc->ref.torq_r = foc->ref.torq_m * foc->motor.div_Gr;
+    foc->ref.iq = foc->ref.torq_r * foc->motor.div_Kt;
     foc->app.pos_reached = foc->pos_traj.done;
     foc->app.last_pos_pause = false;
 
     if (foc_pos_step(foc,
-                     foc->ctrl.posr_set,
-                     foc->ctrl.wr_set,
-                     foc->ctrl.iq_set,
-                     foc->sig.theta_e))
+                     foc->ref.pos_r,
+                     foc->ref.spd_r,
+                     foc->ref.iq,
+                     foc->fb.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -179,13 +179,13 @@ _RAM_FUNC void pp_step(foc_t *foc)
  */
 _RAM_FUNC void cst_step(foc_t *foc)
 {
-    foc->ctrl.tor_set = foc->ctrl.torm_set * foc->motor.div_Gr;
-    foc->ctrl.iq_set = foc->ctrl.tor_set * foc->motor.div_Kt;
+    foc->ref.torq_r = foc->ref.torq_m * foc->motor.div_Gr;
+    foc->ref.iq = foc->ref.torq_r * foc->motor.div_Kt;
 
     if (foc_cur_step(foc,
-                 foc->ctrl.id_set,
-                 foc->ctrl.iq_set,
-                 foc->sig.theta_e))
+                 foc->ref.id,
+                 foc->ref.iq,
+                 foc->fb.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -196,15 +196,15 @@ _RAM_FUNC void cst_step(foc_t *foc)
  */
 _RAM_FUNC void csv_step(foc_t *foc)
 {
-    foc->ctrl.wm_ref = foc->ctrl.wm_set;
-    foc->ctrl.wr_set = foc->ctrl.wm_ref * foc->motor.Gr;
-    foc->ctrl.tor_set = foc->ctrl.torm_set * foc->motor.div_Gr;
-    foc->ctrl.iq_set = foc->ctrl.tor_set * foc->motor.div_Kt;
+    foc->ref.spd_m_ramp = foc->ref.spd_m;
+    foc->ref.spd_r = foc->ref.spd_m_ramp * foc->motor.Gr;
+    foc->ref.torq_r = foc->ref.torq_m * foc->motor.div_Gr;
+    foc->ref.iq = foc->ref.torq_r * foc->motor.div_Kt;
 
     if (foc_spd_step(foc,
-                foc->ctrl.wr_set,
-                foc->ctrl.iq_set,
-                foc->sig.theta_e))
+                foc->ref.spd_r,
+                foc->ref.iq,
+                foc->fb.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -215,17 +215,17 @@ _RAM_FUNC void csv_step(foc_t *foc)
  */
 _RAM_FUNC void csp_step(foc_t *foc)
 {
-    foc->ctrl.posm_ref = foc->ctrl.posm_set;
-    foc->ctrl.posr_set = foc->ctrl.posm_ref * foc->motor.Gr;
-    foc->ctrl.wr_set = foc->ctrl.wm_set * foc->motor.Gr;
-    foc->ctrl.tor_set = foc->ctrl.torm_set * foc->motor.div_Gr;
-    foc->ctrl.iq_set = foc->ctrl.tor_set * foc->motor.div_Kt;
+    foc->ref.pos_m_ramp = foc->ref.pos_m;
+    foc->ref.pos_r = foc->ref.pos_m_ramp * foc->motor.Gr;
+    foc->ref.spd_r = foc->ref.spd_m * foc->motor.Gr;
+    foc->ref.torq_r = foc->ref.torq_m * foc->motor.div_Gr;
+    foc->ref.iq = foc->ref.torq_r * foc->motor.div_Kt;
 
     if (foc_pos_step(foc,
-                foc->ctrl.posr_set,
-                foc->ctrl.wr_set,
-                foc->ctrl.iq_set,
-                foc->sig.theta_e))
+                foc->ref.pos_r,
+                foc->ref.spd_r,
+                foc->ref.iq,
+                foc->fb.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -238,27 +238,27 @@ _RAM_FUNC void csp_step(foc_t *foc)
  */
 _RAM_FUNC void stop_ramp_step(foc_t *foc, float deceleration_rad_s2)
 {
-    if (foc->ctrl.wm_set > 0.0f)
+    if (foc->ref.spd_m > 0.0f)
     {
-        foc->ctrl.wr_set -= deceleration_rad_s2 * foc->motor.Gr * foc->rate.foc_ts;
-        if (foc->ctrl.wr_set < 0.0f)
+        foc->ref.spd_r -= deceleration_rad_s2 * foc->motor.Gr * foc->rate.foc_ts;
+        if (foc->ref.spd_r < 0.0f)
         {
-            foc->ctrl.wr_set = 0.0f;
+            foc->ref.spd_r = 0.0f;
         }
     }
-    if (foc->ctrl.wr_set < 0.0f)
+    if (foc->ref.spd_r < 0.0f)
     {
-        foc->ctrl.wr_set += deceleration_rad_s2 * foc->motor.Gr * foc->rate.foc_ts;
-        if (foc->ctrl.wr_set > 0.0f)
+        foc->ref.spd_r += deceleration_rad_s2 * foc->motor.Gr * foc->rate.foc_ts;
+        if (foc->ref.spd_r > 0.0f)
         {
-            foc->ctrl.wr_set = 0.0f;
+            foc->ref.spd_r = 0.0f;
         }
     }
 
     if (foc_spd_step(foc,
-                foc->ctrl.wr_set,
-                foc->ctrl.iq_set,
-                foc->sig.theta_e))
+                foc->ref.spd_r,
+                foc->ref.iq,
+                foc->fb.theta_e))
     {
         (void)drive_pwm_commit(foc);
     }
@@ -270,7 +270,7 @@ _RAM_FUNC void stop_ramp_step(foc_t *foc, float deceleration_rad_s2)
 _RAM_FUNC void quick_stop_step(foc_t *foc)
 {
     stop_ramp_step(foc, foc->app.quick_stop_dec);
-    if (fabsf(foc->sig.spd_r) < CTRL_QUICK_STOP_SPEED_THRESHOLD_RAD_S)
+    if (fabsf(foc->fb.spd_r) < CTRL_QUICK_STOP_SPEED_THRESHOLD_RAD_S)
     {
         foc->req = DRIVE_REQ_STOP;
         foc->mode.sys = release_mode;

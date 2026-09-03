@@ -17,15 +17,15 @@ PLATFORM_FAST_CODE void control_cycle_step(
 {
     /* 将硬件采样或回放数据写入现有控制器上下文。 */
     foc->fast_seq = input->seq;
-    foc->fb_status.i_valid = input->i_valid;
-    foc->fb_status.vbus_valid = input->vbus_valid;
-    foc->fb_status.pos_valid = input->pos_valid;
-    foc->sig.ia = input->ia;
-    foc->sig.ib = input->ib;
-    foc->sig.ic = input->ic;
-    foc->sig.theta_e = input->theta_e;
-    foc->sig.pos_r = input->pos_r;
-    foc->sig.pos_m = input->pos_m;
+    foc->fb.i_valid = input->i_valid;
+    foc->fb.vbus_valid = input->vbus_valid;
+    foc->fb.pos_valid = input->pos_valid;
+    foc->fb.ia = input->ia;
+    foc->fb.ib = input->ib;
+    foc->fb.ic = input->ic;
+    foc->fb.theta_e = input->theta_e;
+    foc->fb.pos_r = input->pos_r;
+    foc->fb.pos_m = input->pos_m;
 
     /* 控制器只消费物理量，不关心这些数据来自真实 Target、文件还是仿真模型。 */
     ctrl_fb_update(foc, input->vbus);

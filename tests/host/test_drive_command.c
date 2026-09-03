@@ -46,11 +46,11 @@ static bool test_positive_polarity_and_limits(void)
 
     return expect_true(drive_cmd_apply(&motor),
                        "有限命令和有效限幅应被接受。") &&
-           expect_true(motor.ctrl.torm_set == 2.0f,
+           expect_true(motor.ref.torq_m == 2.0f,
                        "转矩命令必须限制到正向上限。") &&
-           expect_true(motor.ctrl.wm_set == -100.0f,
+           expect_true(motor.ref.spd_m == -100.0f,
                        "速度命令必须限制到反向下限。") &&
-           expect_true(motor.ctrl.posm_set == 4.0f,
+           expect_true(motor.ref.pos_m == 4.0f,
                        "区间内位置命令必须保持不变。");
 }
 
@@ -66,11 +66,11 @@ static bool test_negative_polarity(void)
 
     return expect_true(drive_cmd_apply(&motor),
                        "反向极性下的有效命令应被接受。") &&
-           expect_true(motor.ctrl.torm_set == -1.0f,
+           expect_true(motor.ref.torq_m == -1.0f,
                        "反向极性必须翻转转矩给定。") &&
-           expect_true(motor.ctrl.wm_set == 20.0f,
+           expect_true(motor.ref.spd_m == 20.0f,
                        "反向极性必须翻转速度给定。") &&
-           expect_true(motor.ctrl.posm_set == -3.0f,
+           expect_true(motor.ref.pos_m == -3.0f,
                        "反向极性必须翻转位置给定。");
 }
 
@@ -88,12 +88,12 @@ static bool test_mit_command(void)
 
     return expect_true(drive_cmd_apply(&motor),
                        "有效 MIT 命令应被接受。") &&
-           expect_true(motor.ctrl.mit_tor_set == -2.0f,
+           expect_true(motor.ref.torq_ff == -2.0f,
                        "MIT 前馈转矩应先限幅再按极性翻转。") &&
-           expect_true((motor.ctrl.wm_set == -20.0f) &&
-                       (motor.ctrl.posm_set == -3.0f),
+           expect_true((motor.ref.spd_m == -20.0f) &&
+                       (motor.ref.pos_m == -3.0f),
                        "MIT 位置和速度应使用统一极性。") &&
-           expect_true((motor.ctrl.kp == 2.0f) && (motor.ctrl.kd == 0.5f),
+           expect_true((motor.ref.kp == 2.0f) && (motor.ref.kd == 0.5f),
                        "MIT 增益必须完整传入控制状态。");
 }
 
@@ -101,16 +101,16 @@ static bool test_invalid_input_does_not_update_setpoints(void)
 {
     foc_t motor = test_motor();
 
-    motor.ctrl.torm_set = 0.1f;
-    motor.ctrl.wm_set = 0.2f;
-    motor.ctrl.posm_set = 0.3f;
+    motor.ref.torq_m = 0.1f;
+    motor.ref.spd_m = 0.2f;
+    motor.ref.pos_m = 0.3f;
     motor.cmd.spd = NAN;
 
     if (!expect_true(!drive_cmd_apply(&motor),
                      "NaN 命令必须被拒绝。") ||
-        !expect_true((motor.ctrl.torm_set == 0.1f) &&
-                     (motor.ctrl.wm_set == 0.2f) &&
-                     (motor.ctrl.posm_set == 0.3f),
+        !expect_true((motor.ref.torq_m == 0.1f) &&
+                     (motor.ref.spd_m == 0.2f) &&
+                     (motor.ref.pos_m == 0.3f),
                      "命令失败时不能只更新一部分给定。"))
     {
         return false;

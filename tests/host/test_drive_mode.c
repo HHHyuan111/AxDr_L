@@ -173,9 +173,9 @@ void open_cur_step(foc_t *foc)
 bool foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float pos)
 {
     arguments_ok = arguments_ok &&
-                   (vd_ref == foc->ctrl.vd_set) &&
-                   (vq_ref == foc->ctrl.vq_set) &&
-                   (pos == foc->sig.theta_e);
+                   (vd_ref == foc->ref.vd) &&
+                   (vq_ref == foc->ref.vq) &&
+                   (pos == foc->fb.theta_e);
     log_event(EVENT_FOC_VOLTAGE);
     return foc_result_valid;
 }
@@ -183,9 +183,9 @@ bool foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float pos)
 bool foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float pos)
 {
     arguments_ok = arguments_ok &&
-                   (id_ref == foc->ctrl.id_set) &&
-                   (iq_ref == foc->ctrl.iq_set) &&
-                   (pos == foc->sig.theta_e);
+                   (id_ref == foc->ref.id) &&
+                   (iq_ref == foc->ref.iq) &&
+                   (pos == foc->fb.theta_e);
     log_event(EVENT_FOC_CURRENT);
     return foc_result_valid;
 }
@@ -193,9 +193,9 @@ bool foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float pos)
 bool foc_spd_step(foc_t *foc, float vel_ref, float iq_ref, float pos)
 {
     arguments_ok = arguments_ok &&
-                   (vel_ref == foc->ctrl.wr_set) &&
-                   (iq_ref == foc->ctrl.iq_set) &&
-                   (pos == foc->sig.theta_e);
+                   (vel_ref == foc->ref.spd_r) &&
+                   (iq_ref == foc->ref.iq) &&
+                   (pos == foc->fb.theta_e);
     log_event(EVENT_FOC_VELOCITY);
     return foc_result_valid;
 }
@@ -207,10 +207,10 @@ bool foc_pos_step(foc_t *foc,
              float pos)
 {
     arguments_ok = arguments_ok &&
-                   (pos_ref == foc->ctrl.posr_set) &&
-                   (vel_ref == foc->ctrl.wr_set) &&
-                   (iq_ref == foc->ctrl.iq_set) &&
-                   (pos == foc->sig.theta_e);
+                   (pos_ref == foc->ref.pos_r) &&
+                   (vel_ref == foc->ref.spd_r) &&
+                   (iq_ref == foc->ref.iq) &&
+                   (pos == foc->fb.theta_e);
     log_event(EVENT_FOC_POSITION);
     return foc_result_valid;
 }
@@ -431,13 +431,13 @@ int main(void)
 {
     foc_t foc = {0};
 
-    foc.ctrl.vd_set = 1.1f;
-    foc.ctrl.vq_set = 1.2f;
-    foc.ctrl.id_set = 1.3f;
-    foc.ctrl.iq_set = 1.4f;
-    foc.ctrl.wr_set = 1.5f;
-    foc.ctrl.posr_set = 1.6f;
-    foc.sig.theta_e = 1.7f;
+    foc.ref.vd = 1.1f;
+    foc.ref.vq = 1.2f;
+    foc.ref.id = 1.3f;
+    foc.ref.iq = 1.4f;
+    foc.ref.spd_r = 1.5f;
+    foc.ref.pos_r = 1.6f;
+    foc.fb.theta_e = 1.7f;
 
     if (!test_release_modes(&foc))
     {

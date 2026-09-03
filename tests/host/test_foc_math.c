@@ -324,7 +324,7 @@ static int test_sin_cos_migration_equivalence(void)
 
     for (index = 0U; index < sizeof(theta_cases) / sizeof(theta_cases[0]); index++)
     {
-        foc_sig_t legacy = {0};
+        legacy_foc_state_t legacy = {0};
         float sin_theta = 0.0f;
         float cos_theta = 0.0f;
 
@@ -362,7 +362,7 @@ static int test_transform_migration_equivalence(void)
     size_t index;
 
     for (index = 0U; index < sizeof(cases) / sizeof(cases[0]); index++) {
-        foc_sig_t legacy = {0};
+        legacy_foc_state_t legacy = {0};
         float i_alpha = 0.0f;
         float i_beta = 0.0f;
         float i_d = 0.0f;
@@ -416,7 +416,7 @@ static int test_transform_migration_equivalence(void)
 
 static int test_coordinate_transforms(void)
 {
-    foc_sig_t foc = {0};
+    legacy_foc_state_t foc = {0};
 
     foc.ia = 1.0f;
     foc.ib = -0.5f;
@@ -528,7 +528,7 @@ static int test_svm_vectors(void)
 
 static int test_foc_zero_angle_pipeline(void)
 {
-    foc_sig_t foc = {0};
+    legacy_foc_state_t foc = {0};
 
     foc.ia = 1.0f;
     foc.ib = -0.5f;

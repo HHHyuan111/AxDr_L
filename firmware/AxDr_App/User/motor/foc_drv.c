@@ -116,8 +116,8 @@ static void motor_pr60_init(foc_t *foc)
     foc->motor.Kt = 1.5f * foc->motor.pn * foc->motor.flux;
     foc->motor.div_Kt = 1.0f / foc->motor.Kt;
 
-    foc->ctrl.wm_acc = CTRL_PR60_PROFILE_ACCEL_RAD_S2;
-    foc->ctrl.wm_dec = CTRL_PR60_PROFILE_DECEL_RAD_S2;
+    foc->ref.acc_m = CTRL_PR60_PROFILE_ACCEL_RAD_S2;
+    foc->ref.dec_m = CTRL_PR60_PROFILE_DECEL_RAD_S2;
 
     foc->motor.phase_order = PR60_PHASE_ORDER;
     foc->motor.e_off = PR60_ELECTRICAL_OFFSET_RAD;
@@ -133,13 +133,13 @@ static void motor_pr60_init(foc_t *foc)
     foc->app.pmax_posm = MOTOR_MAX_POSITION_RAD;
     foc->app.nmax_posm = -MOTOR_MAX_POSITION_RAD;
 
-    foc->ctrl.pmax_iq = foc->app.pmax_torm
+    foc->ref.iq_max = foc->app.pmax_torm
         * foc->motor.div_Gr * foc->motor.div_Kt;
-    foc->ctrl.nmax_iq = foc->app.nmax_torm
+    foc->ref.iq_min = foc->app.nmax_torm
         * foc->motor.div_Gr * foc->motor.div_Kt;
 
-    foc->ctrl.pmax_vel =  foc->app.pmax_velm*foc->motor.Gr;
-    foc->ctrl.nmax_vel =  foc->app.nmax_velm*foc->motor.Gr;
+    foc->ref.spd_max =  foc->app.pmax_velm*foc->motor.Gr;
+    foc->ref.spd_min =  foc->app.nmax_velm*foc->motor.Gr;
 }
 #endif
 
@@ -172,8 +172,8 @@ static void motor_2312s_init(foc_t *foc)
     foc->motor.Kt = 1.5f * foc->motor.pn * foc->motor.flux;
     foc->motor.div_Kt = 1.0f / foc->motor.Kt;
 
-    foc->ctrl.wm_acc = CTRL_2312S_PROFILE_ACCEL_RAD_S2;
-    foc->ctrl.wm_dec = CTRL_2312S_PROFILE_DECEL_RAD_S2;
+    foc->ref.acc_m = CTRL_2312S_PROFILE_ACCEL_RAD_S2;
+    foc->ref.dec_m = CTRL_2312S_PROFILE_DECEL_RAD_S2;
 
     foc->motor.phase_order = MOTOR_2312S_PHASE_ORDER;
     foc->motor.e_off = MOTOR_2312S_ELECTRICAL_OFFSET_RAD;
@@ -189,13 +189,13 @@ static void motor_2312s_init(foc_t *foc)
     foc->app.pmax_posm = MOTOR_MAX_POSITION_RAD;
     foc->app.nmax_posm = -MOTOR_MAX_POSITION_RAD;
 
-    foc->ctrl.pmax_iq = foc->app.pmax_torm
+    foc->ref.iq_max = foc->app.pmax_torm
         * foc->motor.div_Gr * foc->motor.div_Kt;
-    foc->ctrl.nmax_iq = foc->app.nmax_torm
+    foc->ref.iq_min = foc->app.nmax_torm
         * foc->motor.div_Gr * foc->motor.div_Kt;
 
-    foc->ctrl.pmax_vel =  foc->app.pmax_velm*foc->motor.Gr;
-    foc->ctrl.nmax_vel =  foc->app.nmax_velm*foc->motor.Gr;
+    foc->ref.spd_max =  foc->app.pmax_velm*foc->motor.Gr;
+    foc->ref.spd_min =  foc->app.nmax_velm*foc->motor.Gr;
 }
 #endif
 
@@ -334,8 +334,8 @@ void foc_init(foc_t *foc)
     foc->app.polarity = motor_polarity_p;
     foc->app.pos_ctrl_mode = abs_pos_mode;
 
-    foc->app.pause_dec = foc->ctrl.wm_dec;
-    foc->app.quick_stop_dec = foc->ctrl.wm_dec;
+    foc->app.pause_dec = foc->ref.dec_m;
+    foc->app.quick_stop_dec = foc->ref.dec_m;
 
     foc->cmd.kp = CTRL_MIT_POSITION_GAIN_NM_PER_RAD;
     foc->cmd.kd = CTRL_MIT_SPEED_GAIN_NM_S_PER_RAD;
@@ -410,21 +410,21 @@ static _RAM_FUNC bool foc_ctrl_run(
         .iq_pi = &foc->iq_pi,
         .spd_pi = &foc->spd_pi,
         .pos_pi = &foc->pos_pi,
-        .vd = foc->sig.vd,
-        .vq = foc->sig.vq,
-        .iq_ref = foc->ctrl.iq_lim,
-        .spd_ref = foc->ctrl.wr_lim,
+        .vd = foc->out.vd,
+        .vq = foc->out.vq,
+        .iq_ref = foc->ref.iq_lim,
+        .spd_ref = foc->ref.spd_r_lim,
     };
     const foc_fb_t fb = {
         .sample = {
-            .ia = foc->sig.ia,
-            .ib = foc->sig.ib,
-            .ic = foc->sig.ic,
+            .ia = foc->fb.ia,
+            .ib = foc->fb.ib,
+            .ic = foc->fb.ic,
             .theta = theta_e,
         },
-        .inv_vbus = foc->sig.inv_vbus,
-        .spd = foc->sig.spd_r,
-        .pos = foc->sig.pos_r,
+        .inv_vbus = foc->fb.inv_vbus,
+        .spd = foc->fb.spd_r,
+        .pos = foc->fb.pos_r,
     };
     foc_out_t out;
     const bool valid = foc_ctrl_step(&ctrl, &fb, ref, &out);
@@ -432,23 +432,23 @@ static _RAM_FUNC bool foc_ctrl_run(
     foc->rate.cur_pid_cnt = ctrl.cur_rate.count;
     foc->rate.spd_pid_cnt = ctrl.spd_rate.count;
     foc->rate.pos_pid_cnt = ctrl.pos_rate.count;
-    foc->ctrl.iq_lim = ctrl.iq_ref;
-    foc->ctrl.wr_lim = ctrl.spd_ref;
+    foc->ref.iq_lim = ctrl.iq_ref;
+    foc->ref.spd_r_lim = ctrl.spd_ref;
 
-    foc->sig.theta = out.frame.theta;
-    foc->sig.sin_val = out.frame.sin;
-    foc->sig.cos_val = out.frame.cos;
-    foc->sig.ialpha = out.frame.ialpha;
-    foc->sig.ibeta = out.frame.ibeta;
-    foc->sig.id = out.frame.id;
-    foc->sig.iq = out.frame.iq;
-    foc->sig.vd = out.vd;
-    foc->sig.vq = out.vq;
-    foc->sig.valpha = out.pwm.valpha;
-    foc->sig.vbeta = out.pwm.vbeta;
-    foc->sig.duty_a = out.pwm.duty_a;
-    foc->sig.duty_b = out.pwm.duty_b;
-    foc->sig.duty_c = out.pwm.duty_c;
+    foc->out.theta = out.frame.theta;
+    foc->out.sin = out.frame.sin;
+    foc->out.cos = out.frame.cos;
+    foc->fb.ialpha = out.frame.ialpha;
+    foc->fb.ibeta = out.frame.ibeta;
+    foc->fb.id = out.frame.id;
+    foc->fb.iq = out.frame.iq;
+    foc->out.vd = out.vd;
+    foc->out.vq = out.vq;
+    foc->out.valpha = out.pwm.valpha;
+    foc->out.vbeta = out.pwm.vbeta;
+    foc->out.duty_a = out.pwm.duty_a;
+    foc->out.duty_b = out.pwm.duty_b;
+    foc->out.duty_c = out.pwm.duty_c;
 
     return valid;
 }
@@ -472,7 +472,7 @@ _RAM_FUNC bool foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float angle
         .vq = vq_ref,
     };
 
-    foc->sig.mode = foc_volt_mode;
+    foc->out.mode = foc_volt_mode;
     return foc_ctrl_run(foc, angle, &ref);
 }
 
@@ -496,7 +496,7 @@ _RAM_FUNC bool foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float angle)
         .iq_ref = iq_ref,
     };
 
-    foc->sig.mode = foc_curr_mode;
+    foc->out.mode = foc_curr_mode;
     return foc_ctrl_run(foc, angle, &ref);
 }
 /**
@@ -514,12 +514,12 @@ _RAM_FUNC bool foc_spd_step(foc_t *foc, float spd_ref, float cur_lim, float angl
 {
     const foc_ref_t ref = {
         .mode = FOC_CTRL_MODE_SPD,
-        .id_ref = foc->ctrl.id_set,
+        .id_ref = foc->ref.id,
         .spd_ref = spd_ref,
         .cur_lim = cur_lim,
     };
 
-    foc->sig.mode = foc_vel_mode;
+    foc->out.mode = foc_vel_mode;
     return foc_ctrl_run(foc, angle, &ref);
 }
 
@@ -543,13 +543,13 @@ _RAM_FUNC bool foc_pos_step(foc_t *foc,
 {
     const foc_ref_t ref = {
         .mode = FOC_CTRL_MODE_POS,
-        .id_ref = foc->ctrl.id_set,
+        .id_ref = foc->ref.id,
         .pos_ref = pos_ref,
         .cur_lim = cur_lim,
         .spd_lim = spd_lim,
     };
 
-    foc->sig.mode = foc_pos_mode;
+    foc->out.mode = foc_pos_mode;
     return foc_ctrl_run(foc, angle, &ref);
 }
 
@@ -564,46 +564,46 @@ _RAM_FUNC bool foc_pos_step(foc_t *foc,
 _RAM_FUNC void ctrl_fb_update(foc_t *foc, float vbus)
 {
     /* 第 1 步：保存本周期母线电压，并计算调制所需的电压系数和余量。 */
-    foc->sig.vbus = vbus;
+    foc->fb.vbus = vbus;
 
-    if (foc->sig.vbus > 0.0f)
+    if (foc->fb.vbus > 0.0f)
     {
-        foc->sig.inv_vbus = 1.5f / foc->sig.vbus;
+        foc->fb.inv_vbus = 1.5f / foc->fb.vbus;
     }
     else
     {
-        foc->sig.inv_vbus = 0.0f;
+        foc->fb.inv_vbus = 0.0f;
     }
 
-    foc->sig.vs = foc->sig.vbus * 0.5f * CTRL_VOLTAGE_UTILIZATION_RATIO;
+    foc->ref.v_lim = foc->fb.vbus * 0.5f * CTRL_VOLTAGE_UTILIZATION_RATIO;
 
     /* 第 2 步：把本周期允许的电压、电流和速度范围交给各级 PI 控制器。 */
-    foc->id_pi.out_max    =  foc->sig.vs;
-    foc->id_pi.out_min    = -foc->sig.vs;
-    foc->iq_pi.out_max    =  foc->sig.vs;
-    foc->iq_pi.out_min    = -foc->sig.vs;
+    foc->id_pi.out_max    =  foc->ref.v_lim;
+    foc->id_pi.out_min    = -foc->ref.v_lim;
+    foc->iq_pi.out_max    =  foc->ref.v_lim;
+    foc->iq_pi.out_min    = -foc->ref.v_lim;
 
-    foc->spd_pi.out_max   =  foc->ctrl.pmax_iq;
-    foc->spd_pi.out_min   =  foc->ctrl.nmax_iq;
+    foc->spd_pi.out_max   =  foc->ref.iq_max;
+    foc->spd_pi.out_min   =  foc->ref.iq_min;
 
-    foc->pos_pi.out_max   =  foc->ctrl.pmax_vel;
-    foc->pos_pi.out_min   =  foc->ctrl.nmax_vel;
+    foc->pos_pi.out_max   =  foc->ref.spd_max;
+    foc->pos_pi.out_min   =  foc->ref.spd_min;
 
     /* 第 3 步：滤波 q 轴电流，并换算转子侧和减速器输出侧转矩。 */
-    foc->sig.iq_f = control_lpf_step(&foc->iq_lpf, foc->sig.iq);
-    foc->sig.tor_r  = foc->sig.iq     * foc->motor.Kt;
-    foc->sig.tor_rf = foc->sig.iq_f   * foc->motor.Kt;
-    foc->sig.tor_m  = foc->sig.tor_r  * foc->motor.Gr;
-    foc->sig.tor_mf = foc->sig.tor_rf * foc->motor.Gr;
+    foc->fb.iq_f = control_lpf_step(&foc->iq_lpf, foc->fb.iq);
+    foc->fb.torq_r  = foc->fb.iq     * foc->motor.Kt;
+    foc->fb.torq_r_f = foc->fb.iq_f   * foc->motor.Kt;
+    foc->fb.torq_m  = foc->fb.torq_r  * foc->motor.Gr;
+    foc->fb.torq_m_f = foc->fb.torq_r_f * foc->motor.Gr;
 
     /* 第 4 步：由电角度差得到电角速度，再换算转子速度和输出轴速度。 */
-    foc->sig.spd_e = control_angle_speed_step(&foc->elec_speed_diff,
-                                           foc->sig.theta_e,
+    foc->fb.spd_e = control_angle_speed_step(&foc->elec_speed_diff,
+                                           foc->fb.theta_e,
                                            DRIVE_FOC_FREQ_HZ);
-    foc->sig.spd_r_raw = foc->sig.spd_e * foc->motor.div_pn; // rad/s;
+    foc->fb.spd_r_raw = foc->fb.spd_e * foc->motor.div_pn; // rad/s;
 
-    foc->sig.spd_r = control_lpf_step(&foc->wr_lpf, foc->sig.spd_r_raw);
-    foc->sig.spd_m = foc->sig.spd_r * foc->motor.div_Gr; // rad/s
+    foc->fb.spd_r = control_lpf_step(&foc->wr_lpf, foc->fb.spd_r_raw);
+    foc->fb.spd_m = foc->fb.spd_r * foc->motor.div_Gr; // rad/s
 
 }
 
@@ -682,10 +682,10 @@ _RAM_FUNC bool foc_adc_sample(foc_t *foc)
     foc->adc.raw.vc = sample.v_raw.c;
     foc->adc.raw.vbus = sample.v_bus_raw;
 
-    foc->sig.ia = sample.ia;
-    foc->sig.ib = sample.ib;
-    foc->sig.ic = sample.ic;
-    foc->sig.vbus = sample.vbus;
+    foc->fb.ia = sample.ia;
+    foc->fb.ib = sample.ib;
+    foc->fb.ic = sample.ic;
+    foc->fb.vbus = sample.vbus;
 
     return true;
 }

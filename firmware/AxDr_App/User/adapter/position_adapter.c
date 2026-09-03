@@ -67,7 +67,7 @@ _RAM_FUNC bool position_update(foc_t *foc)
 
     enc->rev_flag = 0U;
     encoder_update_angle(enc);
-    foc->sig.enc_pos_r = enc->pos;
+    foc->fb.enc_pos_r = enc->pos;
     position_update_single_encoder(foc);
 
     foc->enc.raw = enc->raw;
@@ -82,7 +82,7 @@ _RAM_FUNC bool position_update(foc_t *foc)
  */
 _RAM_FUNC void position_update_single_encoder(foc_t *foc)
 {
-    foc_sig_t *state = &foc->sig;
+    foc_fb_state_t *state = &foc->fb;
     const motor_cfg_t *motor = &foc->motor;
 
     state->pos_diff = state->enc_pos_r - state->pos_last;

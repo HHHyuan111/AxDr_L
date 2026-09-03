@@ -38,14 +38,14 @@ void target_pwm_set_duty_ratios(float duty_a, float duty_b, float duty_c)
 
 void ctrl_fb_update(foc_t *motor, float vbus)
 {
-    motor->sig.vbus = vbus;
-    motor->sig.spd_r = 0.0f;
+    motor->fb.vbus = vbus;
+    motor->fb.spd_r = 0.0f;
 }
 
 void drive_control_reset(foc_t *motor)
 {
-    motor->ctrl.vd_set = 0.0f;
-    motor->ctrl.vq_set = 0.0f;
+    motor->ref.vd = 0.0f;
+    motor->ref.vq = 0.0f;
 }
 
 void drive_diag_poll_request(foc_t *motor)
@@ -144,9 +144,9 @@ bool foc_cur_step(foc_t *motor, float current_d_a, float current_q_a, float angl
     (void)current_q_a;
     (void)angle_rad;
 
-    motor->sig.duty_a = 0.2f;
-    motor->sig.duty_b = 0.4f;
-    motor->sig.duty_c = 0.6f;
+    motor->out.duty_a = 0.2f;
+    motor->out.duty_b = 0.4f;
+    motor->out.duty_c = 0.6f;
     return true;
 }
 

@@ -57,11 +57,11 @@ PLATFORM_FAST_CODE bool drive_cmd_apply(foc_t *foc)
                                     foc->app.pmax_torm,
                                     foc->app.nmax_torm);
 
-            foc->ctrl.posm_set = reverse ? -pos : pos;
-            foc->ctrl.wm_set = reverse ? -spd : spd;
-            foc->ctrl.mit_tor_set = reverse ? -torq_ff : torq_ff;
-            foc->ctrl.kp = foc->cmd.kp;
-            foc->ctrl.kd = foc->cmd.kd;
+            foc->ref.pos_m = reverse ? -pos : pos;
+            foc->ref.spd_m = reverse ? -spd : spd;
+            foc->ref.torq_ff = reverse ? -torq_ff : torq_ff;
+            foc->ref.kp = foc->cmd.kp;
+            foc->ref.kd = foc->cmd.kd;
             return true;
         }
 
@@ -71,12 +71,12 @@ PLATFORM_FAST_CODE bool drive_cmd_apply(foc_t *foc)
             {
                 return false;
             }
-            foc->ctrl.torm_set = control_limit(foc->cmd.torq,
+            foc->ref.torq_m = control_limit(foc->cmd.torq,
                                                foc->app.pmax_torm,
                                                foc->app.nmax_torm);
             if (reverse)
             {
-                foc->ctrl.torm_set = -foc->ctrl.torm_set;
+                foc->ref.torq_m = -foc->ref.torq_m;
             }
             return true;
 
@@ -89,16 +89,16 @@ PLATFORM_FAST_CODE bool drive_cmd_apply(foc_t *foc)
             {
                 return false;
             }
-            foc->ctrl.torm_set = control_limit(foc->cmd.torq,
+            foc->ref.torq_m = control_limit(foc->cmd.torq,
                                                foc->app.pmax_torm,
                                                foc->app.nmax_torm);
-            foc->ctrl.wm_set = control_limit(foc->cmd.spd,
+            foc->ref.spd_m = control_limit(foc->cmd.spd,
                                              foc->app.pmax_velm,
                                              foc->app.nmax_velm);
             if (reverse)
             {
-                foc->ctrl.torm_set = -foc->ctrl.torm_set;
-                foc->ctrl.wm_set = -foc->ctrl.wm_set;
+                foc->ref.torq_m = -foc->ref.torq_m;
+                foc->ref.spd_m = -foc->ref.spd_m;
             }
             return true;
 
@@ -113,20 +113,20 @@ PLATFORM_FAST_CODE bool drive_cmd_apply(foc_t *foc)
             {
                 return false;
             }
-            foc->ctrl.torm_set = control_limit(foc->cmd.torq,
+            foc->ref.torq_m = control_limit(foc->cmd.torq,
                                                foc->app.pmax_torm,
                                                foc->app.nmax_torm);
-            foc->ctrl.wm_set = control_limit(foc->cmd.spd,
+            foc->ref.spd_m = control_limit(foc->cmd.spd,
                                              foc->app.pmax_velm,
                                              foc->app.nmax_velm);
-            foc->ctrl.posm_set = control_limit(foc->cmd.pos,
+            foc->ref.pos_m = control_limit(foc->cmd.pos,
                                                foc->app.pmax_posm,
                                                foc->app.nmax_posm);
             if (reverse)
             {
-                foc->ctrl.torm_set = -foc->ctrl.torm_set;
-                foc->ctrl.wm_set = -foc->ctrl.wm_set;
-                foc->ctrl.posm_set = -foc->ctrl.posm_set;
+                foc->ref.torq_m = -foc->ref.torq_m;
+                foc->ref.spd_m = -foc->ref.spd_m;
+                foc->ref.pos_m = -foc->ref.pos_m;
             }
             return true;
 

@@ -59,13 +59,13 @@ _RAM_FUNC void fast_loop_step(foc_t *foc)
         .i_valid = current_valid,
         .vbus_valid = true,
         .pos_valid = position_valid,
-        .ia = foc->sig.ia,
-        .ib = foc->sig.ib,
-        .ic = foc->sig.ic,
-        .vbus = foc->sig.vbus,
-        .theta_e = foc->sig.theta_e,
-        .pos_r = foc->sig.pos_r,
-        .pos_m = foc->sig.pos_m,
+        .ia = foc->fb.ia,
+        .ib = foc->fb.ib,
+        .ic = foc->fb.ic,
+        .vbus = foc->fb.vbus,
+        .theta_e = foc->fb.theta_e,
+        .pos_r = foc->fb.pos_r,
+        .pos_m = foc->fb.pos_m,
     };
 
     /* 第 4 步：使用显式输入执行反馈更新、状态机和当前控制模式。 */

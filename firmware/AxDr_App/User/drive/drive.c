@@ -18,25 +18,25 @@ static _RAM_FUNC void drive_update_protection(foc_t *foc)
     const bool power_requested = foc->pwm_active ||
                                  (foc->req == DRIVE_REQ_START) ||
                                  (foc->req == DRIVE_REQ_RUN);
-    const bool currents_valid = foc->fb_status.i_valid &&
-                                isfinite(foc->sig.ia) &&
-                                isfinite(foc->sig.ib) &&
-                                isfinite(foc->sig.ic);
-    const bool bus_voltage_valid = foc->fb_status.vbus_valid &&
-                                   isfinite(foc->sig.vbus) &&
-                                   (foc->sig.vbus >= 0.0f);
-    const bool position_valid = foc->fb_status.pos_valid &&
-                                isfinite(foc->sig.theta_e) &&
-                                isfinite(foc->sig.pos_r) &&
-                                isfinite(foc->sig.pos_m);
+    const bool currents_valid = foc->fb.i_valid &&
+                                isfinite(foc->fb.ia) &&
+                                isfinite(foc->fb.ib) &&
+                                isfinite(foc->fb.ic);
+    const bool bus_voltage_valid = foc->fb.vbus_valid &&
+                                   isfinite(foc->fb.vbus) &&
+                                   (foc->fb.vbus >= 0.0f);
+    const bool position_valid = foc->fb.pos_valid &&
+                                isfinite(foc->fb.theta_e) &&
+                                isfinite(foc->fb.pos_r) &&
+                                isfinite(foc->fb.pos_m);
     const drive_protection_sample_t sample = {
-        .ia = foc->sig.ia,
-        .ib = foc->sig.ib,
-        .ic = foc->sig.ic,
-        .vbus = foc->sig.vbus,
-        .temp_mos = foc->sig.Tmos,
-        .temp_coil = foc->sig.Tcoil,
-        .spd = foc->sig.spd_r,
+        .ia = foc->fb.ia,
+        .ib = foc->fb.ib,
+        .ic = foc->fb.ic,
+        .vbus = foc->fb.vbus,
+        .temp_mos = foc->fb.temp_mos,
+        .temp_coil = foc->fb.temp_coil,
+        .spd = foc->fb.spd_r,
         .i_valid = currents_valid,
         .vbus_valid = bus_voltage_valid,
         /* 当前板级采样链尚未接入两个温度 ADC，不宣称温度数据有效。 */

@@ -188,11 +188,11 @@ static bool test_sample_validity_is_forwarded(foc_t *motor)
 
     return expect_true(event_count == (EVENT_COUNT_PER_CYCLE - 1U),
                        "编码器采样失败后不应继续换算位置。") &&
-           expect_true(!motor->fb_status.i_valid,
+           expect_true(!motor->fb.i_valid,
                        "ADC 采样失败必须传到控制周期。") &&
-           expect_true(motor->fb_status.vbus_valid,
+           expect_true(motor->fb.vbus_valid,
                        "现有母线 ADC 直读结果应保持有效。") &&
-           expect_true(!motor->fb_status.pos_valid,
+           expect_true(!motor->fb.pos_valid,
                        "编码器采样失败必须传到控制周期。");
 }
 

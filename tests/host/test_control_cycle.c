@@ -20,16 +20,16 @@ void ctrl_fb_update(foc_t *motor, float vbus)
     feedback_called = true;
     received_bus_voltage_v = vbus;
     input_visible = (motor->fast_seq == 42U) &&
-                    motor->fb_status.i_valid &&
-                    motor->fb_status.vbus_valid &&
-                    motor->fb_status.pos_valid &&
-                    (motor->sig.ia == 1.0f) &&
-                    (motor->sig.ib == -2.0f) &&
-                    (motor->sig.ic == 3.0f) &&
-                    (motor->sig.theta_e == 0.25f) &&
-                    (motor->sig.pos_r == 4.0f) &&
-                    (motor->sig.pos_m == 5.0f);
-    motor->sig.vbus = vbus;
+                    motor->fb.i_valid &&
+                    motor->fb.vbus_valid &&
+                    motor->fb.pos_valid &&
+                    (motor->fb.ia == 1.0f) &&
+                    (motor->fb.ib == -2.0f) &&
+                    (motor->fb.ic == 3.0f) &&
+                    (motor->fb.theta_e == 0.25f) &&
+                    (motor->fb.pos_r == 4.0f) &&
+                    (motor->fb.pos_m == 5.0f);
+    motor->fb.vbus = vbus;
 }
 
 void drive_fast_step(foc_t *motor)

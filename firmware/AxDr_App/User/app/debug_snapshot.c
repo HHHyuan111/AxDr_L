@@ -60,34 +60,34 @@ _RAM_FUNC void debug_snapshot_publish(const foc_t *foc)
     g_debug_snapshot.obs_status = (uint32_t)g_obs.status;
     g_debug_snapshot.obs_samples = g_obs.flux.accepted_samples;
 
-    g_debug_snapshot.vbus = foc->sig.vbus;
-    g_debug_snapshot.ia = foc->sig.ia;
-    g_debug_snapshot.ib = foc->sig.ib;
-    g_debug_snapshot.ic = foc->sig.ic;
-    g_debug_snapshot.theta_e = foc->sig.theta_e;
+    g_debug_snapshot.vbus = foc->fb.vbus;
+    g_debug_snapshot.ia = foc->fb.ia;
+    g_debug_snapshot.ib = foc->fb.ib;
+    g_debug_snapshot.ic = foc->fb.ic;
+    g_debug_snapshot.theta_e = foc->fb.theta_e;
 
-    g_debug_snapshot.pos_r_ref = foc->ctrl.posr_set;
-    g_debug_snapshot.pos_r_fbk = foc->sig.pos_r;
-    g_debug_snapshot.spd_r_ref = foc->ctrl.wr_set;
-    g_debug_snapshot.spd_r_fbk = foc->sig.spd_r;
+    g_debug_snapshot.pos_r_ref = foc->ref.pos_r;
+    g_debug_snapshot.pos_r_fbk = foc->fb.pos_r;
+    g_debug_snapshot.spd_r_ref = foc->ref.spd_r;
+    g_debug_snapshot.spd_r_fbk = foc->fb.spd_r;
 
-    g_debug_snapshot.id_ref = foc->ctrl.id_set;
-    g_debug_snapshot.id_fbk = foc->sig.id;
-    g_debug_snapshot.iq_ref = foc->ctrl.iq_set;
-    g_debug_snapshot.iq_lim = foc->ctrl.iq_lim;
-    g_debug_snapshot.iq_fbk = foc->sig.iq;
+    g_debug_snapshot.id_ref = foc->ref.id;
+    g_debug_snapshot.id_fbk = foc->fb.id;
+    g_debug_snapshot.iq_ref = foc->ref.iq;
+    g_debug_snapshot.iq_lim = foc->ref.iq_lim;
+    g_debug_snapshot.iq_fbk = foc->fb.iq;
 
-    g_debug_snapshot.vd = foc->sig.vd;
-    g_debug_snapshot.vq = foc->sig.vq;
+    g_debug_snapshot.vd = foc->out.vd;
+    g_debug_snapshot.vq = foc->out.vq;
     g_debug_snapshot.diag_id_ref = g_diag.command.id_ref_a;
     g_debug_snapshot.diag_iq_ref = g_diag.command.iq_ref_a;
     g_debug_snapshot.diag_vd_ref = g_diag.command.vd_ref_v;
     g_debug_snapshot.diag_vq_ref = g_diag.command.vq_ref_v;
     g_debug_snapshot.diag_freq = g_diag.sweep.active_frequency_hz;
     g_debug_snapshot.flux_wb = g_obs.flux.psi_magnitude_filtered_wb;
-    g_debug_snapshot.duty_a = foc->sig.duty_a;
-    g_debug_snapshot.duty_b = foc->sig.duty_b;
-    g_debug_snapshot.duty_c = foc->sig.duty_c;
+    g_debug_snapshot.duty_a = foc->out.duty_a;
+    g_debug_snapshot.duty_b = foc->out.duty_b;
+    g_debug_snapshot.duty_c = foc->out.duty_c;
 
     g_debug_snapshot.duty_cmd_a = foc->pwm_cmd.duty_a;
     g_debug_snapshot.duty_cmd_b = foc->pwm_cmd.duty_b;

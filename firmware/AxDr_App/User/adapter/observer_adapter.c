@@ -37,13 +37,13 @@ PLATFORM_FAST_CODE void obs_step(const foc_t *foc)
     }
 
     sample = (mc_sample_t){
-        .id_a = foc->sig.id,
-        .iq_a = foc->sig.iq,
-        .vd_v = foc->sig.vd,
-        .vq_v = foc->sig.vq,
-        .omega_mech_rad_s = foc->sig.spd_r,
-        .voltage_saturated = (foc->sig.vs > 0.0f)
-            && (hypotf(foc->sig.vd, foc->sig.vq) >= (0.999f * foc->sig.vs)),
+        .id_a = foc->fb.id,
+        .iq_a = foc->fb.iq,
+        .vd_v = foc->out.vd,
+        .vq_v = foc->out.vq,
+        .omega_mech_rad_s = foc->fb.spd_r,
+        .voltage_saturated = (foc->ref.v_lim > 0.0f)
+            && (hypotf(foc->out.vd, foc->out.vq) >= (0.999f * foc->ref.v_lim)),
     };
 
     g_obs.status = mc_flux_observer_step(&g_obs.flux, &g_obs.cfg, &sample);

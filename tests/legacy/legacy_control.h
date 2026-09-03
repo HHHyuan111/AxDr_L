@@ -23,14 +23,39 @@
 #define SQRT3            (1.73205080757f)
 #define TWO_BY_SQRT3     (1.15470053838f)
 
-void foc_calc(foc_sig_t *foc);
-void sin_cos_val(foc_sig_t *foc);
-void clarke_transform(foc_sig_t *foc);
-void inverse_clarke(foc_sig_t *foc);
-void park_transform(foc_sig_t *foc);
-void inverse_park(foc_sig_t *foc);
-void svpwm_midpoint(foc_sig_t *foc);
-void svpwm_sector(foc_sig_t *foc);
+typedef struct
+{
+    float theta;
+    float sin_val;
+    float cos_val;
+    float ia;
+    float ib;
+    float ic;
+    float ialpha;
+    float ibeta;
+    float id;
+    float iq;
+    float va;
+    float vb;
+    float vc;
+    float valpha;
+    float vbeta;
+    float vd;
+    float vq;
+    float inv_vbus;
+    float duty_a;
+    float duty_b;
+    float duty_c;
+} legacy_foc_state_t;
+
+void foc_calc(legacy_foc_state_t *foc);
+void sin_cos_val(legacy_foc_state_t *foc);
+void clarke_transform(legacy_foc_state_t *foc);
+void inverse_clarke(legacy_foc_state_t *foc);
+void park_transform(legacy_foc_state_t *foc);
+void inverse_park(legacy_foc_state_t *foc);
+void svpwm_midpoint(legacy_foc_state_t *foc);
+void svpwm_sector(legacy_foc_state_t *foc);
 int svm(float alpha, float beta, float *ta, float *tb, float *tc);
 
 void pid_para_init(pid_para_t *pid_config);

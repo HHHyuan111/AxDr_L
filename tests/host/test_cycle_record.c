@@ -40,20 +40,20 @@ int main(void)
     foc.mode.release = csv_mode;
     foc.state = DRIVE_STATE_RUN;
     foc.fault.all = 0x12U;
-    foc.sig.vbus = 24.0f;
-    foc.sig.ia = 1.0f;
-    foc.sig.ib = -0.4f;
-    foc.sig.ic = -0.6f;
-    foc.sig.theta_e = 0.7f;
-    foc.sig.pos_r = 1.2f;
-    foc.sig.spd_r = 3.4f;
-    foc.sig.id = 0.1f;
-    foc.sig.iq = 0.8f;
-    foc.sig.vd = 2.0f;
-    foc.sig.vq = 3.0f;
-    foc.sig.duty_a = 0.4f;
-    foc.sig.duty_b = 0.5f;
-    foc.sig.duty_c = 0.6f;
+    foc.fb.vbus = 24.0f;
+    foc.fb.ia = 1.0f;
+    foc.fb.ib = -0.4f;
+    foc.fb.ic = -0.6f;
+    foc.fb.theta_e = 0.7f;
+    foc.fb.pos_r = 1.2f;
+    foc.fb.spd_r = 3.4f;
+    foc.fb.id = 0.1f;
+    foc.fb.iq = 0.8f;
+    foc.out.vd = 2.0f;
+    foc.out.vq = 3.0f;
+    foc.out.duty_a = 0.4f;
+    foc.out.duty_b = 0.5f;
+    foc.out.duty_c = 0.6f;
 
     for (index = 1U; index <= (CYCLE_RECORD_CAPACITY + 3U); index++)
     {

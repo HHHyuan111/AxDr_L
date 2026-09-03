@@ -15,7 +15,7 @@
 
 PLATFORM_FAST_CODE void drive_control_reset(foc_t *foc)
 {
-    const float angle_rad = isfinite(foc->sig.theta_e) ? foc->sig.theta_e : 0.0f;
+    const float angle_rad = isfinite(foc->fb.theta_e) ? foc->fb.theta_e : 0.0f;
 
     control_pid_clear(&foc->id_pi);
     control_pid_clear(&foc->iq_pi);
@@ -27,45 +27,45 @@ PLATFORM_FAST_CODE void drive_control_reset(foc_t *foc)
     foc->rate.spd_pid_cnt = 0U;
     foc->rate.pos_pid_cnt = 0U;
 
-    foc->ctrl.drag_pe = 0.0f;
-    foc->ctrl.pos_acc = 0.0f;
-    foc->ctrl.vd_set = 0.0f;
-    foc->ctrl.vq_set = 0.0f;
-    foc->ctrl.id_set = 0.0f;
-    foc->ctrl.iq_set = 0.0f;
-    foc->ctrl.iq_lim = 0.0f;
-    foc->ctrl.torm_set = 0.0f;
-    foc->ctrl.tor_set = 0.0f;
-    foc->ctrl.we_set = 0.0f;
-    foc->ctrl.wr_set = 0.0f;
-    foc->ctrl.wr_lim = 0.0f;
-    foc->ctrl.wm_set = 0.0f;
-    foc->ctrl.wm_ref = 0.0f;
-    foc->ctrl.posm_set = 0.0f;
-    foc->ctrl.posm_ref = 0.0f;
-    foc->ctrl.posr_set = 0.0f;
-    foc->ctrl.posm_lst = 0.0f;
-    foc->ctrl.mit_tor_set = 0.0f;
-    foc->ctrl.mit_tor_out = 0.0f;
-    foc->ctrl.kp = 0.0f;
-    foc->ctrl.kd = 0.0f;
+    foc->ref.theta_e = 0.0f;
+    foc->ref.theta_step = 0.0f;
+    foc->ref.vd = 0.0f;
+    foc->ref.vq = 0.0f;
+    foc->ref.id = 0.0f;
+    foc->ref.iq = 0.0f;
+    foc->ref.iq_lim = 0.0f;
+    foc->ref.torq_m = 0.0f;
+    foc->ref.torq_r = 0.0f;
+    foc->ref.spd_e = 0.0f;
+    foc->ref.spd_r = 0.0f;
+    foc->ref.spd_r_lim = 0.0f;
+    foc->ref.spd_m = 0.0f;
+    foc->ref.spd_m_ramp = 0.0f;
+    foc->ref.pos_m = 0.0f;
+    foc->ref.pos_m_ramp = 0.0f;
+    foc->ref.pos_r = 0.0f;
+    foc->ref.pos_m_last = 0.0f;
+    foc->ref.torq_ff = 0.0f;
+    foc->ref.torq_mit = 0.0f;
+    foc->ref.kp = 0.0f;
+    foc->ref.kd = 0.0f;
 
-    traj_spd_reset(&foc->spd_traj, foc->sig.spd_m);
-    traj_pos_reset(&foc->pos_traj, foc->sig.pos_m, foc->sig.spd_m);
-    foc->app.rel_pos_ref = foc->sig.pos_m;
+    traj_spd_reset(&foc->spd_traj, foc->fb.spd_m);
+    traj_pos_reset(&foc->pos_traj, foc->fb.pos_m, foc->fb.spd_m);
+    foc->app.rel_pos_ref = foc->fb.pos_m;
     foc->app.pos_reached = false;
     foc->app.vel_reached = false;
     foc->app.last_pos_pause = false;
 
-    foc->sig.id = 0.0f;
-    foc->sig.iq = 0.0f;
-    foc->sig.vd = 0.0f;
-    foc->sig.vq = 0.0f;
-    foc->sig.ialpha = 0.0f;
-    foc->sig.ibeta = 0.0f;
-    foc->sig.valpha = 0.0f;
-    foc->sig.vbeta = 0.0f;
-    foc->sig.duty_a = 0.5f;
-    foc->sig.duty_b = 0.5f;
-    foc->sig.duty_c = 0.5f;
+    foc->fb.id = 0.0f;
+    foc->fb.iq = 0.0f;
+    foc->out.vd = 0.0f;
+    foc->out.vq = 0.0f;
+    foc->fb.ialpha = 0.0f;
+    foc->fb.ibeta = 0.0f;
+    foc->out.valpha = 0.0f;
+    foc->out.vbeta = 0.0f;
+    foc->out.duty_a = 0.5f;
+    foc->out.duty_b = 0.5f;
+    foc->out.duty_c = 0.5f;
 }

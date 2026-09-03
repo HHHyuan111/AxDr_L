@@ -470,8 +470,12 @@ static bool test_protection_blocks_power_actions(void)
     };
     foc_t under_voltage_pm = {
         .req = DRIVE_REQ_START,
-        .sig = {.vbus = 12.0f},
-        .fb_status = {.i_valid = true, .vbus_valid = true, .pos_valid = true},
+        .fb = {
+            .i_valid = true,
+            .vbus_valid = true,
+            .pos_valid = true,
+            .vbus = 12.0f
+        },
         .prot_cfg = {
             .under_voltage_v = 15.0f,
             .under_voltage_samples = 1U
@@ -481,8 +485,13 @@ static bool test_protection_blocks_power_actions(void)
         .req = DRIVE_REQ_RUN,
         .state = DRIVE_STATE_RUN,
         .pwm_active = true,
-        .sig = {.ia = 81.0f, .vbus = 24.0f},
-        .fb_status = {.i_valid = true, .vbus_valid = true, .pos_valid = true},
+        .fb = {
+            .i_valid = true,
+            .vbus_valid = true,
+            .pos_valid = true,
+            .ia = 81.0f,
+            .vbus = 24.0f
+        },
         .prot_cfg = {
             .over_current_a = 80.0f,
             .over_current_samples = 1U
@@ -519,14 +528,24 @@ static bool test_invalid_feedback_blocks_start(void)
 {
     foc_t invalid_current_pm = {
         .req = DRIVE_REQ_START,
-        .sig = {.ia = NAN, .vbus = 24.0f},
-        .fb_status = {.i_valid = true, .vbus_valid = true, .pos_valid = true},
+        .fb = {
+            .i_valid = true,
+            .vbus_valid = true,
+            .pos_valid = true,
+            .ia = NAN,
+            .vbus = 24.0f
+        },
         .prot_cfg = {.invalid_current_samples = 1U}
     };
     foc_t invalid_position_pm = {
         .req = DRIVE_REQ_START,
-        .sig = {.vbus = 24.0f, .theta_e = NAN},
-        .fb_status = {.i_valid = true, .vbus_valid = true, .pos_valid = true},
+        .fb = {
+            .i_valid = true,
+            .vbus_valid = true,
+            .pos_valid = true,
+            .vbus = 24.0f,
+            .theta_e = NAN
+        },
         .prot_cfg = {.invalid_position_samples = 1U}
     };
 

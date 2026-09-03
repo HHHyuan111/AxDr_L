@@ -20,16 +20,16 @@ extern uint16_t adc2_buff[4];
 _RAM_FUNC void vofa_start(void)
 {
 	
-//	vofa_send_data(0, g_foc.ctrl.drag_pe);
-//	vofa_send_data(1, g_foc.sig.theta_e);
+//	vofa_send_data(0, g_foc.ref.theta_e);
+//	vofa_send_data(1, g_foc.fb.theta_e);
 	vofa_send_data(1, g_foc.adc.raw.ia);
 	vofa_send_data(2, g_foc.adc.raw.ib);
 	vofa_send_data(3, g_foc.adc.raw.ic);
 	
-//	vofa_send_data(1, g_foc.sig.spd_r);
-//	vofa_send_data(2, g_foc.sig.iq);
-//	vofa_send_data(2, g_foc.sig.ib);
-//	vofa_send_data(3, g_foc.sig.ic);
+//	vofa_send_data(1, g_foc.fb.spd_r);
+//	vofa_send_data(2, g_foc.fb.iq);
+//	vofa_send_data(2, g_foc.fb.ib);
+//	vofa_send_data(3, g_foc.fb.ic);
 
 	// calibr
 //	vofa_send_data(0, g_foc.calibr.pos);
@@ -47,8 +47,8 @@ _RAM_FUNC void vofa_start(void)
 //	vofa_send_data(3, g_foc.idpm.Lq);
 //	vofa_send_data(5, g_foc.idpm.flux);
 //	vofa_send_data(6, g_foc.idpm.Js);
-//	vofa_send_data(7, g_foc.sig.iq);
-//	vofa_send_data(8, g_foc.sig.spd_r);
+//	vofa_send_data(7, g_foc.fb.iq);
+//	vofa_send_data(8, g_foc.fb.spd_r);
 //	vofa_send_data(9,  g_foc.id_pi.kp);
 //	vofa_send_data(10, g_foc.id_pi.ki);
 //	vofa_send_data(11, g_foc.iq_pi.kp);
@@ -56,23 +56,23 @@ _RAM_FUNC void vofa_start(void)
 //	vofa_send_data(13, g_foc.spd_pi.kp);
 //	vofa_send_data(14, g_foc.spd_pi.ki);
 
-//	vofa_send_data(0, g_foc.sig.id);
-//	vofa_send_data(1, g_foc.ctrl.id_set);
-//	vofa_send_data(2, g_foc.sig.iq);
-//	vofa_send_data(3, g_foc.ctrl.iq_set);
-//	vofa_send_data(4, g_foc.sig.spd_r);
+//	vofa_send_data(0, g_foc.fb.id);
+//	vofa_send_data(1, g_foc.ref.id);
+//	vofa_send_data(2, g_foc.fb.iq);
+//	vofa_send_data(3, g_foc.ref.iq);
+//	vofa_send_data(4, g_foc.fb.spd_r);
 
 	
-//	vofa_send_data(4, g_foc.sig.spd_r);
-//	vofa_send_data(4, g_foc.ctrl.wm_set);
+//	vofa_send_data(4, g_foc.fb.spd_r);
+//	vofa_send_data(4, g_foc.ref.spd_m);
 //	vofa_send_data(4, g_foc.traj.spd_step);
-//	vofa_send_data(4, g_foc.sig.pos_m_1t);
+//	vofa_send_data(4, g_foc.fb.pos_m_1t);
 //	
-//	vofa_send_data(4, g_foc.sig.pos_m);
-//	vofa_send_data(4, g_foc.ctrl.posm_set);
-//	vofa_send_data(4, g_foc.ctrl.posr_set);
+//	vofa_send_data(4, g_foc.fb.pos_m);
+//	vofa_send_data(4, g_foc.ref.pos_m);
+//	vofa_send_data(4, g_foc.ref.pos_r);
 //	
-//	vofa_send_data(4, g_foc.sig.rev);
+//	vofa_send_data(4, g_foc.fb.rev);
 	
 	vofa_sendframetail();
 }

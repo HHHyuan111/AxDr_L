@@ -113,9 +113,9 @@ _RAM_FUNC bool drive_mode_step(foc_t *foc)
 
                 case volt_op:
                     if (!foc_volt_step(foc,
-                                  foc->ctrl.vd_set,
-                                  foc->ctrl.vq_set,
-                                  foc->sig.theta_e))
+                                  foc->ref.vd,
+                                  foc->ref.vq,
+                                  foc->fb.theta_e))
                     {
                         return false;
                     }
@@ -127,9 +127,9 @@ _RAM_FUNC bool drive_mode_step(foc_t *foc)
 
                 case curr_cl:
                     if (!foc_cur_step(foc,
-                                  foc->ctrl.id_set,
-                                  foc->ctrl.iq_set,
-                                  foc->sig.theta_e))
+                                  foc->ref.id,
+                                  foc->ref.iq,
+                                  foc->fb.theta_e))
                     {
                         return false;
                     }
@@ -137,9 +137,9 @@ _RAM_FUNC bool drive_mode_step(foc_t *foc)
 
                 case spd_curr_cl:
                     if (!foc_spd_step(foc,
-                                 foc->ctrl.wr_set,
-                                 foc->ctrl.iq_set,
-                                 foc->sig.theta_e))
+                                 foc->ref.spd_r,
+                                 foc->ref.iq,
+                                 foc->fb.theta_e))
                     {
                         return false;
                     }
@@ -147,10 +147,10 @@ _RAM_FUNC bool drive_mode_step(foc_t *foc)
 
                 case pos_spd_curr_cl:
                     if (!foc_pos_step(foc,
-                                 foc->ctrl.posr_set,
-                                 foc->ctrl.wr_set,
-                                 foc->ctrl.iq_set,
-                                 foc->sig.theta_e))
+                                 foc->ref.pos_r,
+                                 foc->ref.spd_r,
+                                 foc->ref.iq,
+                                 foc->fb.theta_e))
                     {
                         return false;
                     }
