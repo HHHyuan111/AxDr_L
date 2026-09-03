@@ -49,7 +49,7 @@ set(AXDR_USER_SOURCES
     User/control/control_cascade.c
     User/control/control_filter.c
     User/control/control_limit.c
-    User/control/control_loop.c
+    User/control/foc_control.c
     User/control/control_pid.c
     User/control/control_speed.c
     User/control/foc_core.c

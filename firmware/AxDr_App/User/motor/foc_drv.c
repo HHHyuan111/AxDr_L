@@ -1,7 +1,7 @@
 #include "common.h"
 #include "algorithm_config.h"
 #include "control_filter.h"
-#include "control_loop.h"
+#include "foc_control.h"
 #include "drive_diag.h"
 #include "motor_drive_config.h"
 #include "target_adc.h"
@@ -420,69 +420,66 @@ _RAM_FUNC void foc_spd_pi_calc(pmsm_t* pm)
 static _RAM_FUNC bool foc_run_control_loop(
     pmsm_t *pm,
     float electrical_angle_rad,
-    const control_loop_request_t *request)
+    const foc_ref_t *ref)
 {
-    control_loop_runtime_t runtime = {
-        .current_rate = {
+    foc_ctrl_t ctrl = {
+        .cur_rate = {
             .count = pm->period.cur_pid_cnt,
             .divider = pm->period.cur_pid_cnt_val,
         },
-        .speed_rate = {
+        .spd_rate = {
             .count = pm->period.spd_pid_cnt,
             .divider = pm->period.spd_pid_cnt_val,
         },
-        .position_rate = {
+        .pos_rate = {
             .count = pm->period.pos_pid_cnt,
             .divider = pm->period.pos_pid_cnt_val,
         },
-        .current_d_pid = &pm->id_pi,
-        .current_q_pid = &pm->iq_pi,
-        .speed_pid = &pm->spd_pi,
-        .position_pid = &pm->pos_pi,
-        .voltage_d_v = pm->foc.v_d,
-        .voltage_q_v = pm->foc.v_q,
-        .current_q_ref_a = pm->ctrl.iq_lim,
-        .speed_ref_rad_s = pm->ctrl.wr_lim,
+        .id_pi = &pm->id_pi,
+        .iq_pi = &pm->iq_pi,
+        .spd_pi = &pm->spd_pi,
+        .pos_pi = &pm->pos_pi,
+        .v_d = pm->foc.v_d,
+        .v_q = pm->foc.v_q,
+        .i_q_ref = pm->ctrl.iq_lim,
+        .spd_ref = pm->ctrl.wr_lim,
     };
-    const control_loop_feedback_t feedback = {
-        .foc_sample = {
+    const foc_fb_t fb = {
+        .sample = {
             .i_a = pm->foc.i_a,
             .i_b = pm->foc.i_b,
             .i_c = pm->foc.i_c,
             .theta = electrical_angle_rad,
         },
-        .inv_bus_voltage = pm->foc.inv_vbus,
-        .rotor_speed_rad_s = pm->foc.wr_f,
-        .rotor_position_rad = pm->foc.mp_r,
+        .inv_v_bus = pm->foc.inv_vbus,
+        .spd = pm->foc.wr_f,
+        .pos = pm->foc.mp_r,
     };
-    control_loop_output_t output;
-    const bool duty_valid = control_loop_step(&runtime,
-                                               &feedback,
-                                               request,
-                                               &output);
+    foc_out_t out;
+    const bool valid = foc_ctrl_step(&ctrl, &fb, ref, &out);
 
-    pm->period.cur_pid_cnt = runtime.current_rate.count;
-    pm->period.spd_pid_cnt = runtime.speed_rate.count;
-    pm->period.pos_pid_cnt = runtime.position_rate.count;
-    pm->ctrl.iq_lim = runtime.current_q_ref_a;
-    pm->ctrl.wr_lim = runtime.speed_ref_rad_s;
+    pm->period.cur_pid_cnt = ctrl.cur_rate.count;
+    pm->period.spd_pid_cnt = ctrl.spd_rate.count;
+    pm->period.pos_pid_cnt = ctrl.pos_rate.count;
+    pm->ctrl.iq_lim = ctrl.i_q_ref;
+    pm->ctrl.wr_lim = ctrl.spd_ref;
 
-    pm->foc.theta = output.frame.theta;
-    pm->foc.sin_val = output.frame.sin_theta;
-    pm->foc.cos_val = output.frame.cos_theta;
-    pm->foc.i_alph = output.frame.i_alpha;
-    pm->foc.i_beta = output.frame.i_beta;
-    pm->foc.i_d = output.frame.i_d;
-    pm->foc.i_q = output.frame.i_q;
-    pm->foc.v_d = output.voltage_d_v;
-    pm->foc.v_q = output.voltage_q_v;
-    pm->foc.v_alph = output.duty.v_alpha;
-    pm->foc.v_beta = output.duty.v_beta;
-    pm->foc.dtc_a = output.duty.duty_a;
-    pm->foc.dtc_b = output.duty.duty_b;
-    pm->foc.dtc_c = output.duty.duty_c;
+    pm->foc.theta = out.frame.theta;
+    pm->foc.sin_val = out.frame.sin_theta;
+    pm->foc.cos_val = out.frame.cos_theta;
+    pm->foc.i_alph = out.frame.i_alpha;
+    pm->foc.i_beta = out.frame.i_beta;
+    pm->foc.i_d = out.frame.i_d;
+    pm->foc.i_q = out.frame.i_q;
+    pm->foc.v_d = out.v_d;
+    pm->foc.v_q = out.v_q;
+    pm->foc.v_alph = out.pwm.v_alpha;
+    pm->foc.v_beta = out.pwm.v_beta;
+    pm->foc.dtc_a = out.pwm.duty_a;
+    pm->foc.dtc_b = out.pwm.duty_b;
+    pm->foc.dtc_c = out.pwm.duty_c;
 
-    return duty_valid;
+    return valid;
 }
 
 /**
@@ -498,14 +495,14 @@ static _RAM_FUNC bool foc_run_control_loop(
 **/
 _RAM_FUNC bool foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
 {
-    const control_loop_request_t request = {
-        .mode = CONTROL_LOOP_MODE_VOLTAGE,
-        .voltage_d_v = vd_ref,
-        .voltage_q_v = vq_ref,
+    const foc_ref_t ref = {
+        .mode = FOC_CTRL_MODE_VOLT,
+        .v_d = vd_ref,
+        .v_q = vq_ref,
     };
 
     pm->foc.mode = foc_volt_mode;
-    return foc_run_control_loop(pm, pos, &request);
+    return foc_run_control_loop(pm, pos, &ref);
 }
 
 
@@ -522,14 +519,14 @@ _RAM_FUNC bool foc_volt(pmsm_t* pm, float vd_ref, float vq_ref, float pos)
 **/
 _RAM_FUNC bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
 {
-    const control_loop_request_t request = {
-        .mode = CONTROL_LOOP_MODE_CURRENT,
-        .current_d_ref_a = id_set,
-        .current_q_ref_a = iq_set,
+    const foc_ref_t ref = {
+        .mode = FOC_CTRL_MODE_CUR,
+        .i_d_ref = id_set,
+        .i_q_ref = iq_set,
     };
 
     pm->foc.mode = foc_curr_mode;
-    return foc_run_control_loop(pm, pos, &request);
+    return foc_run_control_loop(pm, pos, &ref);
 }
 /**
 ***********************************************************************
@@ -544,15 +541,15 @@ _RAM_FUNC bool foc_curr(pmsm_t* pm, float id_set, float iq_set, float pos)
 **/
 _RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
 {
-    const control_loop_request_t request = {
-        .mode = CONTROL_LOOP_MODE_SPEED,
-        .current_d_ref_a = pm->ctrl.id_set,
-        .speed_ref_rad_s = vel_set,
-        .current_limit_a = iq_set,
+    const foc_ref_t ref = {
+        .mode = FOC_CTRL_MODE_SPD,
+        .i_d_ref = pm->ctrl.id_set,
+        .spd_ref = vel_set,
+        .cur_lim = iq_set,
     };
 
     pm->foc.mode = foc_vel_mode;
-    return foc_run_control_loop(pm, pos, &request);
+    return foc_run_control_loop(pm, pos, &ref);
 }
 
 /**
@@ -569,16 +566,16 @@ _RAM_FUNC bool foc_vel(pmsm_t* pm, float vel_set, float iq_set, float pos)
 **/
 _RAM_FUNC bool foc_pos(pmsm_t* pm, float pos_set, float vel_set, float iq_set, float pos)
 {
-    const control_loop_request_t request = {
-        .mode = CONTROL_LOOP_MODE_POSITION,
-        .current_d_ref_a = pm->ctrl.id_set,
-        .position_ref_rad = pos_set,
-        .current_limit_a = iq_set,
-        .speed_limit_rad_s = vel_set,
+    const foc_ref_t ref = {
+        .mode = FOC_CTRL_MODE_POS,
+        .i_d_ref = pm->ctrl.id_set,
+        .pos_ref = pos_set,
+        .cur_lim = iq_set,
+        .spd_lim = vel_set,
     };
 
     pm->foc.mode = foc_pos_mode;
-    return foc_run_control_loop(pm, pos, &request);
+    return foc_run_control_loop(pm, pos, &ref);
 }
 
 /**

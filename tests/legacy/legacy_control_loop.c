@@ -5,76 +5,75 @@
 
 #include "legacy_control.h"
 
-bool legacy_control_loop_step(
-    control_loop_runtime_t *runtime,
-    const control_loop_feedback_t *feedback,
-    const control_loop_request_t *request,
-    control_loop_output_t *output)
+bool legacy_foc_ctrl_step(foc_ctrl_t *ctrl,
+                          const foc_fb_t *fb,
+                          const foc_ref_t *ref,
+                          foc_out_t *out)
 {
     foc_voltage_t voltage;
 
-    *output = (control_loop_output_t){0};
-    legacy_foc_core_prepare(&feedback->foc_sample, &output->frame);
+    *out = (foc_out_t){0};
+    legacy_foc_core_prepare(&fb->sample, &out->frame);
 
-    switch (request->mode)
+    switch (ref->mode)
     {
-        case CONTROL_LOOP_MODE_VOLTAGE:
-            runtime->voltage_d_v = request->voltage_d_v;
-            runtime->voltage_q_v = request->voltage_q_v;
+        case FOC_CTRL_MODE_VOLT:
+            ctrl->v_d = ref->v_d;
+            ctrl->v_q = ref->v_q;
             break;
 
-        case CONTROL_LOOP_MODE_CURRENT:
-            (void)legacy_control_cur_step(&runtime->current_rate,
-                                          runtime->current_d_pid,
-                                          runtime->current_q_pid,
-                                          request->current_d_ref_a,
-                                          request->current_q_ref_a,
-                                          output->frame.i_d,
-                                          output->frame.i_q,
-                                          &runtime->voltage_d_v,
-                                          &runtime->voltage_q_v);
+        case FOC_CTRL_MODE_CUR:
+            (void)legacy_control_cur_step(&ctrl->cur_rate,
+                                          ctrl->id_pi,
+                                          ctrl->iq_pi,
+                                          ref->i_d_ref,
+                                          ref->i_q_ref,
+                                          out->frame.i_d,
+                                          out->frame.i_q,
+                                          &ctrl->v_d,
+                                          &ctrl->v_q);
             break;
 
-        case CONTROL_LOOP_MODE_SPEED:
-            (void)legacy_control_spd_step(&runtime->speed_rate,
-                                          runtime->speed_pid,
-                                          request->speed_ref_rad_s,
-                                          feedback->rotor_speed_rad_s,
-                                          request->current_limit_a,
-                                          &runtime->current_q_ref_a);
-            (void)legacy_control_cur_step(&runtime->current_rate,
-                                          runtime->current_d_pid,
-                                          runtime->current_q_pid,
-                                          request->current_d_ref_a,
-                                          runtime->current_q_ref_a,
-                                          output->frame.i_d,
-                                          output->frame.i_q,
-                                          &runtime->voltage_d_v,
-                                          &runtime->voltage_q_v);
+        case FOC_CTRL_MODE_SPD:
+            (void)legacy_control_spd_step(&ctrl->spd_rate,
+                                          ctrl->spd_pi,
+                                          ref->spd_ref,
+                                          fb->spd,
+                                          ref->cur_lim,
+                                          &ctrl->i_q_ref);
+            (void)legacy_control_cur_step(&ctrl->cur_rate,
+                                          ctrl->id_pi,
+                                          ctrl->iq_pi,
+                                          ref->i_d_ref,
+                                          ctrl->i_q_ref,
+                                          out->frame.i_d,
+                                          out->frame.i_q,
+                                          &ctrl->v_d,
+                                          &ctrl->v_q);
             break;
 
-        case CONTROL_LOOP_MODE_POSITION:
-            (void)legacy_control_pos_step(&runtime->position_rate,
-                                          runtime->position_pid,
-                                          request->position_ref_rad,
-                                          feedback->rotor_position_rad,
-                                          request->speed_limit_rad_s,
-                                          &runtime->speed_ref_rad_s);
-            (void)legacy_control_spd_step(&runtime->speed_rate,
-                                          runtime->speed_pid,
-                                          runtime->speed_ref_rad_s,
-                                          feedback->rotor_speed_rad_s,
-                                          request->current_limit_a,
-                                          &runtime->current_q_ref_a);
-            (void)legacy_control_cur_step(&runtime->current_rate,
-                                          runtime->current_d_pid,
-                                          runtime->current_q_pid,
-                                          request->current_d_ref_a,
-                                          runtime->current_q_ref_a,
-                                          output->frame.i_d,
-                                          output->frame.i_q,
-                                          &runtime->voltage_d_v,
-                                          &runtime->voltage_q_v);
+        case FOC_CTRL_MODE_POS:
+            (void)legacy_control_pos_step(&ctrl->pos_rate,
+                                          ctrl->pos_pi,
+                                          ref->pos_ref,
+                                          fb->pos,
+                                          ref->spd_lim,
+                                          &ctrl->spd_ref);
+            (void)legacy_control_spd_step(&ctrl->spd_rate,
+                                          ctrl->spd_pi,
+                                          ctrl->spd_ref,
+                                          fb->spd,
+                                          ref->cur_lim,
+                                          &ctrl->i_q_ref);
+            (void)legacy_control_cur_step(&ctrl->cur_rate,
+                                          ctrl->id_pi,
+                                          ctrl->iq_pi,
+                                          ref->i_d_ref,
+                                          ctrl->i_q_ref,
+                                          out->frame.i_d,
+                                          out->frame.i_q,
+                                          &ctrl->v_d,
+                                          &ctrl->v_q);
             break;
 
         default:
@@ -82,18 +81,18 @@ bool legacy_control_loop_step(
     }
 
     voltage = (foc_voltage_t){
-        .v_d = runtime->voltage_d_v,
-        .v_q = runtime->voltage_q_v,
-        .inv_vbus = feedback->inv_bus_voltage,
+        .v_d = ctrl->v_d,
+        .v_q = ctrl->v_q,
+        .inv_vbus = fb->inv_v_bus,
     };
 
-    output->voltage_d_v = runtime->voltage_d_v;
-    output->voltage_q_v = runtime->voltage_q_v;
-    output->current_q_ref_a = runtime->current_q_ref_a;
-    output->speed_ref_rad_s = runtime->speed_ref_rad_s;
-    output->duty_valid = legacy_foc_core_modulate(&output->frame,
-                                                  &voltage,
-                                                  &output->duty);
+    out->v_d = ctrl->v_d;
+    out->v_q = ctrl->v_q;
+    out->i_q_ref = ctrl->i_q_ref;
+    out->spd_ref = ctrl->spd_ref;
+    out->valid = legacy_foc_core_modulate(&out->frame,
+                                          &voltage,
+                                          &out->pwm);
 
-    return output->duty_valid;
+    return out->valid;
 }

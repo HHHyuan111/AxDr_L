@@ -12,7 +12,7 @@
 
 #include "common.h"
 #include "control_cascade.h"
-#include "control_loop.h"
+#include "foc_control.h"
 #include "foc_core.h"
 
 void foc_calc(pmsm_foc_t *foc);
@@ -68,9 +68,9 @@ bool legacy_control_pos_step(control_rate_t *rate,
                              float position_feedback,
                              float speed_limit_abs,
                              float *speed_ref);
-bool legacy_control_loop_step(control_loop_runtime_t *runtime,
-                              const control_loop_feedback_t *feedback,
-                              const control_loop_request_t *request,
-                              control_loop_output_t *output);
+bool legacy_foc_ctrl_step(foc_ctrl_t *ctrl,
+                          const foc_fb_t *fb,
+                          const foc_ref_t *ref,
+                          foc_out_t *out);
 
 #endif /* TESTS_LEGACY_CONTROL_H */
