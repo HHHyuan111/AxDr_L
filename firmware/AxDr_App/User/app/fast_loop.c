@@ -73,15 +73,3 @@ _RAM_FUNC void fast_loop_step(pmsm_t *motor)
     /* 第 5 步：复制本周期最终结果，仅供调试器观察，不参与控制。 */
     debug_snapshot_publish(motor);
 }
-
-/**
- * @brief ADC 注入转换完成回调。
- *
- * HAL 报告一次 ADC1 注入转换完成时进入这里。本回调不再展开控制流程，只把本次
- * 回调交给应用层统一入口。当前节点保持原有 ADC EOC 配置和回调触发行为。
- */
-_RAM_FUNC void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
-{
-    (void)hadc;
-    fast_loop_step(&pm);
-}

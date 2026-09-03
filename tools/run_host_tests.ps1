@@ -9,7 +9,8 @@ $testDir = Join-Path $repoRoot "tests/host"
 $legacyDir = Join-Path $repoRoot "tests/legacy"
 $focFakeIncludeDir = Join-Path $testDir "fakes"
 $appDir = Join-Path $repoRoot "firmware/AxDr_App/User/app"
-$bspIncludeDir = Join-Path $repoRoot "firmware/AxDr_App/User/bsp/inc"
+$bspDir = Join-Path $repoRoot "firmware/AxDr_App/User/bsp"
+$bspIncludeDir = Join-Path $bspDir "inc"
 $commonDir = Join-Path $repoRoot "firmware/AxDr_App/User/common"
 $controlDir = Join-Path $repoRoot "firmware/AxDr_App/User/control"
 $diagnosticIncludeDir = Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic/include"
@@ -33,6 +34,7 @@ $fastLoopTestSource = Join-Path $testDir "test_fast_loop.c"
 $publicHeadersTestSource = Join-Path $testDir "test_public_headers.c"
 $controlCycleSource = Join-Path $appDir "control_cycle.c"
 $fastLoopSource = Join-Path $appDir "fast_loop.c"
+$targetIrqSource = Join-Path $bspDir "target_irq.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
 $legacyFocSource = Join-Path $legacyDir "legacy_foc.c"
 $legacyFocCoreSource = Join-Path $legacyDir "legacy_foc_core.c"
@@ -251,9 +253,9 @@ Write-Host "Host C11/控制链 STOP-START-RUN-FAULT 离线回放测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$controlDir" `
         "-I$motorDir" "-I$driveDir" `
-        $fastLoopTestSource $fastLoopSource $controlCycleSource `
+        $fastLoopTestSource $fastLoopSource $targetIrqSource $controlCycleSource `
         -o $fastLoopExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
 )

@@ -12,7 +12,18 @@
 #ifndef TARGET_ADC_H
 #define TARGET_ADC_H
 
+#include <stdbool.h>
 #include <stdint.h>
+
+/**
+ * @brief 启动控制周期所需的 ADC 采样链。
+ *
+ * @return ADC 校准、注入组、DMA 和 TIM1 CH4 采样触发全部启动成功时返回 true。
+ *
+ * 本函数在电机对象初始化前调用，使零偏采集能够读取持续更新的 ADC 结果。
+ * 它只建立采样链，不放行快速控制，也不启动三相功率 PWM。
+ */
+bool target_adc_start(void);
 
 /**
  * @brief A、B、C 三相 ADC 原始值。

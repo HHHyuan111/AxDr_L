@@ -31,6 +31,7 @@
 /* USER CODE BEGIN Includes */
 #include "fast_loop.h"
 #include "common.h"
+#include "target_adc.h"
 #include "modlue.h"
 #include "lcd.h"
 /* USER CODE END Includes */
@@ -64,8 +65,6 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint16_t adc1_buff[2];
-uint16_t adc2_buff[4];
 /* USER CODE END 0 */
 
 /**
@@ -113,16 +112,10 @@ int main(void)
   HAL_TIM_Base_Start(&htim3);
   // HAL_TIM_Base_Start_IT(&htim1);
 
-  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
-  HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
-  HAL_ADCEx_InjectedStart_IT(&hadc1);
-  HAL_ADCEx_InjectedStart(&hadc2);
-
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc1_buff, 2);
-  HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc2_buff, 4);
-
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
-  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 3900);
+  if (!target_adc_start())
+  {
+    Error_Handler();
+  }
 
   pmsm_init();
   fast_loop_enable();

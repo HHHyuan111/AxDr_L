@@ -580,6 +580,11 @@
               <FilePath>..\User\bsp\target_encoder.c</FilePath>
             </File>
             <File>
+              <FileName>target_irq.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\target_irq.c</FilePath>
+            </File>
+            <File>
               <FileName>target_pwm.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\bsp\target_pwm.c</FilePath>
