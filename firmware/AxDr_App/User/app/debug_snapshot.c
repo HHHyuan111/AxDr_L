@@ -8,6 +8,7 @@
 #include "common.h"
 #include "diag_runtime.h"
 #include "drive_diag.h"
+#include "observer_adapter.h"
 
 volatile debug_snapshot_t g_debug_snapshot;
 
@@ -56,6 +57,8 @@ _RAM_FUNC void debug_snapshot_publish(const foc_t *foc)
     g_debug_snapshot.diag_status = (uint32_t)g_diag.last_status;
     g_debug_snapshot.diag_active = (uint32_t)g_diag.active;
     g_debug_snapshot.diag_v_sat = (uint32_t)g_diag.voltage_saturated;
+    g_debug_snapshot.obs_status = (uint32_t)g_obs.status;
+    g_debug_snapshot.obs_samples = g_obs.flux.accepted_samples;
 
     g_debug_snapshot.v_bus = foc->sig.vbus;
     g_debug_snapshot.i_a = foc->sig.i_a;
@@ -81,6 +84,7 @@ _RAM_FUNC void debug_snapshot_publish(const foc_t *foc)
     g_debug_snapshot.diag_vd_ref = g_diag.command.vd_ref_v;
     g_debug_snapshot.diag_vq_ref = g_diag.command.vq_ref_v;
     g_debug_snapshot.diag_freq = g_diag.sweep.active_frequency_hz;
+    g_debug_snapshot.flux_wb = g_obs.flux.psi_magnitude_filtered_wb;
     g_debug_snapshot.duty_a = foc->sig.dtc_a;
     g_debug_snapshot.duty_b = foc->sig.dtc_b;
     g_debug_snapshot.duty_c = foc->sig.dtc_c;

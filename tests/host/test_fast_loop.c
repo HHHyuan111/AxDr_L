@@ -17,11 +17,12 @@ typedef enum
     EVENT_ADC_SAMPLE,
     EVENT_FEEDBACK_UPDATE,
     EVENT_DRIVE_STEP,
+    EVENT_OBSERVER_STEP,
     EVENT_SNAPSHOT_PUBLISH
 } fast_event_e;
 
-#define EVENT_COUNT_PER_CYCLE (6U)
-#define EVENT_CAPACITY        (18U)
+#define EVENT_COUNT_PER_CYCLE (7U)
+#define EVENT_CAPACITY        (21U)
 
 foc_t g_foc;
 
@@ -74,6 +75,12 @@ void drive_fast_step(foc_t *motor)
     log_event(EVENT_DRIVE_STEP);
 }
 
+void obs_step(const foc_t *motor)
+{
+    last_motor = motor;
+    log_event(EVENT_OBSERVER_STEP);
+}
+
 void debug_snapshot_publish(const foc_t *motor)
 {
     last_motor = motor;
@@ -99,6 +106,7 @@ static bool expect_cycle_events(size_t first_event)
         EVENT_ADC_SAMPLE,
         EVENT_FEEDBACK_UPDATE,
         EVENT_DRIVE_STEP,
+        EVENT_OBSERVER_STEP,
         EVENT_SNAPSHOT_PUBLISH
     };
     size_t index;

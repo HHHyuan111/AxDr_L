@@ -44,6 +44,7 @@ include_directories(
 set(AXDR_USER_SOURCES
     User/adapter/board_adapter.c
     User/adapter/encoder_adapter.c
+    User/adapter/observer_adapter.c
     User/adapter/position_adapter.c
     User/app/control_cycle.c
     User/app/fast_loop.c
@@ -55,6 +56,8 @@ set(AXDR_USER_SOURCES
     User/control/control_cascade.c
     User/control/control_filter.c
     User/control/control_limit.c
+    User/control/control_mit.c
+    User/control/control_traj.c
     User/control/foc_control.c
     User/control/control_pid.c
     User/control/control_speed.c

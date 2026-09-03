@@ -79,12 +79,32 @@ void drive_diag_on_fault(void)
 {
 }
 
+void obs_step(const foc_t *motor)
+{
+    (void)motor;
+}
+
 void open_volt_step(foc_t *motor)
 {
     (void)motor;
 }
 
 void open_cur_step(foc_t *motor)
+{
+    (void)motor;
+}
+
+void mit_step(foc_t *motor)
+{
+    (void)motor;
+}
+
+void pv_step(foc_t *motor)
+{
+    (void)motor;
+}
+
+void pp_step(foc_t *motor)
 {
     (void)motor;
 }

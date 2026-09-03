@@ -40,6 +40,8 @@ int main(void)
         .sig = {
             .p_e = 1.2f,
             .mp_r = 8.0f,
+            .mp_m = 4.0f,
+            .wm = 1.5f,
             .i_a = 0.3f,
             .v_d = 2.0f,
             .v_q = 3.0f,
@@ -82,6 +84,10 @@ int main(void)
            expect_true((motor.elec_speed_diff.delta_angle_rad == 0.0f) &&
                        (motor.elec_speed_diff.previous_angle_rad == 1.2f),
                        "测速复位必须用当前电角度建立下一拍基准。") &&
+           expect_true((motor.spd_traj.ref == 1.5f) &&
+                       (motor.pos_traj.pos == 4.0f) &&
+                       (motor.pos_traj.spd == 1.5f),
+                       "轨迹复位必须从当前输出轴位置和速度继续。") &&
            expect_true((motor.rate.foc_ts == 0.00005f) &&
                        (motor.motor.pn == 7.0f) &&
                        (motor.ctrl.wm_acc == 20.0f) &&

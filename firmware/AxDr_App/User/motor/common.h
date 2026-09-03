@@ -13,6 +13,7 @@
 #include "control_filter.h"
 #include "control_pid.h"
 #include "control_speed.h"
+#include "control_traj.h"
 #include "drive_io.h"
 #include "drive_protection.h"
 #include "encoder_type.h"
@@ -434,6 +435,7 @@ typedef struct
     float posm_lst;
 
     float mit_tor_set;
+    float mit_tor_out;
     float kp;
     float kd;
 
@@ -1301,6 +1303,9 @@ struct foc
 
     control_angle_speed_state_t elec_speed_diff;
 
+    traj_spd_t spd_traj;
+    traj_pos_t pos_traj;
+
     traj_t traj;
 
     foc_map_t map;
@@ -1365,10 +1370,9 @@ void open_cur_step(foc_t *foc);
 void sensory_pos_calc(foc_t *foc);
 void senless_pos_calc(foc_t *foc);
 
-void pm_mit_mode(foc_t *foc);
-void pt_tor_mode(foc_t *foc);
-void pv_vel_mode(foc_t *foc);
-void pp_pos_mode(foc_t *foc);
+void mit_step(foc_t *foc);
+void pv_step(foc_t *foc);
+void pp_step(foc_t *foc);
 
 void cst_step(foc_t *foc);
 void csv_step(foc_t *foc);

@@ -2,7 +2,7 @@
  * @file target_encoder.c
  * @brief STM32G474 驱动板上的 SPI 磁编码器原始位置读取。
  *
- * 数据流：MT6816 -> SPI1 两帧响应 -> 14 位原始计数 -> 电机位置计算层。
+ * 数据流：MA732/MT6816 -> SPI1 响应 -> 14 位原始计数 -> 位置适配层。
  * 本文件只处理硬件通信和数据拼接，不处理弧度换算、零位和极对数。
  */
 
@@ -15,7 +15,7 @@
 #define MT6816_READ_REG_03_COMMAND (0x8300U)
 #define MT6816_READ_REG_04_COMMAND (0x8400U)
 #define MA732_READ_ANGLE_COMMAND    (0x0000U)
-#define MT6816_SPI_TIMEOUT_COUNT   (200U)
+#define ENCODER_SPI_TIMEOUT_COUNT  (200U)
 
 /**
  * @brief 通过 SPI1 完成一次带独立片选的 16 位 MT6816 通信。
@@ -35,7 +35,7 @@ bool target_encoder_transfer_word(uint16_t tx_word, uint16_t *rx_word)
         &hspi1,
         tx_word,
         rx_word,
-        MT6816_SPI_TIMEOUT_COUNT);
+        ENCODER_SPI_TIMEOUT_COUNT);
     HAL_GPIO_WritePin(SPI1_CSN_GPIO_Port, SPI1_CSN_Pin, GPIO_PIN_SET);
 
     return transfer_status == 0;

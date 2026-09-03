@@ -32,6 +32,8 @@
 #define CTRL_PR60_POSITION_KP                     (12.0f)
 #define CTRL_PR60_POSITION_KI                     (0.0f)
 #define CTRL_PR60_POSITION_KD                     (0.0f)
+#define CTRL_PR60_PROFILE_ACCEL_RAD_S2             (20.0f)
+#define CTRL_PR60_PROFILE_DECEL_RAD_S2             (20.0f)
 
 /* 2312S 三闭环整定参数；上电测试前应针对该电机重新确认。 */
 #define CTRL_2312S_CURRENT_BANDWIDTH_RAD_S        (500.0f)
@@ -41,6 +43,8 @@
 #define CTRL_2312S_POSITION_KP                     (12.0f)
 #define CTRL_2312S_POSITION_KI                     (0.0f)
 #define CTRL_2312S_POSITION_KD                     (0.0f)
+#define CTRL_2312S_PROFILE_ACCEL_RAD_S2             (200.0f)
+#define CTRL_2312S_PROFILE_DECEL_RAD_S2             (200.0f)
 
 /* 三闭环上电初始限幅；进入 FOC 后会根据实时母线电压和电机能力刷新。 */
 #define CTRL_CURRENT_PI_INITIAL_LIMIT_V           (11.0f)
@@ -51,7 +55,7 @@
 #define CTRL_VOLTAGE_UTILIZATION_RATIO            (0.96f)
 #define CTRL_QUICK_STOP_SPEED_THRESHOLD_RAD_S     (0.5f)
 
-/* MIT 默认值；正式命令可在运行前覆盖，当前固件尚未开放 MIT 模式路由。 */
+/* MIT 默认值；正式命令可在运行前覆盖。 */
 #define CTRL_MIT_POSITION_GAIN_NM_PER_RAD          (0.0f)
 #define CTRL_MIT_SPEED_GAIN_NM_S_PER_RAD           (0.0f)
 #define CTRL_MIT_TORQUE_FEEDFORWARD_NM             (0.0f)

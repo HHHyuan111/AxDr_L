@@ -29,6 +29,8 @@ $drivePwmTestSource = Join-Path $testDir "test_drive_pwm.c"
 $pidTestSource = Join-Path $testDir "test_control_pid.c"
 $cascadeTestSource = Join-Path $testDir "test_control_cascade.c"
 $controlLoopTestSource = Join-Path $testDir "test_control_loop.c"
+$controlTrajTestSource = Join-Path $testDir "test_control_traj.c"
+$observerAdapterTestSource = Join-Path $testDir "test_observer_adapter.c"
 $debugSnapshotTestSource = Join-Path $testDir "test_debug_snapshot.c"
 $controlCycleTestSource = Join-Path $testDir "test_control_cycle.c"
 $controlReplayTestSource = Join-Path $testDir "test_control_replay.c"
@@ -39,6 +41,7 @@ $controlCycleSource = Join-Path $appDir "control_cycle.c"
 $fastLoopSource = Join-Path $appDir "fast_loop.c"
 $targetIrqSource = Join-Path $bspDir "target_irq.c"
 $boardAdapterSource = Join-Path $adapterDir "board_adapter.c"
+$observerAdapterSource = Join-Path $adapterDir "observer_adapter.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
 $legacyFocSource = Join-Path $legacyDir "legacy_foc.c"
 $legacyFocCoreSource = Join-Path $legacyDir "legacy_foc_core.c"
@@ -50,12 +53,16 @@ $filterSource = Join-Path $controlDir "control_filter.c"
 $cascadeSource = Join-Path $controlDir "control_cascade.c"
 $controlLoopSource = Join-Path $controlDir "foc_control.c"
 $controlMitSource = Join-Path $controlDir "control_mit.c"
+$controlTrajSource = Join-Path $controlDir "control_traj.c"
 $focCoreSource = Join-Path $controlDir "foc_core.c"
 $limitSource = Join-Path $controlDir "control_limit.c"
 $svmSource = Join-Path $controlDir "foc_svm.c"
 $transformSource = Join-Path $controlDir "foc_transform.c"
 $controlPidSource = Join-Path $controlDir "control_pid.c"
 $speedSource = Join-Path $controlDir "control_speed.c"
+$diagnosticCoreDir = Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic/core"
+$mcCommonSource = Join-Path $diagnosticCoreDir "mc_common.c"
+$mcFluxObserverSource = Join-Path $diagnosticCoreDir "mc_flux_observer.c"
 $utilSource = Join-Path $motorDir "util.c"
 $driveSource = Join-Path $driveDir "drive.c"
 $driveDiagSource = Join-Path $driveDir "drive_diag.c"
@@ -76,6 +83,8 @@ $drivePwmExecutablePath = Join-Path $outputDir "test_drive_pwm.exe"
 $pidExecutablePath = Join-Path $outputDir "test_control_pid.exe"
 $cascadeExecutablePath = Join-Path $outputDir "test_control_cascade.exe"
 $controlLoopExecutablePath = Join-Path $outputDir "test_control_loop.exe"
+$controlTrajExecutablePath = Join-Path $outputDir "test_control_traj.exe"
+$observerAdapterExecutablePath = Join-Path $outputDir "test_observer_adapter.exe"
 $debugSnapshotExecutablePath = Join-Path $outputDir "test_debug_snapshot.exe"
 $controlCycleExecutablePath = Join-Path $outputDir "test_control_cycle.exe"
 $controlReplayExecutablePath = Join-Path $outputDir "test_control_replay.exe"
@@ -190,7 +199,28 @@ Write-Host "Host C11/电压电流速度位置与 MIT 主链测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" `
+        $controlTrajTestSource $controlTrajSource `
+        -o $controlTrajExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host 轨迹测试编译失败，退出码：$compileExitCode"
+}
+
+& $controlTrajExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host 轨迹测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/速度与位置轨迹测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
         "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $debugSnapshotTestSource $debugSnapshotSource `
         -o $debugSnapshotExecutablePath 2>&1 |
@@ -212,8 +242,8 @@ Write-Host "Host C11/只读调试快照测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
-        "-I$motorDir" "-I$driveDir" `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
+        "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $controlCycleTestSource $controlCycleSource `
         -o $controlCycleExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -234,8 +264,8 @@ Write-Host "Host C11/控制周期显式输入输出测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" `
-        "-I$controlDir" "-I$motorDir" "-I$driveDir" `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" `
+        "-I$controlDir" "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $controlReplayTestSource $controlCycleSource $driveSource `
         $driveModeSource $driveCommandSource $driveProtectionSource `
         $drivePwmSource $limitSource `
@@ -258,8 +288,8 @@ Write-Host "Host C11/控制链 STOP-START-RUN-FAULT 离线回放测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$controlDir" `
-        "-I$motorDir" "-I$driveDir" `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$controlDir" `
+        "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $fastLoopTestSource $fastLoopSource $targetIrqSource $controlCycleSource `
         -o $fastLoopExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -346,6 +376,7 @@ $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$motorDir" "-I$driveDir" `
         $driveResetTestSource $driveResetSource $controlPidSource $speedSource `
+        $controlTrajSource `
         -o $driveResetExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )
@@ -446,6 +477,29 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/板卡相序与ADC换算适配测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" `
+        "-I$controlDir" "-I$diagnosticIncludeDir" "-I$driveDir" "-I$motorDir" `
+        $observerAdapterTestSource $observerAdapterSource `
+        $mcCommonSource $mcFluxObserverSource `
+        -o $observerAdapterExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host 观测器适配测试编译失败，退出码：$compileExitCode"
+}
+
+& $observerAdapterExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host 观测器适配测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/在线磁链观测器适配测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `

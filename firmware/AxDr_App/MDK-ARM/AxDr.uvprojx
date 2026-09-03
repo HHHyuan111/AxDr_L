@@ -460,6 +460,16 @@
               <FilePath>..\User\control\control_limit.c</FilePath>
             </File>
             <File>
+              <FileName>control_mit.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\control\control_mit.c</FilePath>
+            </File>
+            <File>
+              <FileName>control_traj.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\control\control_traj.c</FilePath>
+            </File>
+            <File>
               <FileName>foc_control.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\control\foc_control.c</FilePath>
@@ -868,6 +878,11 @@
               <FileName>encoder_adapter.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\adapter\encoder_adapter.c</FilePath>
+            </File>
+            <File>
+              <FileName>observer_adapter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\adapter\observer_adapter.c</FilePath>
             </File>
             <File>
               <FileName>position_adapter.c</FileName>

@@ -8,6 +8,7 @@
 #include "common.h"
 #include "compiler.h"
 #include "drive.h"
+#include "observer_adapter.h"
 
 PLATFORM_FAST_CODE void control_cycle_step(
     foc_t *foc,
@@ -29,6 +30,7 @@ PLATFORM_FAST_CODE void control_cycle_step(
     /* 控制器只消费物理量，不关心这些数据来自真实 Target、文件还是仿真模型。 */
     ctrl_fb_update(foc, input->bus_voltage_v);
     drive_fast_step(foc);
+    obs_step(foc);
 
     output->seq = foc->fast_seq;
     output->drive_state = (uint32_t)foc->state;

@@ -11,6 +11,7 @@
 
 static bool feedback_called;
 static bool drive_called;
+static bool observer_called;
 static bool input_visible;
 static float received_bus_voltage_v;
 
@@ -44,6 +45,11 @@ void drive_fast_step(foc_t *motor)
         .duty_b = 0.4f,
         .duty_c = 0.6f,
     };
+}
+
+void obs_step(const foc_t *motor)
+{
+    observer_called = drive_called && (motor->state == DRIVE_STATE_RUN);
 }
 
 static bool expect_true(bool condition, const char *message)
@@ -83,6 +89,8 @@ int main(void)
                      "母线电压必须通过显式输入传入反馈更新。") ||
         !expect_true(drive_called,
                      "Drive 必须在反馈更新之后运行。") ||
+        !expect_true(observer_called,
+                     "观测器必须在 Drive 本周期计算完成后运行。") ||
         !expect_true(output.seq == 42U,
                      "输出周期序号必须与输入一致。") ||
         !expect_true(output.drive_state == (uint32_t)DRIVE_STATE_RUN,

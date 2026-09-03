@@ -18,43 +18,119 @@ static PLATFORM_FAST_CODE bool drive_cmd_range_valid(float lower, float upper)
 
 PLATFORM_FAST_CODE bool drive_cmd_apply(foc_t *foc)
 {
-    float position_rad;
-    float speed_rad_s;
-    float torque_nm;
+    const bool reverse = foc->app.polarity == motor_polarity_n;
 
-    if (!isfinite(foc->cmd.torm_set) ||
-        !isfinite(foc->cmd.wm_set) ||
-        !isfinite(foc->cmd.posm_set) ||
-        !drive_cmd_range_valid(foc->app.nmax_torm, foc->app.pmax_torm) ||
-        !drive_cmd_range_valid(foc->app.nmax_velm, foc->app.pmax_velm) ||
-        !drive_cmd_range_valid(foc->app.nmax_posm, foc->app.pmax_posm))
+    if ((foc->app.polarity != motor_polarity_p) && !reverse)
     {
         return false;
     }
 
-    torque_nm = control_limit(foc->cmd.torm_set,
-                              foc->app.pmax_torm,
-                              foc->app.nmax_torm);
-    speed_rad_s = control_limit(foc->cmd.wm_set,
+    switch (foc->mode.release)
+    {
+        case mit_mode:
+        {
+            float pos;
+            float spd;
+            float torq_ff;
+
+            if (!isfinite(foc->cmd.posm_set) ||
+                !isfinite(foc->cmd.wm_set) ||
+                !isfinite(foc->cmd.mit_tor_set) ||
+                !isfinite(foc->cmd.kp) ||
+                !isfinite(foc->cmd.kd) ||
+                (foc->cmd.kp < 0.0f) ||
+                (foc->cmd.kd < 0.0f) ||
+                !drive_cmd_range_valid(foc->app.nmax_torm, foc->app.pmax_torm) ||
+                !drive_cmd_range_valid(foc->app.nmax_velm, foc->app.pmax_velm) ||
+                !drive_cmd_range_valid(foc->app.nmax_posm, foc->app.pmax_posm))
+            {
+                return false;
+            }
+
+            pos = control_limit(foc->cmd.posm_set,
+                                foc->app.pmax_posm,
+                                foc->app.nmax_posm);
+            spd = control_limit(foc->cmd.wm_set,
                                 foc->app.pmax_velm,
                                 foc->app.nmax_velm);
-    position_rad = control_limit(foc->cmd.posm_set,
-                                 foc->app.pmax_posm,
-                                 foc->app.nmax_posm);
+            torq_ff = control_limit(foc->cmd.mit_tor_set,
+                                    foc->app.pmax_torm,
+                                    foc->app.nmax_torm);
 
-    if (foc->app.polarity == motor_polarity_n)
-    {
-        torque_nm = -torque_nm;
-        speed_rad_s = -speed_rad_s;
-        position_rad = -position_rad;
-    }
-    else if (foc->app.polarity != motor_polarity_p)
-    {
-        return false;
-    }
+            foc->ctrl.posm_set = reverse ? -pos : pos;
+            foc->ctrl.wm_set = reverse ? -spd : spd;
+            foc->ctrl.mit_tor_set = reverse ? -torq_ff : torq_ff;
+            foc->ctrl.kp = foc->cmd.kp;
+            foc->ctrl.kd = foc->cmd.kd;
+            return true;
+        }
 
-    foc->ctrl.torm_set = torque_nm;
-    foc->ctrl.wm_set = speed_rad_s;
-    foc->ctrl.posm_set = position_rad;
-    return true;
+        case cst_mode:
+            if (!isfinite(foc->cmd.torm_set) ||
+                !drive_cmd_range_valid(foc->app.nmax_torm, foc->app.pmax_torm))
+            {
+                return false;
+            }
+            foc->ctrl.torm_set = control_limit(foc->cmd.torm_set,
+                                               foc->app.pmax_torm,
+                                               foc->app.nmax_torm);
+            if (reverse)
+            {
+                foc->ctrl.torm_set = -foc->ctrl.torm_set;
+            }
+            return true;
+
+        case vel_mode:
+        case csv_mode:
+            if (!isfinite(foc->cmd.torm_set) ||
+                !isfinite(foc->cmd.wm_set) ||
+                !drive_cmd_range_valid(foc->app.nmax_torm, foc->app.pmax_torm) ||
+                !drive_cmd_range_valid(foc->app.nmax_velm, foc->app.pmax_velm))
+            {
+                return false;
+            }
+            foc->ctrl.torm_set = control_limit(foc->cmd.torm_set,
+                                               foc->app.pmax_torm,
+                                               foc->app.nmax_torm);
+            foc->ctrl.wm_set = control_limit(foc->cmd.wm_set,
+                                             foc->app.pmax_velm,
+                                             foc->app.nmax_velm);
+            if (reverse)
+            {
+                foc->ctrl.torm_set = -foc->ctrl.torm_set;
+                foc->ctrl.wm_set = -foc->ctrl.wm_set;
+            }
+            return true;
+
+        case pos_mode:
+        case csp_mode:
+            if (!isfinite(foc->cmd.torm_set) ||
+                !isfinite(foc->cmd.wm_set) ||
+                !isfinite(foc->cmd.posm_set) ||
+                !drive_cmd_range_valid(foc->app.nmax_torm, foc->app.pmax_torm) ||
+                !drive_cmd_range_valid(foc->app.nmax_velm, foc->app.pmax_velm) ||
+                !drive_cmd_range_valid(foc->app.nmax_posm, foc->app.pmax_posm))
+            {
+                return false;
+            }
+            foc->ctrl.torm_set = control_limit(foc->cmd.torm_set,
+                                               foc->app.pmax_torm,
+                                               foc->app.nmax_torm);
+            foc->ctrl.wm_set = control_limit(foc->cmd.wm_set,
+                                             foc->app.pmax_velm,
+                                             foc->app.nmax_velm);
+            foc->ctrl.posm_set = control_limit(foc->cmd.posm_set,
+                                               foc->app.pmax_posm,
+                                               foc->app.nmax_posm);
+            if (reverse)
+            {
+                foc->ctrl.torm_set = -foc->ctrl.torm_set;
+                foc->ctrl.wm_set = -foc->ctrl.wm_set;
+                foc->ctrl.posm_set = -foc->ctrl.posm_set;
+            }
+            return true;
+
+        default:
+            return false;
+    }
 }

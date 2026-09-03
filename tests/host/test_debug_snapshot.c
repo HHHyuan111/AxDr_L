@@ -12,8 +12,10 @@
 #include "diag_runtime.h"
 #include "debug_snapshot.h"
 #include "drive_diag.h"
+#include "observer_adapter.h"
 
 diag_runtime_t g_diag;
+obs_t g_obs;
 
 static int expect_u32(const char *name, uint32_t actual, uint32_t expected)
 {
@@ -48,6 +50,7 @@ static void fill_source(foc_t *motor)
 {
     memset(motor, 0, sizeof(*motor));
     memset(&g_diag, 0, sizeof(g_diag));
+    memset(&g_obs, 0, sizeof(g_obs));
 
     motor->fast_seq = 41U;
     motor->req = DRIVE_REQ_START;
@@ -67,6 +70,9 @@ static void fill_source(foc_t *motor)
     g_diag.command.vd_ref_v = 0.6f;
     g_diag.command.vq_ref_v = 0.7f;
     g_diag.sweep.active_frequency_hz = 100.0f;
+    g_obs.status = MC_OK;
+    g_obs.flux.accepted_samples = 7U;
+    g_obs.flux.psi_magnitude_filtered_wb = 0.0049f;
 
     motor->pwm_cmd.seq = motor->fast_seq;
     motor->pwm_cmd.valid = true;
@@ -144,6 +150,12 @@ static int expect_snapshot_fields(const foc_t *motor,
            expect_u32("diag_v_sat",
                       g_debug_snapshot.diag_v_sat,
                       (uint32_t)g_diag.voltage_saturated) &&
+           expect_u32("obs_status",
+                      g_debug_snapshot.obs_status,
+                      (uint32_t)g_obs.status) &&
+           expect_u32("obs_samples",
+                      g_debug_snapshot.obs_samples,
+                      g_obs.flux.accepted_samples) &&
            expect_float_bits("v_bus", g_debug_snapshot.v_bus, motor->sig.vbus) &&
            expect_float_bits("i_a", g_debug_snapshot.i_a, motor->sig.i_a) &&
            expect_float_bits("i_b", g_debug_snapshot.i_b, motor->sig.i_b) &&
@@ -175,6 +187,9 @@ static int expect_snapshot_fields(const foc_t *motor,
            expect_float_bits("diag_freq",
                              g_debug_snapshot.diag_freq,
                              g_diag.sweep.active_frequency_hz) &&
+           expect_float_bits("flux_wb",
+                             g_debug_snapshot.flux_wb,
+                             g_obs.flux.psi_magnitude_filtered_wb) &&
            expect_float_bits("duty_a", g_debug_snapshot.duty_a, motor->sig.dtc_a) &&
            expect_float_bits("duty_b", g_debug_snapshot.duty_b, motor->sig.dtc_b) &&
            expect_float_bits("duty_c", g_debug_snapshot.duty_c, motor->sig.dtc_c) &&
@@ -248,7 +263,7 @@ int main(void)
     foc_t motor;
     uint32_t expected_seq;
 
-    _Static_assert(sizeof(debug_snapshot_t) == 188U, "调试快照布局发生了变化");
+    _Static_assert(sizeof(debug_snapshot_t) == 200U, "调试快照布局发生了变化");
 
     fill_source(&motor);
     debug_snapshot_publish(&motor);

@@ -41,6 +41,10 @@ typedef struct
     uint32_t diag_active;
     uint32_t diag_v_sat;
 
+    /* 在线磁链观测器状态；只用于验证电机模型，不参与位置闭环。 */
+    uint32_t obs_status;
+    uint32_t obs_samples;
+
     /* 母线电压单位 V；三相电流单位 A；电角度单位 rad。 */
     float v_bus;
     float i_a;
@@ -69,6 +73,7 @@ typedef struct
     float diag_vd_ref;
     float diag_vq_ref;
     float diag_freq;
+    float flux_wb;
     float duty_a;
     float duty_b;
     float duty_c;

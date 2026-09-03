@@ -7,6 +7,7 @@
 #include "foc_control.h"
 #include "drive_diag.h"
 #include "motor_config.h"
+#include "observer_adapter.h"
 #include "target_adc.h"
 
 _RAM_DATA foc_t g_foc;
@@ -123,8 +124,8 @@ static void motor_pr60_init(foc_t *foc)
     foc->motor.Kt = 1.5f * foc->motor.pn * foc->motor.flux;
     foc->motor.div_Kt = 1.0f / foc->motor.Kt;
 
-    foc->ctrl.wm_acc = PR60_ACCELERATION_RAD_S2;
-    foc->ctrl.wm_dec = PR60_DECELERATION_RAD_S2;
+    foc->ctrl.wm_acc = CTRL_PR60_PROFILE_ACCEL_RAD_S2;
+    foc->ctrl.wm_dec = CTRL_PR60_PROFILE_DECEL_RAD_S2;
 
     foc->motor.phase_order = PR60_PHASE_ORDER;
     foc->motor.e_off = PR60_ELECTRICAL_OFFSET_RAD;
@@ -183,8 +184,8 @@ static void motor_2312s_init(foc_t *foc)
     foc->motor.Kt = 1.5f * foc->motor.pn * foc->motor.flux;
     foc->motor.div_Kt = 1.0f / foc->motor.Kt;
 
-    foc->ctrl.wm_acc = MOTOR_2312S_ACCELERATION_RAD_S2;
-    foc->ctrl.wm_dec = MOTOR_2312S_DECELERATION_RAD_S2;
+    foc->ctrl.wm_acc = CTRL_2312S_PROFILE_ACCEL_RAD_S2;
+    foc->ctrl.wm_dec = CTRL_2312S_PROFILE_DECEL_RAD_S2;
 
     foc->motor.phase_order = MOTOR_2312S_PHASE_ORDER;
     foc->motor.e_off = MOTOR_2312S_ELECTRICAL_OFFSET_RAD;
@@ -354,11 +355,6 @@ void foc_init(foc_t *foc)
         CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S,
         -CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S);
     
-    encoder_init(&foc->enc);
-    drive_diag_init(foc);
-
-    /* 辨识、标定、轨迹和无感观测器尚未进入正式运行链，上电时不初始化。 */
-
     /* 上电默认保持三相功率输出关闭，等待明确的 START 请求。 */
     foc->req = DRIVE_REQ_STOP;
     foc->state = DRIVE_STATE_STOP;
@@ -366,6 +362,7 @@ void foc_init(foc_t *foc)
 
     foc->enc.pos_mode = Sensorsory_s;
     foc->enc.sensory1 = ENCODER_SELECTED_TYPE;
+    encoder_init(&foc->enc);
 
     /* 默认使用零电流闭环调试；切换模式前仍需显式发送 START 请求。 */
     foc->mode.sys = debug_mode;
@@ -379,6 +376,16 @@ void foc_init(foc_t *foc)
     foc->app.v_curve = tcurve;
     foc->app.vel_set_immediate = 1;
     foc->app.pos_set_immediate = 1;
+    foc->app.pause_dec = foc->ctrl.wm_dec;
+    foc->app.quick_stop_dec = foc->ctrl.wm_dec;
+    foc->app.fault_stop_dec = foc->ctrl.wm_dec;
+
+    foc->cmd.kp = CTRL_MIT_POSITION_GAIN_NM_PER_RAD;
+    foc->cmd.kd = CTRL_MIT_SPEED_GAIN_NM_S_PER_RAD;
+    foc->cmd.mit_tor_set = CTRL_MIT_TORQUE_FEEDFORWARD_NM;
+
+    drive_diag_init(foc);
+    obs_init(foc);
 
     cur_offset_init(foc);
 }

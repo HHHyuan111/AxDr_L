@@ -11,6 +11,7 @@
 #include "compiler.h"
 #include "control_pid.h"
 #include "control_speed.h"
+#include "control_traj.h"
 
 PLATFORM_FAST_CODE void drive_control_reset(foc_t *foc)
 {
@@ -48,8 +49,17 @@ PLATFORM_FAST_CODE void drive_control_reset(foc_t *foc)
     foc->ctrl.wm_lst = 0.0f;
     foc->ctrl.posm_lst = 0.0f;
     foc->ctrl.mit_tor_set = 0.0f;
+    foc->ctrl.mit_tor_out = 0.0f;
     foc->ctrl.kp = 0.0f;
     foc->ctrl.kd = 0.0f;
+
+    traj_spd_reset(&foc->spd_traj, foc->sig.wm);
+    traj_pos_reset(&foc->pos_traj, foc->sig.mp_m, foc->sig.wm);
+    foc->app.rel_pos_ref = foc->sig.mp_m;
+    foc->app.pos_reached = false;
+    foc->app.vel_reached = false;
+    foc->app.tor_reached = false;
+    foc->app.last_pos_pause = false;
 
     foc->sig.i_d = 0.0f;
     foc->sig.i_q = 0.0f;

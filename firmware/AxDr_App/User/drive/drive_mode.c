@@ -15,7 +15,10 @@ bool drive_mode_is_supported(const foc_t *foc)
     switch (foc->mode.sys)
     {
         case release_mode:
-            return (foc->mode.release == cst_mode) ||
+            return (foc->mode.release == mit_mode) ||
+                   (foc->mode.release == vel_mode) ||
+                   (foc->mode.release == pos_mode) ||
+                   (foc->mode.release == cst_mode) ||
                    (foc->mode.release == csv_mode) ||
                    (foc->mode.release == csp_mode);
 
@@ -69,6 +72,18 @@ _RAM_FUNC bool drive_mode_step(foc_t *foc)
         case release_mode:
             switch (foc->mode.release)
             {
+                case mit_mode:
+                    mit_step(foc);
+                    return true;
+
+                case vel_mode:
+                    pv_step(foc);
+                    return true;
+
+                case pos_mode:
+                    pp_step(foc);
+                    return true;
+
                 case cst_mode:
                     cst_step(foc);
                     return true;

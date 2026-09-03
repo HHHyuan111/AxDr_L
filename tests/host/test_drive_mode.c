@@ -92,7 +92,7 @@ static void log_event(mode_event_e event)
     event_count++;
 }
 
-void pm_mit_mode(foc_t *foc)
+void mit_step(foc_t *foc)
 {
     (void)foc;
     log_event(EVENT_MIT);
@@ -104,13 +104,13 @@ void pt_tor_mode(foc_t *foc)
     log_event(EVENT_TORQUE);
 }
 
-void pv_vel_mode(foc_t *foc)
+void pv_step(foc_t *foc)
 {
     (void)foc;
     log_event(EVENT_VELOCITY);
 }
 
-void pp_pos_mode(foc_t *foc)
+void pp_step(foc_t *foc)
 {
     (void)foc;
     log_event(EVENT_POSITION);
@@ -259,6 +259,9 @@ static bool expect_dispatch(foc_t *foc,
 static bool test_release_modes(foc_t *foc)
 {
     static const mode_case_t cases[] = {
+        {mit_mode, EVENT_MIT, false},
+        {vel_mode, EVENT_VELOCITY, false},
+        {pos_mode, EVENT_POSITION, false},
         {cst_mode, EVENT_CST, false},
         {csv_mode, EVENT_CSV, false},
         {csp_mode, EVENT_CSP, false}
@@ -342,10 +345,7 @@ static bool test_diagnostic_mode(foc_t *foc)
 static bool test_unimplemented_modes_do_nothing(foc_t *foc)
 {
     static const release_mode_e release_modes[] = {
-        mit_mode,
-        tor_mode,
-        vel_mode,
-        pos_mode
+        tor_mode
     };
     static const calibrat_mode_e calibration_modes[] = {
         rotor_enc_mod,
