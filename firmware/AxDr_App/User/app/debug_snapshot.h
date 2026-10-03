@@ -58,6 +58,12 @@ typedef struct
     float spd_r_ref;
     float spd_r_fbk;
 
+    /* 关口①影子观测：ABZ 原始计数（方向已应用）、单圈机械角、影子速度、Z 脉冲计数。 */
+    int32_t abz_raw;
+    float abz_pos;
+    float abz_spd_raw;
+    uint32_t abz_z;
+
     /* dq 轴电流单位 A；iq_ref 是原始目标，iq_lim 是级联环实际限幅结果。 */
     float id_ref;
     float id_fbk;

@@ -1,4 +1,5 @@
 #include "common.h"
+#include "speed_adapter.h"
 
 #include <string.h>
 
@@ -325,6 +326,7 @@ void foc_init(foc_t *foc)
     foc->enc.source = POSITION_SOURCE_ENCODER;
     foc->enc.primary = ENCODER_SELECTED_TYPE;
     encoder_init(&foc->enc);
+    speed_est_init(); /* 影子测速历史清零（关口①对照链） */
 
     /* 默认使用零电流闭环调试；切换模式前仍需显式发送 START 请求。 */
     foc->mode.sys = debug_mode;

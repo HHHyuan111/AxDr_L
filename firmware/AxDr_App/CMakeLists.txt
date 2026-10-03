@@ -46,6 +46,7 @@ set(AXDR_USER_SOURCES
     User/adapter/encoder_adapter.c
     User/adapter/observer_adapter.c
     User/adapter/position_adapter.c
+    User/adapter/speed_adapter.c
     User/app/control_cycle.c
     User/app/cycle_record.c
     User/app/fast_loop.c

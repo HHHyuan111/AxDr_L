@@ -18,6 +18,10 @@ $controlDir = Join-Path $repoRoot "firmware/AxDr_App/User/control"
 $diagnosticIncludeDir = Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic/include"
 $motorDir = Join-Path $repoRoot "firmware/AxDr_App/User/motor"
 $driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
+$positionAbzTestSource = Join-Path $testDir "test_position_abz.c"
+$encoderAdapterSource = Join-Path $adapterDir "encoder_adapter.c"
+$positionAdapterSource = Join-Path $adapterDir "position_adapter.c"
+$speedAdapterSource = Join-Path $adapterDir "speed_adapter.c"
 $focTestSource = Join-Path $testDir "test_foc_math.c"
 $driveModeTestSource = Join-Path $testDir "test_drive_mode.c"
 $driveDiagTestSource = Join-Path $testDir "test_drive_diag.c"
@@ -74,6 +78,7 @@ $driveProtectionSource = Join-Path $driveDir "drive_protection.c"
 $driveResetSource = Join-Path $driveDir "drive_reset.c"
 $drivePwmSource = Join-Path $driveDir "drive_pwm.c"
 $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
+$positionAbzExecutablePath = Join-Path $outputDir "test_position_abz.exe"
 $focExecutablePath = Join-Path $outputDir "test_foc_math.exe"
 $driveModeExecutablePath = Join-Path $outputDir "test_drive_mode.exe"
 $driveDiagExecutablePath = Join-Path $outputDir "test_drive_diag.exe"
@@ -223,9 +228,9 @@ Write-Host "Host C11/速度与位置轨迹测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" `
         "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
-        $debugSnapshotTestSource $debugSnapshotSource `
+        $debugSnapshotTestSource $debugSnapshotSource $speedAdapterSource `
         -o $debugSnapshotExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
 )
@@ -313,9 +318,10 @@ Write-Host "Host C11/控制链 STOP-START-RUN-FAULT 离线回放测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" `
         "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $fastLoopTestSource $fastLoopSource $targetIrqSource $controlCycleSource `
+        $speedAdapterSource `
         -o $fastLoopExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
 )
@@ -548,6 +554,29 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/诊断采样、FOC 与 PWM 适配测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" `
+        "-I$controlDir" "-I$motorDir" "-I$driveDir" `
+        $positionAbzTestSource $encoderAdapterSource $positionAdapterSource `
+        $speedAdapterSource `
+        -o $positionAbzExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host ABZ 位置链测试编译失败，退出码：$compileExitCode"
+}
+
+& $positionAbzExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host ABZ 位置链测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/ABZ 位置链与影子测速测试通过。"
 
 $foundationTestSource = Join-Path $testDir "test_foundation_headers.c"
 $foundationExecutablePath = Join-Path $outputDir "test_foundation_headers.exe"

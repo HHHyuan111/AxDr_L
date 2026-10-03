@@ -15,6 +15,12 @@
 #include "observer_adapter.h"
 
 diag_runtime_t g_diag;
+
+/* target_qenc 桩：debug_snapshot 发布 ABZ Z 计数，主机测试返回固定值。 */
+uint32_t target_qenc_z_count(void)
+{
+    return 7U;
+}
 obs_t g_obs;
 
 static int expect_u32(const char *name, uint32_t actual, uint32_t expected)
@@ -263,7 +269,9 @@ int main(void)
     foc_t motor;
     uint32_t expected_seq;
 
-    _Static_assert(sizeof(debug_snapshot_t) == 200U, "调试快照布局发生了变化");
+    /* P3 布局变更：尾部追加 4 个关口①影子字段（abz_raw/abz_pos/abz_spd_raw/abz_z，16B，
+     4 字节对齐无填充），200 -> 216。快照尚无协议消费者（P7 才冻结帧格式）。 */
+    _Static_assert(sizeof(debug_snapshot_t) == 216U, "调试快照布局发生了变化");
 
     fill_source(&motor);
     debug_snapshot_publish(&motor);

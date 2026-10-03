@@ -26,6 +26,9 @@ _RAM_FUNC bool encoder_sample(encoder_state_t *enc)
         case ENCODER_TYPE_MT6816:
             return read_mt6816_raw(&enc->mt6816);
 
+        case ENCODER_TYPE_ABZ:
+            return read_abz_raw(&enc->abz);
+
         default:
             return false;
     }
@@ -54,6 +57,10 @@ _RAM_FUNC bool position_update(foc_t *foc)
 
         case ENCODER_TYPE_MT6816:
             enc = &foc->enc.mt6816;
+            break;
+
+        case ENCODER_TYPE_ABZ:
+            enc = &foc->enc.abz;
             break;
 
         default:

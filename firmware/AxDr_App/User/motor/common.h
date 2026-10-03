@@ -436,6 +436,7 @@ typedef struct
     encoder_type_t secondary;
     encoder_data_t ma732;
     encoder_data_t mt6816;
+    encoder_data_t abz;
     int32_t raw;
     float pos;
 } encoder_state_t;
@@ -504,6 +505,7 @@ void csp_step(foc_t *foc);
 
 void encoder_init(encoder_state_t *enc);
 bool read_mt6816_raw(encoder_data_t *enc);
+bool read_abz_raw(encoder_data_t *enc);
 bool read_ma732_raw(encoder_data_t *enc);
 void encoder_update_angle(encoder_data_t *enc);
 bool encoder_sample(encoder_state_t *enc);

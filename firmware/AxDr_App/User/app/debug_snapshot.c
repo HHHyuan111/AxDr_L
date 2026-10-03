@@ -5,6 +5,9 @@
 
 #include "debug_snapshot.h"
 
+#include "speed_adapter.h"
+#include "target_qenc.h"
+
 #include "common.h"
 #include "diag_runtime.h"
 #include "drive_diag.h"
@@ -70,6 +73,12 @@ _RAM_FUNC void debug_snapshot_publish(const foc_t *foc)
     g_debug_snapshot.pos_r_fbk = foc->fb.pos_r;
     g_debug_snapshot.spd_r_ref = foc->ref.spd_r;
     g_debug_snapshot.spd_r_fbk = foc->fb.spd_r;
+
+    /* 关口①影子观测（只读诊断，不参与控制）。 */
+    g_debug_snapshot.abz_raw = foc->enc.abz.raw;
+    g_debug_snapshot.abz_pos = foc->enc.abz.pos;
+    g_debug_snapshot.abz_spd_raw = speed_est_get();
+    g_debug_snapshot.abz_z = target_qenc_z_count();
 
     g_debug_snapshot.id_ref = foc->ref.id;
     g_debug_snapshot.id_fbk = foc->fb.id;

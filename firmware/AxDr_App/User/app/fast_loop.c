@@ -14,6 +14,7 @@
 #include "control_cycle.h"
 #include "cycle_record.h"
 #include "debug_snapshot.h"
+#include "speed_adapter.h"
 
 /*
  * 主初始化流程只把本标志从 false 写为 true 一次，ADC 中断只读取它。
@@ -49,6 +50,9 @@ _RAM_FUNC void fast_loop_step(foc_t *foc)
     /* 第 1 步：读取编码器，并更新机械角、电角度和多圈位置。 */
     encoder_valid = encoder_sample(&foc->enc);
     position_valid = encoder_valid && position_update(foc);
+
+    /* 影子测速（关口①对照用）：只观测不参与控制，验证后接管主链。 */
+    speed_est_step(foc->fb.enc_pos_r, 20000.0f);
 
     /* 第 2 步：读取 ADC 原始值，并换算本周期三相电流。 */
     current_valid = foc_adc_sample(foc);

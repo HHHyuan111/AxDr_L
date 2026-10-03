@@ -8,6 +8,7 @@
 #include <math.h>
 #include "encoder_config.h"
 #include "target_encoder.h"
+#include "target_qenc.h"
 
 /**
  * @brief 初始化正式使用的 MA732 和 MT6816 参数。
@@ -29,6 +30,20 @@ void encoder_init(encoder_state_t *enc)
     enc->mt6816.shift_bit = (uint8_t)log2f(
         (float)enc->mt6816.cpr / 256.0f);
     enc->mt6816.factor = M_2PI / (float)enc->mt6816.cpr;
+
+    /* ABZ（当前主编码器，值迁自 B 库 encoder.c:146-155）。 */
+    enc->abz.dir = ABZ_DIRECTION;
+    enc->abz.bit = ABZ_RESOLUTION_BITS;
+    enc->abz.cpr = ABZ_COUNTS_PER_REV;
+    enc->abz.shift_bit = 0U; /* 增量式无标定 LUT，此字段不用 */
+    enc->abz.factor = M_2PI / (float)enc->abz.cpr;
+
+    /*
+     * 坑①（B 库 encoder.c:27-29）：target_qenc_init 必须晚于 MX_TIM3_Init /
+     * MX_ADC2_Init，否则 PA6/PA7 被 ADC2 的 MspInit 重配为模拟脚。
+     * 本函数由 foc_init 调用，main.c 中位于全部 MX_*_Init 之后，时序天然满足。
+     */
+    target_qenc_init();
 }
 
 /**
@@ -82,4 +97,18 @@ _RAM_FUNC void encoder_update_angle(encoder_data_t *enc)
 {
     enc->pos = (float)enc->raw * enc->factor;
     wrap_0_2pi(enc->pos);
+}
+
+/**
+ * @brief 从 TIM3 读取一拍 ABZ 原始计数。
+ *
+ * @param[in,out] enc 编码器对象；方向在源头应用（dir=-1 与 ABC 相序配套）。
+ * @return TIM3 计数始终有效，恒返回 true；每拍都是新数据。
+ * @note   增量式无绝对零点：上电 e_off=0，先对齐（Drive 层门控）再进闭环。
+ */
+_RAM_FUNC bool read_abz_raw(encoder_data_t *enc)
+{
+    enc->raw = enc->dir * target_qenc_read();
+    enc->rev_flag = 1U;
+    return true;
 }
