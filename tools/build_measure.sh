@@ -33,8 +33,11 @@ arm-none-eabi-gcc -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard \
   -T stm32g474retx_flash.ld --specs=nano.specs -Wl,--gc-sections -Wl,-Map="$B/AxDr.map" \
   -o "$B/AxDr.elf" && echo "LINK OK" || exit 1
 
-PY=${PY:-python3}
-command -v $PY >/dev/null 2>&1 || PY=python
+PY=""
+for c in python3 python; do
+  if command -v $c >/dev/null 2>&1 && $c -c "import sys" >/dev/null 2>&1; then PY=$c; break; fi
+done
+[ -n "$PY" ] || { echo "ERROR: 找不到可用的 python 解释器"; exit 1; }
 $PY - "$B" "$OUTJSON" <<'PYEOF'
 import sys, os, glob, subprocess, json, re
 B, out = sys.argv[1], sys.argv[2]
