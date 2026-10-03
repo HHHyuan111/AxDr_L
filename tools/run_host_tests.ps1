@@ -549,4 +549,28 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Host C11/诊断采样、FOC 与 PWM 适配测试通过。"
 
+$foundationTestSource = Join-Path $testDir "test_foundation_headers.c"
+$foundationExecutablePath = Join-Path $outputDir "test_foundation_headers.exe"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$commonDir" `
+        $foundationTestSource `
+        -o $foundationExecutablePath 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+$compileExitCode = $LASTEXITCODE
+
+if ($compileExitCode -ne 0) {
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    throw "Host foundation 头卫生测试编译失败，退出码：$compileExitCode"
+}
+
+& $foundationExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Host foundation 头卫生测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/foundation 头自包含与位图唯一性测试通过。"
+
 & (Join-Path $PSScriptRoot "run_diagnostic_tests.ps1") -Compiler $Compiler
