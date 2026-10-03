@@ -14,9 +14,10 @@
 void speed_est_init(void);
 
 /**
- * @brief 输入本拍单圈机械角 [rad]，更新影子速度。
- * @param pos_rad 单圈角度（0..2π 之间或含回绕的连续读数均可）。
- * @param fs_hz 采样频率 [Hz]（控制周期 20000）。
+ * @brief 输入本拍转子位置 [rad]，更新测速输出。
+ * @param pos_rad 转子角（推荐多圈连续角 pos_r；单圈角亦可，差分内置解卷绕防御）。
+ * @param fs_hz 采样频率 [Hz]（由 control_cycle 以 rate.foc_fs 传入，禁止硬编码）。
+ * @note  喂入点在 control_cycle_step（回放缝内），位置无效拍由调用方跳过＝速度冻结。
  */
 void speed_est_step(float pos_rad, float fs_hz);
 

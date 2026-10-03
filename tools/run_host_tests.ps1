@@ -272,9 +272,9 @@ Write-Host "Host C11/快速周期环形记录测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
-        $controlCycleTestSource $controlCycleSource `
+        $controlCycleTestSource $controlCycleSource $speedAdapterSource `
         -o $controlCycleExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
 )
@@ -294,9 +294,9 @@ Write-Host "Host C11/控制周期显式输入输出测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" `
         "-I$controlDir" "-I$algorithmDir" "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
-        $controlReplayTestSource $controlCycleSource $driveSource `
+        $controlReplayTestSource $controlCycleSource $speedAdapterSource $driveSource `
         $driveModeSource $driveCommandSource $driveProtectionSource `
         $drivePwmSource $limitSource `
         -o $controlReplayExecutablePath -lm 2>&1 |

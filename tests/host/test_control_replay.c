@@ -4,10 +4,12 @@
  */
 
 #include <stdbool.h>
+#include <math.h>
 #include <stdio.h>
 
 #include "common.h"
 #include "control_cycle.h"
+#include "speed_adapter.h"
 
 static unsigned int pwm_start_count;
 static unsigned int pwm_stop_count;
@@ -201,6 +203,78 @@ static control_cycle_input_t replay_sample(uint32_t seq)
     };
 }
 
+/*
+ * 速度回放缝场景（架构审查修复的验收）：仅凭 control_cycle_input_t 驱动，
+ * RUN 段 pos_r 每拍 +0.001 rad → 窗口 2、fs=20000 → spd_r_raw 应为 20 rad/s；
+ * 随后一拍 pos_valid=false → 速度冻结（丢样本策略）。
+ */
+static int replay_speed_scenario(void)
+{
+    foc_t motor = {
+        .mode = {.sys = debug_mode, .debug = curr_cl},
+        .req = DRIVE_REQ_STOP,
+        .state = DRIVE_STATE_STOP,
+        .motor = {.phase_order = PHASE_ORDER_ABC},
+        .prot_cfg = {.invalid_position_samples = 1U},
+        .rate = {.foc_fs = 20000.0f}
+    };
+    control_cycle_input_t input;
+    control_cycle_output_t output = {0};
+    float pos = 1.0f;
+    int tick;
+
+    pwm_start_count = 0U;
+    pwm_stop_count = 0U;
+    pwm_write_count = 0U;
+
+    /* STOP → START → RUN 握手 */
+    input = replay_sample(100U);
+    control_cycle_step(&motor, &input, &output);
+    motor.req = DRIVE_REQ_START;
+    input = replay_sample(101U);
+    control_cycle_step(&motor, &input, &output);
+    input = replay_sample(102U);
+    control_cycle_step(&motor, &input, &output);
+    if (output.state != (uint32_t)DRIVE_STATE_RUN)
+    {
+        (void)fprintf(stderr, "速度场景启动握手失败。\n");
+        return 1;
+    }
+
+    /* RUN 段：每拍 pos_r +0.001 */
+    for (tick = 0; tick < 10; tick++)
+    {
+        input = replay_sample((uint32_t)(103U + tick));
+        pos += 0.001f;
+        input.pos_r = pos;
+        control_cycle_step(&motor, &input, &output);
+    }
+    if (!(fabsf(speed_est_get() - 20.0f) <= 5.0e-3f))
+    {
+        (void)fprintf(stderr,
+                      "回放速度断言失败：spd_r_raw=%.6f，期望 20。\n",
+                      (double)speed_est_get());
+        return 2;
+    }
+
+    /* 丢样本拍：速度必须冻结（保持上一拍值） */
+    {
+        const float frozen = speed_est_get();
+        input = replay_sample(113U);
+        input.pos_valid = false;
+        control_cycle_step(&motor, &input, &output);
+        if (speed_est_get() != frozen)
+        {
+            (void)fprintf(stderr,
+                          "丢样本拍速度未冻结：%.6f -> %.6f\n",
+                          (double)frozen,
+                          (double)motor.fb.spd_r_raw);
+            return 3;
+        }
+    }
+    return 0;
+}
+
 int main(void)
 {
     foc_t motor = {
@@ -259,15 +333,25 @@ int main(void)
     input.pos_valid = false;
     control_cycle_step(&motor, &input, &output);
 
-    return expect_true(output.state == (uint32_t)DRIVE_STATE_FAULT,
-                       "位置反馈失效必须在同一回放拍进入 FAULT。") &&
-           expect_true(!output.pwm_on,
-                       "位置反馈故障后必须报告 PWM 已关闭。") &&
-           expect_true((output.fault != 0U) &&
-                       (motor.fault.bit.enc_err == 1U),
-                       "位置反馈失效必须锁存编码器故障。") &&
-           expect_true(pwm_stop_count == 1U,
-                       "故障拍必须且只需执行一次 PWM 停止。")
-        ? 0
-        : 4;
+    if (!expect_true(output.state == (uint32_t)DRIVE_STATE_FAULT,
+                     "位置反馈失效必须在同一回放拍进入 FAULT。") ||
+        !expect_true(!output.pwm_on,
+                     "位置反馈故障后必须报告 PWM 已关闭。") ||
+        !expect_true((output.fault != 0U) &&
+                     (motor.fault.bit.enc_err == 1U),
+                     "位置反馈失效必须锁存编码器故障。") ||
+        !expect_true(pwm_stop_count == 1U,
+                     "故障拍必须且只需执行一次 PWM 停止。"))
+    {
+        return 4;
+    }
+
+    {
+        const int speed_result = replay_speed_scenario();
+        if (speed_result != 0)
+        {
+            return 10 + speed_result;
+        }
+    }
+    return 0;
 }

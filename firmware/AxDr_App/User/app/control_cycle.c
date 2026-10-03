@@ -5,6 +5,8 @@
 
 #include "control_cycle.h"
 
+#include "speed_adapter.h"
+
 #include "common.h"
 #include "compiler.h"
 #include "drive.h"
@@ -26,6 +28,16 @@ PLATFORM_FAST_CODE void control_cycle_step(
     foc->fb.theta_e = input->theta_e;
     foc->fb.pos_r = input->pos_r;
     foc->fb.pos_m = input->pos_m;
+
+    /*
+     * 测速喂入点（架构审查修复）：吃回放缝输入 pos_r（多圈连续角），
+     * 频率取配置 rate.foc_fs——control_cycle_step 仅凭输入结构体即可离线复现，
+     * 位置样本无效拍跳过喂入（速度保持上一拍，丢样本冻结策略）。
+     */
+    if (input->pos_valid)
+    {
+        speed_est_step(input->pos_r, foc->rate.foc_fs);
+    }
 
     /* 控制器只消费物理量，不关心这些数据来自真实 Target、文件还是仿真模型。 */
     ctrl_fb_update(foc, input->vbus);
