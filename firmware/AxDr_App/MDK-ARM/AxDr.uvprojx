@@ -137,7 +137,7 @@
             <DriverSelection>4101</DriverSelection>
           </Flash1>
           <bUseTDR>1</bUseTDR>
-          <Flash2>BIN\UL2V8M.DLL</Flash2>
+          <Flash2>BIN\UL2CM3.DLL</Flash2>
           <Flash3></Flash3>
           <Flash4></Flash4>
           <pFcarmOut></pFcarmOut>
@@ -595,6 +595,11 @@
               <FilePath>..\User\bsp\target_encoder.c</FilePath>
             </File>
             <File>
+              <FileName>target_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\target_flash.c</FilePath>
+            </File>
+            <File>
               <FileName>target_irq.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\bsp\target_irq.c</FilePath>
@@ -603,6 +608,16 @@
               <FileName>target_pwm.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\bsp\target_pwm.c</FilePath>
+            </File>
+            <File>
+              <FileName>target_qenc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\target_qenc.c</FilePath>
+            </File>
+            <File>
+              <FileName>target_time.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp\target_time.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -893,6 +908,11 @@
               <FileName>position_adapter.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\adapter\position_adapter.c</FilePath>
+            </File>
+            <File>
+              <FileName>speed_adapter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\adapter\speed_adapter.c</FilePath>
             </File>
           </Files>
         </Group>

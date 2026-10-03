@@ -3,7 +3,9 @@
 /firmware/AxDr_App/cmake-build-*/
 
 # Keil 构建产物和本机配置
-/firmware/AxDr_App/MDK-ARM/AxDr/
+# 目录本身不排除（AxDr/* 只排除内容），否则内部 sct 无法再包含
+/firmware/AxDr_App/MDK-ARM/AxDr/*
+!/firmware/AxDr_App/MDK-ARM/AxDr/AxDr.sct
 /firmware/AxDr_App/MDK-ARM/*.uvguix.*
 /firmware/AxDr_App/MDK-ARM/*.uvoptx
 /firmware/AxDr_App/MDK-ARM/JLinkLog.txt
@@ -17,3 +19,4 @@
 *.bak
 *.tmp
 *.log
+.vscode/

@@ -1,0 +1,24 @@
+; *************************************************************
+; *** Scatter-Loading Description File (G474RET6, 512K/128K) ***
+; ***
+; *** 2026-10-03 入库修复：原 AxDr.sct 从未提交 git（属构建产物），
+; *** 克隆后链接失败 L6031U。本次入库并修正段名：
+; *** 旧版写 .Ramfunc（小写 f），而 compiler.h 的 PLATFORM_FAST_CODE
+; *** 段名是 .RamFunc（大写 F），armclang 区分大小写——旧 Keil 构建
+; *** 中这些函数实际落在 Flash（能跑但不加速）。与 gcc 链接脚本
+; *** stm32g474retx_flash.ld 的 *(.RamFunc*) 保持一致。
+; *************************************************************
+
+LR_IROM1 0x08000000 0x00080000  {    ; 512KB Flash
+  ER_IROM1 0x08000000 0x00080000  {
+   *.o (RESET, +First)
+   *(InRoot$$Sections)
+   .ANY (+RO)
+   .ANY (+XO)
+  }
+  RW_IRAM1 0x20000000 0x00020000  {  ; 128KB SRAM
+   *.o (.RamFunc)                    ; 快速周期函数（与 gcc 侧一致，大写 F）
+   *.o (.Ramfunc)                    ; 兼容历史小写拼写
+   .ANY (+RW +ZI)
+  }
+}
