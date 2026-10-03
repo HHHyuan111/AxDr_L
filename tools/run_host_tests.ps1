@@ -578,6 +578,23 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Host C11/ABZ 位置链与影子测速测试通过。"
 
+$motorChenshaTestSource = Join-Path $testDir "test_motor_chensha.c"
+$motorProfileSource = Join-Path $configDir "motor_profile.c"
+$motorChenshaExecutablePath = Join-Path $outputDir "test_motor_chensha.exe"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
+        "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
+        $motorChenshaTestSource $motorProfileSource `
+        -o $motorChenshaExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "motor_chensha 编译失败" }
+& $motorChenshaExecutablePath
+if ($LASTEXITCODE -ne 0) { throw "motor_chensha 测试运行失败" }
+Write-Host "Host C11/沉沙档案定版值锁定测试通过。"
+
 $fastTrigTestSource = Join-Path $testDir "test_fast_trig.c"
 $pidCondTestSource = Join-Path $testDir "test_pid_conditional.c"
 $fastTrigExecutablePath = Join-Path $outputDir "test_fast_trig.exe"

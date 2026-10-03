@@ -1,4 +1,5 @@
 #include "common.h"
+#include "motor_profile.h"
 #include "speed_adapter.h"
 
 #include <string.h>
@@ -82,126 +83,6 @@ static void prot_cfg_init(foc_t *foc)
 
 /**
 ***********************************************************************
-* @brief:      motor_pr60_init(foc_t *foc)
-* @param[in]:  foc FOC 总对象
-* @retval:     void
-* @details:    PR60 电机参数初始化，包括极对数、电阻、电感、磁链和转动惯量
-***********************************************************************
-**/
-#if MOTOR_SELECTED_MODEL == MOTOR_MODEL_PR60
-static void motor_pr60_init(foc_t *foc)
-{
-    foc->motor.rated_voltage = PR60_RATED_VOLTAGE_V;
-    foc->motor.rated_current = PR60_RATED_CURRENT_A;
-    foc->motor.rated_speed = PR60_RATED_SPEED_RAD_S;
-    foc->motor.rated_torque = PR60_RATED_TORQUE_NM;
-    foc->motor.rated_power = PR60_RATED_POWER_W;
-    foc->motor.peak_current = PR60_PEAK_CURRENT_A;
-    foc->motor.peak_torque = PR60_PEAK_TORQUE_NM;
-    foc->motor.peak_speed = PR60_PEAK_SPEED_RAD_S;
-
-    foc->motor.pn = PR60_POLE_PAIRS;
-    foc->motor.Rs = PR60_PHASE_RESISTANCE_OHM;
-    foc->motor.Ld = PR60_D_AXIS_INDUCTANCE_H;
-    foc->motor.Lq = PR60_Q_AXIS_INDUCTANCE_H;
-    foc->motor.Ls = PR60_AVERAGE_INDUCTANCE_H;
-    foc->motor.Ldif = PR60_DIFFERENTIAL_INDUCTANCE_H;
-    foc->motor.flux = PR60_FLUX_LINKAGE_WB;
-    foc->motor.B = PR60_VISCOUS_FRICTION_NM_S;
-    foc->motor.Js = PR60_INERTIA_KG_M2;
-
-    foc->motor.Gr = PR60_GEAR_RATIO;
-    foc->motor.div_pn = 1.0f / foc->motor.pn;
-    foc->motor.pnd_2pi = foc->motor.pn / M_2PI;
-    foc->motor.div_Gr = 1.0f / foc->motor.Gr;
-    foc->motor.Kt = 1.5f * foc->motor.pn * foc->motor.flux;
-    foc->motor.div_Kt = 1.0f / foc->motor.Kt;
-
-    foc->ref.acc_m = CTRL_PR60_PROFILE_ACCEL_RAD_S2;
-    foc->ref.dec_m = CTRL_PR60_PROFILE_DECEL_RAD_S2;
-
-    foc->motor.phase_order = PR60_PHASE_ORDER;
-    foc->motor.e_off = PR60_ELECTRICAL_OFFSET_RAD;
-    foc->motor.r_off = PR60_ROTOR_OFFSET_RAD;
-    foc->motor.m_off = PR60_MECHANICAL_OFFSET_RAD;
-
-    foc->app.pmax_torm =
-        foc->motor.peak_torque * MOTOR_COMMAND_USAGE_RATIO;
-    foc->app.nmax_torm = -foc->app.pmax_torm;
-    foc->app.pmax_velm =
-        foc->motor.peak_speed * MOTOR_COMMAND_USAGE_RATIO;
-    foc->app.nmax_velm = -foc->app.pmax_velm;
-    foc->app.pmax_posm = MOTOR_MAX_POSITION_RAD;
-    foc->app.nmax_posm = -MOTOR_MAX_POSITION_RAD;
-
-    foc->ref.iq_max = foc->app.pmax_torm
-        * foc->motor.div_Gr * foc->motor.div_Kt;
-    foc->ref.iq_min = foc->app.nmax_torm
-        * foc->motor.div_Gr * foc->motor.div_Kt;
-
-    foc->ref.spd_max =  foc->app.pmax_velm*foc->motor.Gr;
-    foc->ref.spd_min =  foc->app.nmax_velm*foc->motor.Gr;
-}
-#endif
-
-#if MOTOR_SELECTED_MODEL == MOTOR_MODEL_2312S
-static void motor_2312s_init(foc_t *foc)
-{
-    foc->motor.rated_voltage = MOTOR_2312S_RATED_VOLTAGE_V;
-    foc->motor.rated_current = MOTOR_2312S_RATED_CURRENT_A;
-    foc->motor.rated_speed = MOTOR_2312S_RATED_SPEED_RAD_S;
-    foc->motor.rated_torque = MOTOR_2312S_RATED_TORQUE_NM;
-    foc->motor.rated_power = MOTOR_2312S_RATED_POWER_W;
-    foc->motor.peak_current = MOTOR_2312S_PEAK_CURRENT_A;
-    foc->motor.peak_torque = MOTOR_2312S_PEAK_TORQUE_NM;
-    foc->motor.peak_speed = MOTOR_2312S_PEAK_SPEED_RAD_S;
-
-    foc->motor.pn = MOTOR_2312S_POLE_PAIRS;
-    foc->motor.Rs = MOTOR_2312S_PHASE_RESISTANCE_OHM;
-    foc->motor.Ld = MOTOR_2312S_D_AXIS_INDUCTANCE_H;
-    foc->motor.Lq = MOTOR_2312S_Q_AXIS_INDUCTANCE_H;
-    foc->motor.Ls = MOTOR_2312S_AVERAGE_INDUCTANCE_H;
-    foc->motor.Ldif = MOTOR_2312S_DIFFERENTIAL_INDUCTANCE_H;
-    foc->motor.flux = MOTOR_2312S_FLUX_LINKAGE_WB;
-    foc->motor.B = MOTOR_2312S_VISCOUS_FRICTION_NM_S;
-    foc->motor.Js = MOTOR_2312S_INERTIA_KG_M2;
-
-    foc->motor.Gr = MOTOR_2312S_GEAR_RATIO;
-    foc->motor.div_pn = 1.0f / foc->motor.pn;
-    foc->motor.pnd_2pi = foc->motor.pn / M_2PI;
-    foc->motor.div_Gr = 1.0f / foc->motor.Gr;
-    foc->motor.Kt = 1.5f * foc->motor.pn * foc->motor.flux;
-    foc->motor.div_Kt = 1.0f / foc->motor.Kt;
-
-    foc->ref.acc_m = CTRL_2312S_PROFILE_ACCEL_RAD_S2;
-    foc->ref.dec_m = CTRL_2312S_PROFILE_DECEL_RAD_S2;
-
-    foc->motor.phase_order = MOTOR_2312S_PHASE_ORDER;
-    foc->motor.e_off = MOTOR_2312S_ELECTRICAL_OFFSET_RAD;
-    foc->motor.r_off = MOTOR_2312S_ROTOR_OFFSET_RAD;
-    foc->motor.m_off = MOTOR_2312S_MECHANICAL_OFFSET_RAD;
-
-    foc->app.pmax_torm =
-        foc->motor.peak_torque * MOTOR_COMMAND_USAGE_RATIO;
-    foc->app.nmax_torm = -foc->app.pmax_torm;
-    foc->app.pmax_velm =
-        foc->motor.peak_speed * MOTOR_COMMAND_USAGE_RATIO;
-    foc->app.nmax_velm = -foc->app.pmax_velm;
-    foc->app.pmax_posm = MOTOR_MAX_POSITION_RAD;
-    foc->app.nmax_posm = -MOTOR_MAX_POSITION_RAD;
-
-    foc->ref.iq_max = foc->app.pmax_torm
-        * foc->motor.div_Gr * foc->motor.div_Kt;
-    foc->ref.iq_min = foc->app.nmax_torm
-        * foc->motor.div_Gr * foc->motor.div_Kt;
-
-    foc->ref.spd_max =  foc->app.pmax_velm*foc->motor.Gr;
-    foc->ref.spd_min =  foc->app.nmax_velm*foc->motor.Gr;
-}
-#endif
-
-/**
-***********************************************************************
 * @brief:      ctrl_rate_init(foc_t *foc)
 * @param[in]:  foc FOC 总对象
 * @retval:     void
@@ -258,37 +139,13 @@ void foc_init(foc_t *foc)
 {
     memset(foc, 0, sizeof(*foc));
 
-#if MOTOR_SELECTED_MODEL == MOTOR_MODEL_PR60
-    motor_pr60_init(foc);
-#elif MOTOR_SELECTED_MODEL == MOTOR_MODEL_2312S
-    motor_2312s_init(foc);
-#else
-#error "Unsupported MOTOR_SELECTED_MODEL"
-#endif
-
+    motor_profile_load(foc);
     board_cfg_init(foc);
     ctrl_rate_init(foc);
     ctrl_filter_init(foc);
 
     prot_cfg_init(foc);
 
-#if MOTOR_SELECTED_MODEL == MOTOR_MODEL_PR60
-    foc->motor.ibw = CTRL_PR60_CURRENT_BANDWIDTH_RAD_S;
-    foc->motor.delta = CTRL_PR60_SPEED_DAMPING_RATIO;
-    foc->spd_pi.kfp = CTRL_PR60_SPEED_REFERENCE_WEIGHT;
-    foc->spd_pi.kf_damp = CTRL_PR60_SPEED_FEEDBACK_DAMPING;
-    foc->pos_pi.kp = CTRL_PR60_POSITION_KP;
-    foc->pos_pi.ki = CTRL_PR60_POSITION_KI;
-    foc->pos_pi.kd = CTRL_PR60_POSITION_KD;
-#elif MOTOR_SELECTED_MODEL == MOTOR_MODEL_2312S
-    foc->motor.ibw = CTRL_2312S_CURRENT_BANDWIDTH_RAD_S;
-    foc->motor.delta = CTRL_2312S_SPEED_DAMPING_RATIO;
-    foc->spd_pi.kfp = CTRL_2312S_SPEED_REFERENCE_WEIGHT;
-    foc->spd_pi.kf_damp = CTRL_2312S_SPEED_FEEDBACK_DAMPING;
-    foc->pos_pi.kp = CTRL_2312S_POSITION_KP;
-    foc->pos_pi.ki = CTRL_2312S_POSITION_KI;
-    foc->pos_pi.kd = CTRL_2312S_POSITION_KD;
-#endif
 
     cur_pi_init(foc);
     spd_pi_init(foc);
@@ -317,6 +174,9 @@ void foc_init(foc_t *foc)
         -CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S,
         CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S,
         -CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S);
+
+    /* 档案晚绑定项（沉沙：保护阈值与速度环固化值），须在 prot/spd 初始化后定版。 */
+    motor_profile_control_load(foc);
     
     /* 上电默认保持三相功率输出关闭，等待明确的 START 请求。 */
     foc->req = DRIVE_REQ_STOP;

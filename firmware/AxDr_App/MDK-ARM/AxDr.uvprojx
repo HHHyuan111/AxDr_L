@@ -617,6 +617,16 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>User/config</GroupName>
+          <Files>
+            <File>
+              <FileName>motor_profile.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\config\motor_profile.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>Application/MDK-ARM</GroupName>
           <Files>
             <File>
