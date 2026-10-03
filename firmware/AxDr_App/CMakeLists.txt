@@ -52,8 +52,11 @@ set(AXDR_USER_SOURCES
     User/app/debug_snapshot.c
     User/bsp/target_adc.c
     User/bsp/target_encoder.c
+    User/bsp/target_flash.c
     User/bsp/target_irq.c
     User/bsp/target_pwm.c
+    User/bsp/target_qenc.c
+    User/bsp/target_time.c
     User/control/control_cascade.c
     User/control/control_filter.c
     User/control/control_limit.c

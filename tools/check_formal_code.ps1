@@ -14,7 +14,9 @@ $formalDirs = @(
 )
 $formalFiles = @(
     (Join-Path $repoRoot "firmware/AxDr_App/User/common/compiler.h"),
-    (Join-Path $repoRoot "firmware/AxDr_App/User/bsp/inc/spi_bsp.h"),
+    (Join-Path $repoRoot "firmware/AxDr_App/User/common/math_const.h"),
+    (Join-Path $repoRoot "firmware/AxDr_App/User/common/ret.h"),
+    (Join-Path $repoRoot "firmware/AxDr_App/User/common/fault.h"),
     (Join-Path $repoRoot "firmware/AxDr_App/User/common/phase_order.h"),
     (Join-Path $repoRoot "firmware/AxDr_App/User/motor/motor_modes.c")
 )

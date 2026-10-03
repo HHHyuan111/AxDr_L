@@ -10,7 +10,7 @@
 
 #include "compiler.h"
 #include "spi.h"
-#include "spi_bsp.h"
+#include "target_spi.h"
 
 #define MT6816_READ_REG_03_COMMAND (0x8300U)
 #define MT6816_READ_REG_04_COMMAND (0x8400U)
@@ -31,7 +31,7 @@ bool target_encoder_transfer_word(uint16_t tx_word, uint16_t *rx_word)
     int8_t transfer_status;
 
     HAL_GPIO_WritePin(SPI1_CSN_GPIO_Port, SPI1_CSN_Pin, GPIO_PIN_RESET);
-    transfer_status = spi_transmit_receive_sync(
+    transfer_status = target_spi_tx_rx16(
         &hspi1,
         tx_word,
         rx_word,

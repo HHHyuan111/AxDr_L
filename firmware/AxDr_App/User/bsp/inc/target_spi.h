@@ -1,26 +1,26 @@
 /**
- * @file spi_bsp.h
- * @brief 快速周期使用的有界同步 SPI 单字传输接口。
+ * @file target_spi.h
+ * @brief 快速周期使用的有界同步 SPI 单字传输接口（自 spi_bsp.h 收编，逻辑不变）。
  */
 
-#ifndef SPI_BSP_H
-#define SPI_BSP_H
+#ifndef TARGET_SPI_H
+#define TARGET_SPI_H
 
 #include <stdint.h>
 
 #include "main.h"
 
-static inline uint32_t spi_bsp_tx_ready(const SPI_TypeDef *spi)
+static inline uint32_t target_spi_tx_ready(const SPI_TypeDef *spi)
 {
     return (READ_BIT(spi->SR, SPI_SR_TXE) == SPI_SR_TXE) ? 1UL : 0UL;
 }
 
-static inline uint32_t spi_bsp_busy(const SPI_TypeDef *spi)
+static inline uint32_t target_spi_busy(const SPI_TypeDef *spi)
 {
     return (READ_BIT(spi->SR, SPI_SR_BSY) == SPI_SR_BSY) ? 1UL : 0UL;
 }
 
-static inline uint32_t spi_bsp_rx_ready(const SPI_TypeDef *spi)
+static inline uint32_t target_spi_rx_ready(const SPI_TypeDef *spi)
 {
     return (READ_BIT(spi->SR, SPI_SR_RXNE) == SPI_SR_RXNE) ? 1UL : 0UL;
 }
@@ -37,7 +37,7 @@ static inline uint32_t spi_bsp_rx_ready(const SPI_TypeDef *spi)
  * 这是 ADC 快速周期里的同步接口，因此超时参数表示轮询次数，不表示毫秒。
  * 任一阶段超时后立即退出，不再继续发送或读取无效数据。
  */
-static inline int8_t spi_transmit_receive_sync(
+static inline int8_t target_spi_tx_rx16(
     SPI_HandleTypeDef *hspi,
     uint16_t tx_word,
     uint16_t *rx_word,
@@ -50,7 +50,7 @@ static inline int8_t spi_transmit_receive_sync(
         __HAL_SPI_ENABLE(hspi);
     }
 
-    while (spi_bsp_tx_ready(hspi->Instance) == 0U)
+    while (target_spi_tx_ready(hspi->Instance) == 0U)
     {
         if (++count > timeout_count)
         {
@@ -61,7 +61,7 @@ static inline int8_t spi_transmit_receive_sync(
     hspi->Instance->DR = tx_word;
 
     count = 0U;
-    while (spi_bsp_rx_ready(hspi->Instance) == 0U)
+    while (target_spi_rx_ready(hspi->Instance) == 0U)
     {
         if (++count > timeout_count)
         {
@@ -72,7 +72,7 @@ static inline int8_t spi_transmit_receive_sync(
     *rx_word = (uint16_t)READ_REG(hspi->Instance->DR);
 
     count = 0U;
-    while (spi_bsp_busy(hspi->Instance) != 0U)
+    while (target_spi_busy(hspi->Instance) != 0U)
     {
         if (++count > timeout_count)
         {
@@ -83,4 +83,4 @@ static inline int8_t spi_transmit_receive_sync(
     return 0;
 }
 
-#endif /* SPI_BSP_H */
+#endif /* TARGET_SPI_H */
