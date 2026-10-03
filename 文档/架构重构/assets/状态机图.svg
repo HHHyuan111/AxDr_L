@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1150" height="840" viewBox="0 0 1150 840" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9CA3AF"/>
+    </marker>
+  </defs>
+
+  <rect width="1150" height="840" fill="#FFFFFF"/>
+
+  <text x="40" y="56" font-size="30" font-weight="bold" fill="#111827">AxDr 驱动域状态机（当前落地版）</text>
+  <text x="40" y="88" font-size="15" fill="#6B7280">状态迁移只发生在主循环 motor_service() 内 · ISR 只读状态 · 虚线 = 规划项</text>
+
+  <!-- STOP -->
+  <rect x="100" y="180" width="200" height="90" rx="14" fill="#EAF7F0" stroke="#2E8B57" stroke-width="2.5"/>
+  <text x="200" y="218" font-size="22" font-weight="bold" text-anchor="middle" fill="#14532D">STOP</text>
+  <text x="200" y="246" font-size="14" text-anchor="middle" fill="#374151">功率关闭 · 等待命令</text>
+
+  <!-- STARTING -->
+  <rect x="520" y="120" width="220" height="90" rx="14" fill="#EAF2FC" stroke="#2F6FBF" stroke-width="2.5"/>
+  <text x="630" y="158" font-size="22" font-weight="bold" text-anchor="middle" fill="#1E3A8A">STARTING</text>
+  <text x="630" y="186" font-size="13" text-anchor="middle" fill="#374151">首拍写 50% 中性占空比 → 启动 PWM</text>
+
+  <!-- RUN -->
+  <rect x="900" y="120" width="180" height="90" rx="14" fill="#EAF2FC" stroke="#2F6FBF" stroke-width="2.5"/>
+  <text x="990" y="158" font-size="22" font-weight="bold" text-anchor="middle" fill="#1E3A8A">RUN</text>
+  <text x="990" y="186" font-size="14" text-anchor="middle" fill="#374151">每拍执行模式并提交 PWM</text>
+
+  <!-- RUN 模式表（虚线容器） -->
+  <rect x="640" y="280" width="470" height="310" rx="12" fill="#F9FAFB" stroke="#9CA3AF" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="665" y="312" font-size="16" font-weight="bold" fill="#374151">RUN 内允许的控制模式（模式表驱动）</text>
+  <text x="665" y="348" font-size="14" fill="#374151">调试：V/F · I/F · 开环电压 · 电流环 · 速度—电流环 · 位置—速度—电流环</text>
+  <text x="665" y="380" font-size="14" fill="#374151">正式：CST 转矩 · CSV 速度 · CSP 位置</text>
+  <text x="665" y="412" font-size="14" fill="#374151">停机：Quick Stop 减速停机</text>
+  <line x1="665" y1="435" x2="1085" y2="435" stroke="#E5E7EB" stroke-width="1.2"/>
+  <text x="665" y="465" font-size="13" fill="#6B7280">MIT · 轨迹 · 辨识 · 标定 · 无感：已移出正式构建清单，</text>
+  <text x="665" y="488" font-size="13" fill="#6B7280">完成纯算法测试 + 硬件验证后，单独接回模式表（不影响主链）</text>
+  <text x="665" y="525" font-size="13" fill="#6B7280">每一拍：Control 产出逻辑占空比 → Drive 校验 → Target 写 TIM1</text>
+  <line x1="990" y1="210" x2="990" y2="280" stroke="#9CA3AF" stroke-width="1.5" stroke-dasharray="6 5" marker-end="url(#arrg)"/>
+
+  <!-- FAULT -->
+  <rect x="540" y="640" width="240" height="90" rx="14" fill="#FCEBEB" stroke="#D64545" stroke-width="2.5"/>
+  <text x="660" y="678" font-size="22" font-weight="bold" text-anchor="middle" fill="#7F1D1D">FAULT</text>
+  <text x="660" y="706" font-size="14" text-anchor="middle" fill="#374151">故障锁存 · PWM 关断 · 须显式清除</text>
+
+  <!-- 迁移箭头 -->
+  <!-- STOP -> STARTING -->
+  <path d="M 300 210 L 512 172" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="360" y="152" font-size="14" font-weight="bold" fill="#111827">START 请求</text>
+  <text x="360" y="172" font-size="13" fill="#6B7280">校验模式与命令合法性</text>
+
+  <!-- STARTING -> RUN -->
+  <path d="M 740 165 L 892 165" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="816" y="150" font-size="14" text-anchor="middle" fill="#111827">下一拍自动</text>
+
+  <!-- RUN -> STOP（上方回环） -->
+  <path d="M 990 120 C 850 30, 330 40, 205 172" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="590" y="62" font-size="14" text-anchor="middle" fill="#111827">STOP 请求 → 减速停机（Quick Stop）</text>
+
+  <!-- RUN -> FAULT -->
+  <path d="M 1035 210 C 1090 400, 900 560, 790 640" fill="none" stroke="#D64545" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="1120" y="420" font-size="14" font-weight="bold" fill="#7F1D1D" text-anchor="end">保护触发</text>
+  <text x="1120" y="442" font-size="13" fill="#7F1D1D" text-anchor="end">占空比越限 · 位置反馈连续 3 拍无效</text>
+  <text x="1120" y="464" font-size="13" fill="#7F1D1D" text-anchor="end">无效模式 · 命令超时</text>
+
+  <!-- STARTING -> FAULT（虚线） -->
+  <path d="M 636 210 L 648 632" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrg)"/>
+  <text x="656" y="420" font-size="13" fill="#6B7280">首拍故障</text>
+
+  <!-- FAULT -> STOP -->
+  <path d="M 540 668 C 400 620, 270 450, 202 278" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="300" y="440" font-size="14" font-weight="bold" fill="#111827">显式清除故障</text>
+  <text x="300" y="462" font-size="13" fill="#6B7280">清故障位图 → 回 STOP</text>
+
+  <!-- 笔记区 -->
+  <rect x="60" y="590" width="400" height="200" rx="12" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="80" y="622" font-size="15" font-weight="bold" fill="#374151">规则</text>
+  <text x="80" y="650" font-size="13.5" fill="#374151">· 上电默认 STOP（默认安全）</text>
+  <text x="80" y="676" font-size="13.5" fill="#374151">· FAULT 为锁存态：清除前拒绝一切 START</text>
+  <text x="80" y="702" font-size="13.5" fill="#374151">· 状态迁移只在主循环执行；ISR 只读状态</text>
+  <text x="80" y="728" font-size="13.5" fill="#374151">· 规划：启动阶段子状态（对齐→开环加速→</text>
+  <text x="94" y="750" font-size="13.5" fill="#374151">捕获→闭环）挂在 STARTING → RUN 之间</text>
+  <text x="80" y="776" font-size="13.5" fill="#9CA3AF">· 标定（编码器/参数）作为 RUN 前置序列接入</text>
+</svg>
