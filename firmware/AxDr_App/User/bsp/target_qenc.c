@@ -12,6 +12,28 @@
 #include "main.h"
 #include "tim.h"
 
+/*
+ * 坑①的真正解法（B 库 encoder.c 原版）：ADC2 的 MspInit 会把 PA6/PA7 配成
+ * 模拟脚（adc.c 中 GPIO_PIN_6|GPIO_PIN_7 → analog），本函数必须把三个引脚
+ * 显式抢回 TIM3 复用（AF2），否则编码器永远收不到边沿、CNT 恒 0。
+ * 引脚偏置由板上 1k/1k 分压网络提供，MCU 内部上下拉不启用。
+ */
+static void qenc_gpio_init(void)
+{
+    GPIO_InitTypeDef gpio;
+
+    gpio.Mode = GPIO_MODE_AF_PP;
+    gpio.Pull = GPIO_NOPULL;
+    gpio.Speed = GPIO_SPEED_FREQ_LOW;
+    gpio.Alternate = GPIO_AF2_TIM3;
+
+    /* 按端口分开掩码：误配 PA0（A相电流采样）或 PB6（LCD_CS）会破坏其他外设 */
+    gpio.Pin = GPIO_PIN_6 | GPIO_PIN_7; /* PA6=A PA7=B */
+    HAL_GPIO_Init(GPIOA, &gpio);
+    gpio.Pin = GPIO_PIN_0; /* PB0=Z */
+    HAL_GPIO_Init(GPIOB, &gpio);
+}
+
 /* 坑③：10000 计数需要 14 位表达；此常量供 device 层换算，本文件不参与位宽裁剪 */
 #define QENC_COUNTS_PER_REV 10000U
 
@@ -22,7 +44,9 @@ void target_qenc_init(void)
     TIM_Encoder_InitTypeDef encoder;
     TIM_IC_InitTypeDef ic;
 
-    /* 坑①：本函数必须在 MX_TIM3_Init / MX_ADC2_Init 之后调用（时序由 P3 设备层保证） */
+    /* 坑①：本函数必须在 MX_TIM3_Init / MX_ADC2_Init 之后调用（时序由 P3 设备层保证），
+     * 且必须先把引脚从模拟态抢回 TIM3 复用。 */
+    qenc_gpio_init();
     htim3.Init.Period = 9999U; /* 10000 计数/圈（坑③的来源） */
     htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
     encoder.EncoderMode = TIM_ENCODERMODE_TI12;

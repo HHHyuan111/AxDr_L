@@ -117,6 +117,12 @@ int main(void)
     Error_Handler();
   }
 
+  /* P2 冻结的中断优先级表与微秒时基（见 15 号规范）；须在全部外设初始化后应用。 */
+  extern void target_irq_priority_apply(void);
+  target_irq_priority_apply();
+  extern void target_time_init(void);
+  target_time_init();
+
   foc_init(&g_foc);
   fast_loop_enable();
   
