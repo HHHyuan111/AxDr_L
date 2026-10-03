@@ -14,7 +14,6 @@
 #include "common.h"
 #include "control_filter.h"
 #include "control_limit.h"
-#include "control_speed.h"
 #include "foc_core.h"
 #include "foc_svm.h"
 #include "foc_transform.h"
@@ -145,94 +144,6 @@ static int test_lpf_migration_equivalence(void)
     return 1;
 }
 
-static int test_angle_speed_explicit_state(void)
-{
-    control_angle_speed_state_t first = {0};
-    control_angle_speed_state_t second = {0};
-
-    control_angle_speed_reset(&first, 1.0f);
-    if (!expect_close("测速复位首拍",
-                      control_angle_speed_step(&first, 1.0f, 1000.0f),
-                      0.0f))
-    {
-        return 0;
-    }
-
-    control_angle_speed_reset(&first, 0.0f);
-
-    if (!expect_close("测速实例 A 首拍",
-                      control_angle_speed_step(&first, 0.1f, 1000.0f),
-                      100.0f) ||
-        !expect_close("测速实例 B 首拍",
-                      control_angle_speed_step(&second, 0.2f, 1000.0f),
-                      200.0f) ||
-        !expect_close("测速实例 A 第二拍",
-                      control_angle_speed_step(&first, 0.2f, 1000.0f),
-                      100.0f))
-    {
-        return 0;
-    }
-
-    first.previous_angle_rad = 0.2f;
-    if (!expect_close("测速正向跨圈",
-                      control_angle_speed_step(&first, 6.2f, 1000.0f),
-                      -283.18549f) ||
-        !expect_close("测速反向跨圈",
-                      control_angle_speed_step(&first, 0.1f, 1000.0f),
-                      183.18558f))
-    {
-        return 0;
-    }
-
-    first.previous_angle_rad = 0.0f;
-    if (!expect_close("测速正 pi 边界",
-                      control_angle_speed_step(&first, 3.14159265358f, 1.0f),
-                      3.14159265358f))
-    {
-        return 0;
-    }
-
-    first.previous_angle_rad = 0.0f;
-    return expect_close("测速负 pi 边界",
-                        control_angle_speed_step(&first, -3.14159265358f, 1.0f),
-                        -3.14159265358f);
-}
-
-static int test_angle_speed_migration_equivalence(void)
-{
-    static const struct
-    {
-        float angle_rad;
-        float sample_frequency_hz;
-    } cases[] = {
-        {0.1f, 1000.0f},
-        {0.2f, 1000.0f},
-        {6.2f, 1000.0f},
-        {0.1f, 1000.0f},
-        {3.14159265358f, 1.0f},
-        {-3.14159265358f, 1.0f}
-    };
-    control_angle_speed_state_t control = {0};
-    size_t index;
-
-    for (index = 0U; index < sizeof(cases) / sizeof(cases[0]); index++)
-    {
-        const float legacy = angle_speed_calc(cases[index].angle_rad,
-                                              cases[index].sample_frequency_hz);
-        const float migrated = control_angle_speed_step(&control,
-                                                        cases[index].angle_rad,
-                                                        cases[index].sample_frequency_hz);
-
-        if (!expect_same_float_bits("角度差分测速", migrated, legacy))
-        {
-            fprintf(stderr, "角度差分测速等价用例 %zu 失败。\n", index);
-            return 0;
-        }
-    }
-
-    return 1;
-}
-
 static int test_pure_transform_interface(void)
 {
     float sin_theta = 0.0f;
@@ -332,10 +243,16 @@ static int test_sin_cos_migration_equivalence(void)
         sin_cos_val(&legacy);
         foc_sin_cos(theta_cases[index], &sin_theta, &cos_theta);
 
-        if (!expect_same_float_bits("角度 sin", sin_theta, legacy.sin_val) ||
-            !expect_same_float_bits("角度 cos", cos_theta, legacy.cos_val))
+        /* P4 起三角实现换为 B 库多项式（fast_trig.h），Legacy 为 512 点查表插值，
+         * 数学同源但量化不同：逐位比较改为容差比较（查表量化误差量级 5e-4）。 */
+        if (fabsf(sin_theta - legacy.sin_val) > 5.0e-4f ||
+            fabsf(cos_theta - legacy.cos_val) > 5.0e-4f)
         {
-            fprintf(stderr, "正余弦等价用例 %zu 失败。\n", index);
+            fprintf(stderr,
+                    "正余弦等价用例 %zu 超差：sin 差 %.3e，cos 差 %.3e。\n",
+                    index,
+                    (double)fabsf(sin_theta - legacy.sin_val),
+                    (double)fabsf(cos_theta - legacy.cos_val));
             return 0;
         }
     }
@@ -561,14 +478,6 @@ int main(void)
 
     if (!test_lpf_migration_equivalence()) {
         return 2;
-    }
-
-    if (!test_angle_speed_migration_equivalence()) {
-        return 3;
-    }
-
-    if (!test_angle_speed_explicit_state()) {
-        return 4;
     }
 
     if (!test_foc_core_migration_equivalence()) {

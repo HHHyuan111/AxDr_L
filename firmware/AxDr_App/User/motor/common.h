@@ -15,7 +15,6 @@
 #include "compiler.h"
 #include "control_filter.h"
 #include "control_pid.h"
-#include "control_speed.h"
 #include "control_traj.h"
 #include "drive_io.h"
 #include "drive_protection.h"
@@ -472,7 +471,6 @@ struct foc
     pid_para_t pos_pi;
     lpf_t iq_lpf;
     lpf_t wr_lpf;
-    control_angle_speed_state_t elec_speed_diff;
     traj_spd_t spd_traj;
     traj_pos_t pos_traj;
 };

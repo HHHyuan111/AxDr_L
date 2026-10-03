@@ -35,6 +35,7 @@ include_directories(
     "User/common"
     "User/config"
     "User/control"
+    "User/algorithm"
     "User/diagnostic/include"
     "User/drive"
     "User/motor"
@@ -59,16 +60,16 @@ set(AXDR_USER_SOURCES
     User/bsp/target_qenc.c
     User/bsp/target_time.c
     User/control/control_cascade.c
-    User/control/control_filter.c
-    User/control/control_limit.c
+    User/algorithm/control_filter.c
+    User/algorithm/control_limit.c
     User/control/control_mit.c
-    User/control/control_traj.c
+    User/algorithm/control_traj.c
     User/control/foc_control.c
-    User/control/control_pid.c
-    User/control/control_speed.c
+    User/algorithm/control_pid.c
+
     User/control/foc_core.c
-    User/control/foc_svm.c
-    User/control/foc_transform.c
+    User/algorithm/foc_svm.c
+    User/algorithm/foc_transform.c
     User/diagnostic/core/mc_bias_bandwidth.c
     User/diagnostic/core/diag_runtime.c
     User/diagnostic/core/mc_biased_l_ident.c

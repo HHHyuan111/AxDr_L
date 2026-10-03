@@ -56,10 +56,6 @@ int main(void)
             .i_term = 2.0f,
             .out_max = 10.0f
         },
-        .elec_speed_diff = {
-            .delta_angle_rad = 0.7f,
-            .previous_angle_rad = 0.8f
-        }
     };
 
     drive_control_reset(&motor);
@@ -83,9 +79,6 @@ int main(void)
                        (motor.id_pi.out_max == 10.0f) &&
                        (motor.id_pi.i_term == 0.0f),
                        "PID 复位必须保留配置并清除运行历史。") &&
-           expect_true((motor.elec_speed_diff.delta_angle_rad == 0.0f) &&
-                       (motor.elec_speed_diff.previous_angle_rad == 1.2f),
-                       "测速复位必须用当前电角度建立下一拍基准。") &&
            expect_true((motor.spd_traj.ref == 1.5f) &&
                        (motor.pos_traj.pos == 4.0f) &&
                        (motor.pos_traj.spd == 1.5f),

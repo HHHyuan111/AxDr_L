@@ -153,3 +153,70 @@ PLATFORM_FAST_CODE float control_pid_pdff_step(pid_para_t *pid,
 
     return pid->out_value;
 }
+
+/**
+ * @brief PDFF 条件积分步进（B 库 pdff_ctrl_conditional 原样移植）。
+ *
+ * 与 control_pid_pdff_step 的动态积分限幅抗饱和不同，本变体采用条件积分：
+ * 仅当积分增量不会把（试探）输出进一步推过限幅时才采纳该增量。
+ * abs_output_limit 为调用方给定的绝对输出限幅，与 pid 内部限幅取更严者；
+ * 限幅非正时退化为普通 PDFF。B 库沉沙速度环即用此变体。
+ */
+PLATFORM_FAST_CODE float control_pid_pdff_conditional_step(pid_para_t *pid,
+                                                            float ref_value,
+                                                            float feedback_value,
+                                                            float abs_output_limit)
+{
+    float limit;
+    float increment;
+    float trial;
+    float output;
+
+    if (pid == 0)
+    {
+        return 0.0f;
+    }
+    if (!(abs_output_limit > 0.0f))
+    {
+        return control_pid_pdff_step(pid, ref_value, feedback_value);
+    }
+
+    limit = abs_output_limit;
+    if (limit > pid->out_max)
+    {
+        limit = pid->out_max;
+    }
+    if (-limit < pid->out_min)
+    {
+        limit = -pid->out_min;
+    }
+
+    pid->ref_value = ref_value;
+    pid->fback_value = feedback_value;
+    pid->error = ref_value - feedback_value;
+
+    pid->p_term = pid->kp * (ref_value * pid->kfp - feedback_value * (1.0f + pid->kf_damp));
+    pid->d_term = pid->kd * (pid->error - pid->pre_err);
+    pid->pre_err = pid->error;
+
+    increment = pid->ki * pid->error * pid->ts;
+    trial = pid->i_term + increment;
+    output = pid->p_term + trial + pid->d_term;
+
+    /* 条件积分：积分只会推着输出更饱和时，放弃本拍增量 */
+    if (!((output > limit && increment > 0.0f) || (output < -limit && increment < 0.0f)))
+    {
+        pid->i_term = trial;
+    }
+
+    pid->out_value = pid->p_term + pid->i_term + pid->d_term;
+    if (pid->out_value > limit)
+    {
+        pid->out_value = limit;
+    }
+    if (pid->out_value < -limit)
+    {
+        pid->out_value = -limit;
+    }
+    return pid->out_value;
+}

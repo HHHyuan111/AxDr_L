@@ -10,19 +10,14 @@
 #include "common.h"
 #include "compiler.h"
 #include "control_pid.h"
-#include "control_speed.h"
 #include "control_traj.h"
 
 PLATFORM_FAST_CODE void drive_control_reset(foc_t *foc)
 {
-    const float angle_rad = isfinite(foc->fb.theta_e) ? foc->fb.theta_e : 0.0f;
-
     control_pid_clear(&foc->id_pi);
     control_pid_clear(&foc->iq_pi);
     control_pid_clear(&foc->spd_pi);
     control_pid_clear(&foc->pos_pi);
-    control_angle_speed_reset(&foc->elec_speed_diff, angle_rad);
-
     foc->rate.cur_pid_cnt = 0U;
     foc->rate.spd_pid_cnt = 0U;
     foc->rate.pos_pid_cnt = 0U;

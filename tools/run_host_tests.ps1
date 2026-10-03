@@ -15,6 +15,7 @@ $bspIncludeDir = Join-Path $bspDir "inc"
 $commonDir = Join-Path $repoRoot "firmware/AxDr_App/User/common"
 $configDir = Join-Path $repoRoot "firmware/AxDr_App/User/config"
 $controlDir = Join-Path $repoRoot "firmware/AxDr_App/User/control"
+$algorithmDir = Join-Path $repoRoot "firmware/AxDr_App/User/algorithm"
 $diagnosticIncludeDir = Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic/include"
 $motorDir = Join-Path $repoRoot "firmware/AxDr_App/User/motor"
 $driveDir = Join-Path $repoRoot "firmware/AxDr_App/User/drive"
@@ -55,17 +56,16 @@ $legacyCascadeSource = Join-Path $legacyDir "legacy_control_cascade.c"
 $legacyControlLoopSource = Join-Path $legacyDir "legacy_control_loop.c"
 $legacyPidSource = Join-Path $legacyDir "legacy_pid.c"
 $legacyUtilSource = Join-Path $legacyDir "legacy_util.c"
-$filterSource = Join-Path $controlDir "control_filter.c"
+$filterSource = Join-Path $algorithmDir "control_filter.c"
 $cascadeSource = Join-Path $controlDir "control_cascade.c"
 $controlLoopSource = Join-Path $controlDir "foc_control.c"
 $controlMitSource = Join-Path $controlDir "control_mit.c"
-$controlTrajSource = Join-Path $controlDir "control_traj.c"
+$controlTrajSource = Join-Path $algorithmDir "control_traj.c"
 $focCoreSource = Join-Path $controlDir "foc_core.c"
-$limitSource = Join-Path $controlDir "control_limit.c"
-$svmSource = Join-Path $controlDir "foc_svm.c"
-$transformSource = Join-Path $controlDir "foc_transform.c"
-$controlPidSource = Join-Path $controlDir "control_pid.c"
-$speedSource = Join-Path $controlDir "control_speed.c"
+$limitSource = Join-Path $algorithmDir "control_limit.c"
+$svmSource = Join-Path $algorithmDir "foc_svm.c"
+$transformSource = Join-Path $algorithmDir "foc_transform.c"
+$controlPidSource = Join-Path $algorithmDir "control_pid.c"
 $diagnosticCoreDir = Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic/core"
 $mcCommonSource = Join-Path $diagnosticCoreDir "mc_common.c"
 $mcFluxObserverSource = Join-Path $diagnosticCoreDir "mc_flux_observer.c"
@@ -109,10 +109,10 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$motorDir" `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" "-I$motorDir" `
         "-I$driveDir" "-I$legacyDir" `
         $focTestSource $legacyFocSource $legacyFocCoreSource $legacyUtilSource `
-        $filterSource $limitSource $speedSource $focCoreSource `
+        $filterSource $limitSource $focCoreSource `
         $svmSource $transformSource $utilSource `
         -o $focExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -134,7 +134,7 @@ Write-Host "Host C11/FOC 数学测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         -Wno-misleading-indentation `
-        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$motorDir" `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" "-I$motorDir" `
         "-I$driveDir" "-I$legacyDir" `
         $pidTestSource $legacyPidSource $controlPidSource `
         -o $pidExecutablePath 2>&1 |
@@ -157,7 +157,7 @@ Write-Host "Host C11/PID 与 PDFF 逐位对照测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         -Wno-misleading-indentation `
-        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$motorDir" `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" "-I$motorDir" `
         "-I$driveDir" "-I$legacyDir" `
         $cascadeTestSource $legacyCascadeSource $legacyPidSource $legacyUtilSource `
         $cascadeSource $controlPidSource $limitSource `
@@ -181,7 +181,7 @@ Write-Host "Host C11/电流速度位置级联逐拍对照测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         -Wno-misleading-indentation `
-        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$driveDir" "-I$motorDir" "-I$legacyDir" `
         $controlLoopTestSource $controlLoopSource $controlMitSource `
         $cascadeSource $controlPidSource $limitSource $focCoreSource `
@@ -207,7 +207,7 @@ Write-Host "Host C11/电压电流速度位置与 MIT 主链测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" `
         $controlTrajTestSource $controlTrajSource `
         -o $controlTrajExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -228,7 +228,7 @@ Write-Host "Host C11/速度与位置轨迹测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $debugSnapshotTestSource $debugSnapshotSource $speedAdapterSource `
         -o $debugSnapshotExecutablePath 2>&1 |
@@ -250,7 +250,7 @@ Write-Host "Host C11/只读调试快照测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$appDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$motorDir" "-I$driveDir" `
         $cycleRecordTestSource $cycleRecordSource `
         -o $cycleRecordExecutablePath 2>&1 |
@@ -272,7 +272,7 @@ Write-Host "Host C11/快速周期环形记录测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$commonDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $controlCycleTestSource $controlCycleSource `
         -o $controlCycleExecutablePath 2>&1 |
@@ -295,7 +295,7 @@ Write-Host "Host C11/控制周期显式输入输出测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" `
-        "-I$controlDir" "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
+        "-I$controlDir" "-I$algorithmDir" "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $controlReplayTestSource $controlCycleSource $driveSource `
         $driveModeSource $driveCommandSource $driveProtectionSource `
         $drivePwmSource $limitSource `
@@ -318,7 +318,7 @@ Write-Host "Host C11/控制链 STOP-START-RUN-FAULT 离线回放测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $fastLoopTestSource $fastLoopSource $targetIrqSource $controlCycleSource `
         $speedAdapterSource `
@@ -362,7 +362,7 @@ Write-Host "Host C11/App 与 Drive 对外头文件边界测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$bspIncludeDir" "-I$commonDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$bspIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$motorDir" "-I$driveDir" `
         $drivePwmTestSource $drivePwmSource `
         -o $drivePwmExecutablePath 2>&1 |
@@ -384,7 +384,7 @@ Write-Host "Host C11/Drive PWM 与 Fake Target 边界测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$motorDir" "-I$driveDir" `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" "-I$motorDir" "-I$driveDir" `
         $driveCommandTestSource $driveCommandSource $limitSource `
         -o $driveCommandExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -405,8 +405,8 @@ Write-Host "Host C11/Drive 命令校验与限幅测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$motorDir" "-I$driveDir" `
-        $driveResetTestSource $driveResetSource $controlPidSource $speedSource `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" "-I$motorDir" "-I$driveDir" `
+        $driveResetTestSource $driveResetSource $controlPidSource `
         $controlTrajSource `
         -o $driveResetExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -427,7 +427,7 @@ Write-Host "Host C11/Drive 控制运行状态复位测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$motorDir" "-I$driveDir" `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" "-I$motorDir" "-I$driveDir" `
         $driveModeTestSource $driveModeSource `
         -o $driveModeExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -469,7 +469,7 @@ Write-Host "Host C11/Drive 保护与故障锁存测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$motorDir" "-I$driveDir" `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" "-I$motorDir" "-I$driveDir" `
         $driveTestSource $driveSource $driveProtectionSource `
         -o $driveExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -512,7 +512,7 @@ Write-Host "Host C11/板卡相序与ADC换算适配测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$adapterDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" `
-        "-I$controlDir" "-I$diagnosticIncludeDir" "-I$driveDir" "-I$motorDir" `
+        "-I$controlDir" "-I$algorithmDir" "-I$diagnosticIncludeDir" "-I$driveDir" "-I$motorDir" `
         $observerAdapterTestSource $observerAdapterSource `
         $mcCommonSource $mcFluxObserverSource `
         -o $observerAdapterExecutablePath -lm 2>&1 |
@@ -534,7 +534,7 @@ Write-Host "Host C11/在线磁链观测器适配测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
         $driveDiagTestSource $driveDiagSource $focCoreSource `
         $svmSource $transformSource `
@@ -558,7 +558,7 @@ Write-Host "Host C11/诊断采样、FOC 与 PWM 适配测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$adapterDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" `
-        "-I$controlDir" "-I$motorDir" "-I$driveDir" `
+        "-I$controlDir" "-I$algorithmDir" "-I$motorDir" "-I$driveDir" `
         $positionAbzTestSource $encoderAdapterSource $positionAdapterSource `
         $speedAdapterSource `
         -o $positionAbzExecutablePath -lm 2>&1 |
@@ -577,6 +577,35 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Host C11/ABZ 位置链与影子测速测试通过。"
+
+$fastTrigTestSource = Join-Path $testDir "test_fast_trig.c"
+$pidCondTestSource = Join-Path $testDir "test_pid_conditional.c"
+$fastTrigExecutablePath = Join-Path $outputDir "test_fast_trig.exe"
+$pidCondExecutablePath = Join-Path $outputDir "test_pid_conditional.exe"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$algorithmDir" `
+        $fastTrigTestSource `
+        -o $fastTrigExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "fast_trig 编译失败" }
+& $fastTrigExecutablePath
+if ($LASTEXITCODE -ne 0) { throw "fast_trig 测试运行失败" }
+Write-Host "Host C11/多项式 sincos 数值基准测试通过。"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$algorithmDir" "-I$motorDir" `
+        $pidCondTestSource $controlPidSource `
+        -o $pidCondExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "pid_conditional 编译失败" }
+& $pidCondExecutablePath
+if ($LASTEXITCODE -ne 0) { throw "pid_conditional 测试运行失败" }
+Write-Host "Host C11/PDFF 条件积分变体行为测试通过。"
 
 $foundationTestSource = Join-Path $testDir "test_foundation_headers.c"
 $foundationExecutablePath = Join-Path $outputDir "test_foundation_headers.exe"

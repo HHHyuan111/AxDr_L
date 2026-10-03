@@ -37,7 +37,7 @@
           <bCustSvd>0</bCustSvd>
           <UseEnv>0</UseEnv>
           <BinPath></BinPath>
-          <IncludePath></IncludePath>
+          <IncludePath>;..\User\algorithm</IncludePath>
           <LibPath></LibPath>
           <RegisterFilePath></RegisterFilePath>
           <DBRegisterFilePath></DBRegisterFilePath>
@@ -358,7 +358,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath></IncludePath>
+              <IncludePath>;..\User\algorithm</IncludePath>
             </VariousControls>
           </Aads>
           <LDads>
@@ -457,12 +457,12 @@
             <File>
               <FileName>control_filter.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\control\control_filter.c</FilePath>
+              <FilePath>..\User\algorithm\control_filter.c</FilePath>
             </File>
             <File>
               <FileName>control_limit.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\control\control_limit.c</FilePath>
+              <FilePath>..\User\algorithm\control_limit.c</FilePath>
             </File>
             <File>
               <FileName>control_mit.c</FileName>
@@ -472,7 +472,7 @@
             <File>
               <FileName>control_traj.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\control\control_traj.c</FilePath>
+              <FilePath>..\User\algorithm\control_traj.c</FilePath>
             </File>
             <File>
               <FileName>foc_control.c</FileName>
@@ -482,12 +482,7 @@
             <File>
               <FileName>control_pid.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\control\control_pid.c</FilePath>
-            </File>
-            <File>
-              <FileName>control_speed.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\control\control_speed.c</FilePath>
+              <FilePath>..\User\algorithm\control_pid.c</FilePath>
             </File>
             <File>
               <FileName>foc_core.c</FileName>
@@ -497,12 +492,12 @@
             <File>
               <FileName>foc_svm.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\control\foc_svm.c</FilePath>
+              <FilePath>..\User\algorithm\foc_svm.c</FilePath>
             </File>
             <File>
               <FileName>foc_transform.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\control\foc_transform.c</FilePath>
+              <FilePath>..\User\algorithm\foc_transform.c</FilePath>
             </File>
           </Files>
         </Group>

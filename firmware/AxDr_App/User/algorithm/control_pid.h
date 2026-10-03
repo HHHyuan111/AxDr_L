@@ -112,4 +112,13 @@ float control_pid_pdff_step(pid_para_t *pid,
                             float ref_value,
                             float feedback_value);
 
+/**
+ * @brief PDFF 条件积分步进（B 库变体）：积分增量会把试探输出进一步推过
+ *        限幅时放弃该增量。abs_output_limit 为绝对限幅，非正时退化为普通 PDFF。
+ */
+float control_pid_pdff_conditional_step(pid_para_t *pid,
+                                         float ref_value,
+                                         float feedback_value,
+                                         float abs_output_limit);
+
 #endif /* AXDR_CONTROL_PID_H */
