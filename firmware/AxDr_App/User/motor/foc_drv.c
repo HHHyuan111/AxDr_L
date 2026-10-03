@@ -598,11 +598,14 @@ _RAM_FUNC void ctrl_fb_update(foc_t *foc, float vbus)
     foc->fb.torq_m  = foc->fb.torq_r  * foc->motor.Gr;
     foc->fb.torq_m_f = foc->fb.torq_r_f * foc->motor.Gr;
 
-    /* 第 4 步：由电角度差得到电角速度，再换算转子速度和输出轴速度。 */
-    foc->fb.spd_e = control_angle_speed_step(&foc->elec_speed_diff,
-                                           foc->fb.theta_e,
-                                           DRIVE_FOC_FREQ_HZ);
-    foc->fb.spd_r_raw = foc->fb.spd_e * foc->motor.div_pn; // rad/s;
+    /* 第 4 步：转子侧窗口差分测速（关口①实机验证通过后转正，B 库同构实现）。
+     * 旧链为电角度单拍差分（foc->elec_speed_diff），已由 speed_adapter 取代；
+     * fb.spd_e 无其他消费者，保留字段由新测速推导以维持可观测性。 */
+    {
+        float spd_r = speed_est_get(); /* rad/s，转子机械角速度 */
+        foc->fb.spd_e = spd_r * foc->motor.pn;
+        foc->fb.spd_r_raw = spd_r; /* rad/s */
+    }
 
     foc->fb.spd_r = control_lpf_step(&foc->wr_lpf, foc->fb.spd_r_raw);
     foc->fb.spd_m = foc->fb.spd_r * foc->motor.div_Gr; // rad/s
