@@ -581,14 +581,32 @@ Write-Host "Host C11/ABZ 位置链与影子测速测试通过。"
 $serviceDir = Join-Path $repoRoot "firmware/AxDr_App/User/service"
 $axdrCommandCoreSource = Join-Path $serviceDir "axdr_command_core.c"
 $axdrSafetyRuntimeSource = Join-Path $serviceDir "axdr_safety_runtime.c"
-$serviceUsbTestSource = Join-Path $testDir "test_service_usb.c"
 $serviceUsbSource = Join-Path $serviceDir "service_usb.c"
+$serviceCommandTestSource = Join-Path $testDir "test_service_command.c"
+$serviceCommandSource = Join-Path $serviceDir "service_command.c"
+$serviceCommandExecutablePath = Join-Path $outputDir "test_service_command.exe"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
+        "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" `
+        $serviceCommandTestSource $serviceUsbSource $serviceCommandSource $axdrCommandCoreSource $axdrSafetyRuntimeSource `
+        -o $serviceCommandExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "service_command 编译失败" }
+& $serviceCommandExecutablePath
+if ($LASTEXITCODE -ne 0) { throw "service_command 测试运行失败" }
+Write-Host "Host C11/S3 命令分发器与安全链旅程测试通过。"
+
+$serviceUsbTestSource = Join-Path $testDir "test_service_usb.c"
 $serviceUsbExecutablePath = Join-Path $outputDir "test_service_usb.exe"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$serviceDir" `
-        $serviceUsbTestSource $serviceUsbSource $axdrCommandCoreSource $axdrSafetyRuntimeSource `
+        "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
+        "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" `
+        $serviceUsbTestSource $serviceUsbSource $serviceCommandSource $axdrCommandCoreSource $axdrSafetyRuntimeSource `
         -o $serviceUsbExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )

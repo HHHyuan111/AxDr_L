@@ -205,22 +205,12 @@ const service_usb_stats_t *service_usb_stats(void)
     return &stats;
 }
 
-/* S2 阶段桩：S3 替换为 14 opcode 分发器 */
-uint8_t service_command_dispatch(void *context, uint16_t opcode,
-                                 const uint8_t *request_payload,
-                                 uint16_t request_payload_length,
-                                 uint8_t *response_payload,
-                                 uint16_t response_payload_capacity,
-                                 uint16_t *response_payload_length,
-                                 uint8_t *ack_state)
-{
-    (void)context;
-    (void)opcode;
-    (void)request_payload;
-    (void)request_payload_length;
-    (void)response_payload;
-    (void)response_payload_capacity;
-    *response_payload_length = 0u;
-    *ack_state = AXDR_ACK_REJECTED;
-    return AXDR_REASON_UNKNOWN_OPCODE;
-}
+/* S3 真身分发器在 service_command.c（本文件只引用） */
+extern uint8_t service_command_dispatch(
+    void *context, uint16_t opcode,
+    const uint8_t *request_payload,
+    uint16_t request_payload_length,
+    uint8_t *response_payload,
+    uint16_t response_payload_capacity,
+    uint16_t *response_payload_length,
+    uint8_t *ack_state);

@@ -49,6 +49,7 @@ set(AXDR_USER_SOURCES
     User/service/axdr_command_core.c
     User/service/axdr_safety_runtime.c
     User/service/service_usb.c
+    User/service/service_command.c
     User/adapter/encoder_adapter.c
     User/adapter/observer_adapter.c
     User/adapter/position_adapter.c

@@ -13,6 +13,9 @@
 #include "axdr_command_contract.h"
 #include "axdr_command_core.h"
 #include "service_usb.h"
+#include "common.h"
+
+foc_t g_foc; /* service_command 引用（S2 测试链接） */
 
 static int fail_count;
 static void expect(const char *name, bool cond)
@@ -81,9 +84,8 @@ int main(void)
     expect("完整帧产生 tx 响应", tx_capture_len >= AXDR_COMMAND_MIN_RESPONSE_SIZE);
     expect("响应 magic AXCA", memcmp(tx_capture, "AXCA", 4) == 0);
     expect("帧计数 +1", service_usb_stats()->rx_frames == base_stats_frames + 1u);
-    expect("桩分发 ACK=REJECTED", tx_capture[14] == AXDR_ACK_REJECTED);
-    expect("桩分发 reason=UNKNOWN_OPCODE",
-           tx_capture[15] == AXDR_REASON_UNKNOWN_OPCODE);
+    /* S3 起分发器为真身：GET_RUNTIME_STATE 是只读查询 → ACCEPTED */
+    expect("真分发 ACK=ACCEPTED", tx_capture[14] == AXDR_ACK_ACCEPTED);
 
     /* ---- 场景 2：分片到达（1 字节一次）→ 拼装后仍分发 ---- */
     reset_tx();
