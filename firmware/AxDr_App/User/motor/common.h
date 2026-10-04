@@ -160,13 +160,11 @@ typedef enum
 typedef enum
 {
     drag_vf = 0,
-    drag_if,
-    volt_op,
-    curr_cl,
-    spd_volt_cl,     /* 4：未实现（无速度-电压级联），写入将安全停机——勿用 */
-    spd_curr_cl,     /* 5：速度-电流级联（速度模式用这个） */
-    pos_spd_curr_cl, /* 6：位置-速度-电流级联 */
-    pos_spd_volt_cl, /* 7：未实现——勿用 */
+    drag_if,         /* 1 */
+    volt_op,         /* 2 */
+    curr_cl,         /* 3：电流环 */
+    spd_curr_cl,     /* 4：速度-电流级联（速度模式） */
+    pos_spd_curr_cl, /* 5：位置-速度-电流级联 */
 } debug_mode_e;
 
 typedef enum

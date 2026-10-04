@@ -348,9 +348,10 @@ static bool test_unimplemented_modes_do_nothing(foc_t *foc)
         output_enc_cali,
         anticogging_pm
     };
+    /* spd_volt_cl/pos_spd_volt_cl 已从枚举删除（死项清理由关口③后提出）；
+     * debug 全部模式均已实现——占位哨兵使数组非空，is_supported 应拒绝未知值 */
     static const debug_mode_e debug_modes[] = {
-        spd_volt_cl,
-        pos_spd_volt_cl
+        (debug_mode_e)77
     };
     size_t index;
 
