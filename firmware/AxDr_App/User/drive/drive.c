@@ -161,6 +161,17 @@ static _RAM_FUNC void drive_stop_pwm(foc_t *foc)
  */
 #define DRIVE_ALIGN_SETTLE_S   (1.2f)
 #define DRIVE_ALIGN_AVG_S      (0.3f)
+/*
+ * 对齐验收双判据（26 号手册 §2，理论依据见 25/26 号）：
+ * ① 角度收敛：圆均值矢量长度 R̄ >= 0.99（循环统计学 s=sqrt(-2 ln R̄)，
+ *    0.99 对应角标准差约 8.1° 电角——转子锁定则样本集中于单点，R̄→1；
+ *    转子被卡/仍在转/编码器异常则样本分散，R̄→0）；
+ * ② 电流建立：|fb.id| >= 0.8x 指令（场给了电流没到位=采样或功率链问题，
+ *    0.8 为工程容差，参照 B 库"对齐最小有效电流"概念）。
+ * 任一不过 → 置 enc_err 故障拒绝对齐结果（错误零点闭环比不运行危险，
+ *    P6 讲解决策 D1）。 */
+#define DRIVE_ALIGN_MIN_RESULT_LEN  (0.99f)
+#define DRIVE_ALIGN_CURRENT_RATIO   (0.8f)
 
 static _RAM_FUNC void drive_align_reset(foc_t *foc)
 {
@@ -198,15 +209,33 @@ static _RAM_FUNC void drive_align_tick(foc_t *foc)
     }
 
     {
-        float e_off = atan2f(-foc->align_sin_sum, foc->align_cos_sum);
-        if (e_off < 0.0f)
+        const float result_len =
+            sqrtf(foc->align_sin_sum * foc->align_sin_sum +
+                  foc->align_cos_sum * foc->align_cos_sum) / (float)avg_ticks;
+        const bool angle_converged = (result_len >= DRIVE_ALIGN_MIN_RESULT_LEN);
+        const bool current_established =
+            (fabsf(foc->fb.id) >=
+             DRIVE_ALIGN_CURRENT_RATIO * foc->motor.align_current_a);
+
+        if (angle_converged && current_established)
         {
-            e_off += 6.28318530718f;
+            float e_off = atan2f(-foc->align_sin_sum, foc->align_cos_sum);
+            if (e_off < 0.0f)
+            {
+                e_off += 6.28318530718f;
+            }
+            foc->motor.e_off = e_off;
+            foc->enc_aligned = true;
+            foc->req = DRIVE_REQ_RUN; /* 自动晋升：对齐完成即进 RUN */
         }
-        foc->motor.e_off = e_off;
+        else
+        {
+            /* 验收不过：置编码器故障（fault 汇聚路径同拍停机拒绝 RUN），
+             * 清对齐进度——清故障后重新 START 可重试。 */
+            foc->fault.bit.enc_err = 1U;
+            drive_align_reset(foc);
+        }
     }
-    foc->enc_aligned = true;
-    foc->req = DRIVE_REQ_RUN; /* 自动晋升：对齐完成即进 RUN */
 }
 
 static _RAM_FUNC void drive_exec_action(foc_t *foc, drive_req_e req)

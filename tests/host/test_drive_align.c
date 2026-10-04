@@ -120,6 +120,7 @@ int main(void)
     /* 场景 1：START → STARTING，对齐期间固定角 0 注入档案电流 */
     foc_t m = make_align_motor();
     m.fb.theta_e = 1.0f;
+    m.fb.id = 2.0f;
     m.fb.pos_valid = true;
     m.fb.i_valid = true;
     m.fb.vbus_valid = true;
@@ -136,6 +137,7 @@ int main(void)
     for (int i = 0; i < 15; i++)
     {
         m.fb.theta_e = 1.0f;
+        m.fb.id = 2.0f; /* 对齐电流已建立（判据②） */
         m.fb.pos_valid = true;
         m.fb.i_valid = true;
         m.fb.vbus_valid = true;
@@ -173,6 +175,43 @@ int main(void)
     m2.req = DRIVE_REQ_STOP;
     drive_fast_step(&m2);
     expect("STOP 清对齐进度", m2.align_ticks == 0U);
+
+    /* 场景 6：角度未收敛（样本 0/π 交替 → R̄≈0）→ 拒绝对齐，置 enc_err */
+    {
+        foc_t m3 = make_align_motor();
+        m3.fb.pos_valid = true;
+        m3.fb.i_valid = true;
+        m3.fb.vbus_valid = true;
+        m3.fb.vbus = 24.0f;
+        m3.fb.id = 2.0f;
+        m3.req = DRIVE_REQ_START;
+        for (int i = 0; i < 16; i++)
+        {
+            m3.fb.theta_e = (i % 2 == 0) ? 0.0f : 3.14159265f;
+            drive_fast_step(&m3);
+        }
+        expect("角度未收敛拒绝对齐", !m3.enc_aligned);
+        expect("置编码器故障", m3.fault.bit.enc_err == 1U);
+        expect("不晋升 RUN", m3.req == DRIVE_REQ_STOP || m3.req == DRIVE_REQ_START);
+    }
+
+    /* 场景 7：电流未建立（fb.id=0.5 < 0.8x2）→ 拒绝对齐 */
+    {
+        foc_t m4 = make_align_motor();
+        m4.fb.pos_valid = true;
+        m4.fb.i_valid = true;
+        m4.fb.vbus_valid = true;
+        m4.fb.vbus = 24.0f;
+        m4.fb.id = 0.5f;
+        m4.req = DRIVE_REQ_START;
+        for (int i = 0; i < 16; i++)
+        {
+            m4.fb.theta_e = 1.0f;
+            drive_fast_step(&m4);
+        }
+        expect("电流未建立拒绝对齐", !m4.enc_aligned);
+        expect("同样置编码器故障", m4.fault.bit.enc_err == 1U);
+    }
 
     if (fail_count == 0)
     {
