@@ -22,3 +22,5 @@
 .vscode/
 # 关口验收原始录波（体积大，结论见 20 号文档）
 tests/csv/
+# Keil 命令行构建日志（keil_build_check.sh 产物）
+firmware/AxDr_App/MDK-ARM/build_log.txt
