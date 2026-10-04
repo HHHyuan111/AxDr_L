@@ -14,9 +14,9 @@
 
 #include <stdbool.h>
 
-#include "mc_common.h"
-#include "mc_decoupling.h"
-#include "mc_encoder_alignment.h"
+/* P7 前审查修复：删除对 diagnostic 头的三个 include——本文件的 CTRL_* 宏
+ * 与 mc_* 无任何符号依赖（纯遗留反向依赖，control→diagnostic 违反分层）。
+ * 基线 FOC_Baseline 裁剪时已验证过删除后全绿。 */
 
 /* 三闭环执行频率。电流环直接与 FOC 同频，不重复配置。 */
 #define CTRL_SPEED_LOOP_FREQ_HZ                  (10000.0f)
