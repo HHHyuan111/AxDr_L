@@ -629,6 +629,11 @@
               <FileType>1</FileType>
               <FilePath>..\User\service\axdr_safety_runtime.c</FilePath>
             </File>
+            <File>
+              <FileName>service_usb.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\service\service_usb.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

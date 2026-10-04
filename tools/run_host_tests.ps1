@@ -578,10 +578,26 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Host C11/ABZ 位置链与影子测速测试通过。"
 
-$serviceCoreTestSource = Join-Path $testDir "test_service_core.c"
 $serviceDir = Join-Path $repoRoot "firmware/AxDr_App/User/service"
 $axdrCommandCoreSource = Join-Path $serviceDir "axdr_command_core.c"
 $axdrSafetyRuntimeSource = Join-Path $serviceDir "axdr_safety_runtime.c"
+$serviceUsbTestSource = Join-Path $testDir "test_service_usb.c"
+$serviceUsbSource = Join-Path $serviceDir "service_usb.c"
+$serviceUsbExecutablePath = Join-Path $outputDir "test_service_usb.exe"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$serviceDir" `
+        $serviceUsbTestSource $serviceUsbSource $axdrCommandCoreSource $axdrSafetyRuntimeSource `
+        -o $serviceUsbExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "service_usb 编译失败" }
+& $serviceUsbExecutablePath
+if ($LASTEXITCODE -ne 0) { throw "service_usb 测试运行失败" }
+Write-Host "Host C11/USB 薄缝与帧同步测试通过。"
+
+$serviceCoreTestSource = Join-Path $testDir "test_service_core.c"
 $serviceCoreExecutablePath = Join-Path $outputDir "test_service_core.exe"
 
 $compileOutput = @(
