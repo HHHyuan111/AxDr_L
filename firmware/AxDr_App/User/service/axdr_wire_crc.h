@@ -1,0 +1,9 @@
+#ifndef AXDR_WIRE_CRC_H
+#define AXDR_WIRE_CRC_H
+
+#define AXDR_CRC32_INITIAL             0xFFFFFFFFu
+#define AXDR_CRC32_REVERSED_POLYNOMIAL 0xEDB88320u
+#define AXDR_CRC32_XOR_OUT             0xFFFFFFFFu
+
+#endif /* AXDR_WIRE_CRC_H */
+

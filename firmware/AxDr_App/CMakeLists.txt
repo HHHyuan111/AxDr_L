@@ -34,6 +34,7 @@ include_directories(
     "User/bsp/inc"
     "User/common"
     "User/config"
+    "User/service"
     "User/control"
     "User/algorithm"
     "User/diagnostic/include"
@@ -45,6 +46,8 @@ include_directories(
 set(AXDR_USER_SOURCES
     User/adapter/board_adapter.c
     User/config/motor_profile.c
+    User/service/axdr_command_core.c
+    User/service/axdr_safety_runtime.c
     User/adapter/encoder_adapter.c
     User/adapter/observer_adapter.c
     User/adapter/position_adapter.c

@@ -578,6 +578,24 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Host C11/ABZ 位置链与影子测速测试通过。"
 
+$serviceCoreTestSource = Join-Path $testDir "test_service_core.c"
+$serviceDir = Join-Path $repoRoot "firmware/AxDr_App/User/service"
+$axdrCommandCoreSource = Join-Path $serviceDir "axdr_command_core.c"
+$axdrSafetyRuntimeSource = Join-Path $serviceDir "axdr_safety_runtime.c"
+$serviceCoreExecutablePath = Join-Path $outputDir "test_service_core.exe"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$serviceDir" `
+        $serviceCoreTestSource $axdrCommandCoreSource $axdrSafetyRuntimeSource `
+        -o $serviceCoreExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "service_core 编译失败" }
+& $serviceCoreExecutablePath
+if ($LASTEXITCODE -ne 0) { throw "service_core 测试运行失败" }
+Write-Host "Host C11/AXDR 协议核心与安全运行时测试通过。"
+
 $driveAlignTestSource = Join-Path $testDir "test_drive_align.c"
 $driveAlignExecutablePath = Join-Path $outputDir "test_drive_align.exe"
 

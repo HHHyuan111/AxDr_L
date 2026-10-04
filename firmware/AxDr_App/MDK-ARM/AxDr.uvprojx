@@ -37,7 +37,7 @@
           <bCustSvd>0</bCustSvd>
           <UseEnv>0</UseEnv>
           <BinPath></BinPath>
-          <IncludePath></IncludePath>
+          <IncludePath>;..\User\service</IncludePath>
           <LibPath></LibPath>
           <RegisterFilePath></RegisterFilePath>
           <DBRegisterFilePath></DBRegisterFilePath>
@@ -358,7 +358,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath></IncludePath>
+              <IncludePath>;..\User\service</IncludePath>
             </VariousControls>
           </Aads>
           <LDads>
@@ -613,6 +613,21 @@
               <FileName>target_time.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\bsp\target_time.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>User/service</GroupName>
+          <Files>
+            <File>
+              <FileName>axdr_command_core.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\service\axdr_command_core.c</FilePath>
+            </File>
+            <File>
+              <FileName>axdr_safety_runtime.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\service\axdr_safety_runtime.c</FilePath>
             </File>
           </Files>
         </Group>
