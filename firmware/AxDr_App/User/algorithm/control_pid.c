@@ -160,7 +160,9 @@ PLATFORM_FAST_CODE float control_pid_pdff_step(pid_para_t *pid,
  * 与 control_pid_pdff_step 的动态积分限幅抗饱和不同，本变体采用条件积分：
  * 仅当积分增量不会把（试探）输出进一步推过限幅时才采纳该增量。
  * abs_output_limit 为调用方给定的绝对输出限幅，与 pid 内部限幅取更严者；
- * 限幅非正时退化为普通 PDFF。B 库沉沙速度环即用此变体。
+ * 限幅非正时退化为普通 PDFF。
+ * @note 使用场合（B 库行为）：观测器速度接管模式（无感 H2）专用——
+ * 编码器反馈的速度环用 control_pid_pdff_limited_step（见下）。
  */
 PLATFORM_FAST_CODE float control_pid_pdff_conditional_step(pid_para_t *pid,
                                                             float ref_value,
@@ -219,4 +221,59 @@ PLATFORM_FAST_CODE float control_pid_pdff_conditional_step(pid_para_t *pid,
         pid->out_value = -limit;
     }
     return pid->out_value;
+}
+
+/**
+ * @brief PDFF 按指令限幅步进（B 库 pdff_ctrl_limited 原样移植，B 库编码器
+ *        反馈速度环的实际变体——spd_curr_cl 主路径，证据 foc_drv.c:934）。
+ *
+ * 临时把 pid 内部限幅收紧到本次指令的绝对限幅再执行普通 PDFF，随后恢复：
+ * 动态积分限幅（i_term_max = out_max - p_term）随之收紧，防止 per-command
+ * 小限幅（如 MIT 模式 2A）下的积分 windup——比"PI 用宽限幅+后置钳位"多一层
+ * 积分级抗饱和。abs_output_limit 非正或宽于内部限幅时等价于普通 PDFF。
+ * @note 积分范围由本拍比例项和收紧限值共同决定；单独钳位积分到输出限值
+ *       会截断抵消负比例项所需的积分，造成稳态速度误差（B 库原注释）。
+ */
+PLATFORM_FAST_CODE float control_pid_pdff_limited_step(pid_para_t *pid,
+                                                        float ref_value,
+                                                        float feedback_value,
+                                                        float abs_output_limit)
+{
+    float saved_out_max;
+    float saved_out_min;
+    float saved_i_term_max;
+    float saved_i_term_min;
+    float result;
+
+    if (pid == 0)
+    {
+        return 0.0f;
+    }
+    if (!(abs_output_limit > 0.0f))
+    {
+        return control_pid_pdff_step(pid, ref_value, feedback_value);
+    }
+
+    saved_out_max = pid->out_max;
+    saved_out_min = pid->out_min;
+    saved_i_term_max = pid->i_term_max;
+    saved_i_term_min = pid->i_term_min;
+
+    if (abs_output_limit > saved_out_max)
+    {
+        abs_output_limit = saved_out_max;
+    }
+    if (-abs_output_limit < saved_out_min)
+    {
+        abs_output_limit = -saved_out_min;
+    }
+
+    pid->out_max = abs_output_limit;
+    pid->out_min = -abs_output_limit;
+    result = control_pid_pdff_step(pid, ref_value, feedback_value);
+    pid->out_max = saved_out_max;
+    pid->out_min = saved_out_min;
+    pid->i_term_max = saved_i_term_max;
+    pid->i_term_min = saved_i_term_min;
+    return result;
 }

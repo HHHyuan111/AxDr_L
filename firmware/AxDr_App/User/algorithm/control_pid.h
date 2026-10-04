@@ -121,4 +121,14 @@ float control_pid_pdff_conditional_step(pid_para_t *pid,
                                          float feedback_value,
                                          float abs_output_limit);
 
+/**
+ * @brief PDFF 按指令限幅步进（B 库编码器反馈速度环实际变体）：临时收紧 pid
+ *        限幅到 abs_output_limit 执行普通 PDFF 后恢复，积分抗饱和随限值收紧。
+ *        非正或宽于内部限幅时等价于普通 PDFF。
+ */
+float control_pid_pdff_limited_step(pid_para_t *pid,
+                                    float ref_value,
+                                    float feedback_value,
+                                    float abs_output_limit);
+
 #endif /* AXDR_CONTROL_PID_H */

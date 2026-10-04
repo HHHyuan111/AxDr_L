@@ -19,6 +19,9 @@ bool legacy_control_cur_step(control_rate_t *rate,
 {
     if (++rate->count >= rate->divider)
     {
+        /* oracle 修正（23 号审查）：历史代码此处缺 count 清零（divider>=2 时分频
+         * 失效的休眠 bug），生产实现已修，对照基准同步修正。 */
+        rate->count = 0U;
         parallel_pid_ctrl(d_pid, id_ref, id_feedback);
         *v_d = d_pid->out_value;
         parallel_pid_ctrl(q_pid, iq_ref, iq_feedback);
@@ -38,8 +41,36 @@ bool legacy_control_spd_step(control_rate_t *rate,
 {
     if (++rate->count >= rate->divider)
     {
+        /* oracle 升级（23 号审查）：对齐 B 库编码器反馈速度环真身——pdff_ctrl_limited
+         * 语义（临时收紧 pid 限幅到指令限值再跑 pdff，恢复现场），替代 plain+后置钳位。
+         * 证据：B 库 foc_drv.c:934 spd_curr_cl 主路径。 */
         rate->count = 0U;
-        pdff_ctrl(speed_pid, speed_ref, speed_feedback);
+        {
+            float lim = LEGACY_ABS(iq_limit_abs);
+            const float saved_max = speed_pid->out_max;
+            const float saved_min = speed_pid->out_min;
+            const float saved_imax = speed_pid->i_term_max;
+            const float saved_imin = speed_pid->i_term_min;
+
+            if (lim > 0.0f)
+            {
+                if (lim > saved_max)
+                {
+                    lim = saved_max;
+                }
+                if (-lim < saved_min)
+                {
+                    lim = -saved_min;
+                }
+                speed_pid->out_max = lim;
+                speed_pid->out_min = -lim;
+            }
+            pdff_ctrl(speed_pid, speed_ref, speed_feedback);
+            speed_pid->out_max = saved_max;
+            speed_pid->out_min = saved_min;
+            speed_pid->i_term_max = saved_imax;
+            speed_pid->i_term_min = saved_imin;
+        }
         *iq_ref = speed_pid->out_value;
 
         if (LEGACY_ABS(iq_limit_abs) > 0)

@@ -129,7 +129,9 @@ static bool test_current_mode(void)
                         "电流模式 d 轴参考没有进入 PI。") &&
            expect_close(loop.iq_pi.ref_value, 0.2f,
                         "电流模式 q 轴参考没有进入 PI。") &&
-           expect_true(loop.ctrl.cur_rate.count == 1U,
+           /* 23 号审查修复后行为：分频命中执行并清零计数（divider=1 时每拍执行、
+            * count 归零——原期望 count==1 编码了不清零的休眠 bug）。 */
+           expect_true(loop.ctrl.cur_rate.count == 0U,
                        "电流模式应更新电流环分频状态。") &&
            expect_true(loop.ctrl.spd_rate.count == 0U,
                        "电流模式不应运行速度环。");
@@ -157,7 +159,7 @@ static bool test_speed_mode(void)
                         loop.ctrl.iq_ref,
                         "速度环输出没有进入 q 轴电流环。") &&
            expect_true((loop.ctrl.spd_rate.count == 0U) &&
-                       (loop.ctrl.cur_rate.count == 1U),
+                       (loop.ctrl.cur_rate.count == 0U),
                        "速度模式应依次运行速度环和电流环。");
 }
 
@@ -188,7 +190,7 @@ static bool test_position_mode(void)
                         "速度环输出没有进入 q 轴电流环。") &&
            expect_true((loop.ctrl.pos_rate.count == 0U) &&
                        (loop.ctrl.spd_rate.count == 0U) &&
-                       (loop.ctrl.cur_rate.count == 1U),
+                       (loop.ctrl.cur_rate.count == 0U),
                        "位置模式应依次运行位置、速度和电流环。");
 }
 

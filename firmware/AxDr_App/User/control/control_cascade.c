@@ -27,6 +27,7 @@ PLATFORM_FAST_CODE bool control_cur_step(control_rate_t *rate,
     {
         return false;
     }
+    rate->count = 0U;
 
     control_pid_parallel_step(d_pid, id_ref, id_feedback);
     *v_d = d_pid->out_value;
@@ -51,10 +52,15 @@ PLATFORM_FAST_CODE bool control_spd_step(control_rate_t *rate,
     }
 
     rate->count = 0U;
-    control_pid_pdff_step(speed_pid, speed_ref, speed_feedback);
-    *iq_ref = speed_pid->out_value;
 
     limit = control_abs(iq_limit_abs);
+
+    /* B 库编码器反馈速度环实际变体（foc_drv.c:934）：按指令限幅执行 PDFF，
+     * 积分抗饱和随限值收紧（修：此前用宽限幅普通 PDFF+后置钳位，
+     * per-command 小限幅下存在 windup 窗口）。 */
+    control_pid_pdff_limited_step(speed_pid, speed_ref, speed_feedback, limit);
+
+    *iq_ref = speed_pid->out_value;
     if (limit > 0.0f)
     {
         *iq_ref = control_limit(*iq_ref, limit, -limit);
