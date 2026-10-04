@@ -42,7 +42,49 @@ G474RET6（512KB flash / 128KB RAM）余量充足。
 - `bad_crc>0` → 遥测组帧 CRC 范围不一致（S4a 契约 156B）；
 - `sequence_gaps>0` → 发送缝 BUSY 保留逻辑异常或主机读取抖动。
 
-## 4. 使能旅程（GUI 手动，命令链验证）
+## 3a. 一键命令旅程（usb_acceptance，替代第 4/5 节手动步骤）
+
+`tools/usb_acceptance.c` 是协议级验收工具，与固件共用同一份
+`axdr_command_core.c` 编译（零格式漂移），自动执行完整命令旅程并断言：
+
+```
+P0 遥测探针（帧率/CRC/跳号/故障位） → P1 协议查询（版本/档案/确认）
+→ P2 ARM（错 challenge 拒 → 正确 ARM → 未授权断言）
+→ P3 运动旅程（首上电对齐进 RUN → 3s 速度曲线 CSV → ControlStop）
+→ P4 租约超时（零速续租停发 → 自动撤权 stop_reason=2）
+→ P5 心跳超时（停发心跳 → 自动 DISARMED disarm_reason=3 → 失效会话拒绝）
+→ P6 收尾（DISARM → STOP + fault=0）
+```
+
+工具已由 `run_host_tests.ps1` 编译到
+`firmware/AxDr_App/build/host-tests/usb_acceptance.exe`（每次跑闸自动重编）。
+上电后执行：
+
+```powershell
+& 'C:\Users\ready\Desktop\DriverLab\AxDr_L\firmware\AxDr_App\build\host-tests\usb_acceptance.exe' COMx
+```
+
+- 全部 PASS + exit=0 → 第 4/5 节的命令链与负路径验收**自动完成**；
+- 输出 CSV（默认 `usb_motion.csv`）保留 3s 速度曲线供记录；
+- 首上电：P3 会报告 `STARTING 对齐后进 RUN`（约 1.6s，属预期）；
+- 电机实际动作：P3 升速 8 rad/s 约 3s → 停；P4/P5 仅零速闭环/静置，无运动。
+
+断电重启后的免对齐复查（第 6 节核心场景）：
+
+```powershell
+& 'C:\...\usb_acceptance.exe' COMx --reboot-check
+```
+
+只跑探针 + ARM + 启动：`had_starting=0`（无 STARTING 段、约 0.8s 内进 RUN）
+即免对齐生效。另可选 `--probe-only`（只跑 P0）、`--speed 5` / `--iq 1.5`
+（改运动档位）。
+
+第 4 节 GUI 旅程降级为**可选**（想人工看曲线时再走）；
+第 5 节负路径全部由 P4/P5 自动覆盖，无需手动。
+工具自身可信度：`usb_acceptance --selftest` 用内置模拟固件回环自检
+（已入 run_host_tests.ps1 闸）。
+
+## 4. 使能旅程（GUI 手动，可选——已由 3a 节工具覆盖）
 
 启动 QtMotorTool GUI（不带参数），连接同一 COM 口后按序执行，
 每步记录应答 `status`（APPLIED=0 / 拒绝码）：
@@ -97,25 +139,30 @@ G474RET6（512KB flash / 128KB RAM）余量充足。
 
 ## 8. 验收记录表
 
+（标 ※ 的行由 `usb_acceptance` 自动断言——工具 PASS 即整组通过，
+实测栏填工具报告值即可）
+
 | 项目 | 预期 | 实测 | 结论 |
 |---|---|---|---|
-| probe 遥测帧率 | ≈20 Hz |  |  |
-| probe CRC/头错误 | 0 |  |  |
-| probe seq gaps | 0 |  |  |
-| ConfirmProfile | APPLIED |  |  |
-| 错 challenge ARM | 拒绝 |  |  |
-| 正确 ARM | APPLIED |  |  |
-| SetSpeed 运行 | APPLIED+升速 |  |  |
-| ControlStop | 停+HOST_REQUEST |  |  |
-| 心跳超时自锁 | >2s 自动 DISARM |  |  |
-| 租约超时停机 | stop_reason=2 |  |  |
-| 首上电对齐 | ≈1.5s 后 RUN |  |  |
-| 重上电免对齐 | START 直进 RUN |  |  |
+| probe 遥测帧率 ※ | ≈20 Hz |  |  |
+| probe CRC/头错误 ※ | 0 |  |  |
+| probe seq gaps ※ | 0 |  |  |
+| ConfirmProfile ※ | APPLIED |  |  |
+| 错 challenge ARM ※ | 拒 11 |  |  |
+| 正确 ARM ※ | APPLIED+ARMED |  |  |
+| SetSpeed 运行 ※ | APPLIED+升速 |  |  |
+| ControlStop ※ | 停+stop_reason=1 |  |  |
+| 心跳超时自锁 ※ | 自动 DISARM(reason=3) |  |  |
+| 租约超时停机 ※ | stop_reason=2 |  |  |
+| 首上电对齐 ※ | ≈1.6s 后 RUN |  |  |
+| 重上电免对齐 ※ | had_starting=0 直进 RUN |  |  |
 | session acceptance | PASS |  |  |
 
 ## 9. 通过标准
 
-第 3–7 节全部满足且记录表无空白项 → 打标签：
+`usb_acceptance COMx` 全 PASS + `usb_acceptance COMx --reboot-check`
+报 `had_starting=0`，辅以第 6 节断电重启场景与第 7 节 session acceptance，
+记录表无空白项 → 打标签：
 
 ```bash
 git tag -a layer-service -m "P7 service 层实机验收通过" && git push origin layer-service

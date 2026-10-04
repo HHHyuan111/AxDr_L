@@ -754,4 +754,21 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Host C11/foundation 头自包含与位图唯一性测试通过。"
 
+# P7 上位机基准验收工具：编译闸 + selftest 回环（模拟固件在进程内，
+# 不开串口、无需硬件；真机全旅程验收见开发记录 61 号手册第 3a 节）。
+$usbAccSource = Join-Path $repoRoot "tools/usb_acceptance.c"
+$usbAccExecutablePath = Join-Path $outputDir "usb_acceptance.exe"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$serviceDir" `
+        $usbAccSource $axdrCommandCoreSource `
+        -o $usbAccExecutablePath 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "usb_acceptance 编译失败" }
+& $usbAccExecutablePath --selftest
+if ($LASTEXITCODE -ne 0) { throw "usb_acceptance selftest 运行失败" }
+Write-Host "Host C11/上位机基准验收工具编译与 selftest 回环测试通过。"
+
 & (Join-Path $PSScriptRoot "run_diagnostic_tests.ps1") -Compiler $Compiler
