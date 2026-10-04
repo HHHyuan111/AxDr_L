@@ -35,6 +35,7 @@
 #include "modlue.h"
 #include "lcd.h"
 #include "service_command.h"
+#include "service_param_store.h"
 #include "service_telemetry.h"
 #include "service_usb.h"
 #include "usbd_cdc_if.h"
@@ -139,6 +140,9 @@ int main(void)
   target_time_init();
 
   foc_init(&g_foc);
+  /* S5 零位装载：须在 fast_loop_enable 之前——快环一开 START 即可进来，
+   * enc_aligned 得先就位（有效存储 → 免 1.5s 对齐直进 RUN）。 */
+  service_param_store_boot();
   fast_loop_enable();
 
   /* S4/S3 service 装配：发送缝绑定 + 遥测复位。CDC 收路径在
@@ -157,11 +161,13 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* service 慢路径三 poll（自由节拍）：安全链执法（ARM 后生效）、
-     * 命令帧解析分发、遥测取帧发送。均设计为空转廉价。 */
+    /* service 慢路径四 poll（自由节拍）：安全链执法（ARM 后生效）、
+     * 命令帧解析分发、遥测取帧发送、对齐零位保存（边沿触发）。
+     * 均设计为空转廉价；save 时页擦除约 22ms（Bank2 擦写不 stall Bank1 取指）。 */
     service_safety_poll();
     service_usb_poll();
     service_telemetry_poll();
+    service_param_store_poll();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

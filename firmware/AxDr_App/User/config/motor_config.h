@@ -125,3 +125,8 @@
 #define CHENSHA_OVER_CURRENT_A                (10.0f)
 #define CHENSHA_OVER_VOLTAGE_V                (30.0f)
 #define CHENSHA_UNDER_VOLTAGE_V               (10.0f)
+
+/* 档案绑定标识：上位机 ConfirmProfile 匹配用；param_store 持久化零位时
+ * 随存随校——任一变更即视为换了电机/机械，存储零位作废走重新对齐。 */
+#define MOTOR_PROFILE_ID                      (1U)
+#define MOTOR_PROFILE_REVISION                (2U) /* 沉沙档案定版 2026-09-23 */

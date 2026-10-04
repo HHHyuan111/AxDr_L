@@ -29,9 +29,6 @@
 #include "motor_config.h"
 #include "encoder_type.h"
 #include "service_telemetry.h"
-
-/* 档案版本（B 库 chensha_config L28=rev2；主线宏暂未定义，本地别名，S5 收编） */
-#define CHENSHA_ARCHIVE_REVISION 2u
 #include "service_usb.h"
 
 /* ---- 板级/固件身份（上位机 GetDeviceInfo/GetProtocolInfo 匹配用） ---- */
@@ -41,6 +38,7 @@
 #define SVC_DEVICE_FAMILY 0x00000001u /* 沉沙/AxDrive-L 驱动 */
 #define SVC_BOARD_PROFILE 0x00000003u /* hw_rev v1.3 */
 #define SVC_PRODUCT_NAME "AxDrService"
+/* 档案标识用 motor_config.h 的 MOTOR_PROFILE_ID / MOTOR_PROFILE_REVISION */
 
 /* 本版支持的 opcode 掩码（15 个，契约 bit 位 = opcode 值，最大 0x1A < 32） */
 #define SVC_SUPPORTED_MASK                                                  \
@@ -78,8 +76,7 @@ static axdr_motor_profile_payload_t profile_payload;
 static uint8_t profile_built;
 static uint8_t profile_configured;
 
-/* 档案版本（B 库 chensha_config rev2）与档案 id */
-#define SVC_PROFILE_ID 1u
+/* 档案 id/版本来自 motor_config.h（S5 收编：param_store 与协议共用同一来源） */
 
 /* ---- 内部工具 ---- */
 
@@ -100,8 +97,8 @@ static void build_profile_once(void)
     memset(&profile_payload, 0, sizeof(profile_payload));
     profile_payload.schema_version = 1u;
     profile_payload.payload_size = (uint16_t)sizeof(profile_payload);
-    profile_payload.profile_id = SVC_PROFILE_ID;
-    profile_payload.revision = CHENSHA_ARCHIVE_REVISION;
+    profile_payload.profile_id = MOTOR_PROFILE_ID;
+    profile_payload.revision = MOTOR_PROFILE_REVISION;
     profile_payload.encoder_type = ENCODER_TYPE_ABZ;
     profile_payload.pole_pairs = (uint8_t)CHENSHA_POLE_PAIRS;
     profile_payload.name_length = 10u;
@@ -136,7 +133,7 @@ static void ensure_profile_configured(void)
         build_profile_once();
         axdr_safety_runtime_init(&safety, 0u, 0x20261004u);
         axdr_safety_runtime_configure_motor_profile(
-            &safety, SVC_PROFILE_ID, CHENSHA_ARCHIVE_REVISION,
+            &safety, MOTOR_PROFILE_ID, MOTOR_PROFILE_REVISION,
             profile_payload.profile_crc32);
         profile_configured = 1u;
     }
@@ -329,8 +326,8 @@ static uint8_t provide_control_limits(uint8_t *resp, uint16_t cap,
     memset(&p, 0, sizeof(p));
     p.schema_version = 1u;
     p.payload_size = sizeof(p);
-    p.profile_id = SVC_PROFILE_ID;
-    p.profile_revision = CHENSHA_ARCHIVE_REVISION;
+    p.profile_id = MOTOR_PROFILE_ID;
+    p.profile_revision = MOTOR_PROFILE_REVISION;
     p.maximum_current_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
     p.maximum_speed_rad_s = CHENSHA_PEAK_SPEED_RAD_S;
     p.maximum_speed_iq_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;

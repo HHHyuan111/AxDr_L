@@ -620,6 +620,24 @@ if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; th
 if ($LASTEXITCODE -ne 0) { throw "service_telemetry 测试运行失败" }
 Write-Host "Host C11/S4 遥测帧组包与发送缝测试通过。"
 
+$serviceParamStoreTestSource = Join-Path $testDir "test_service_param_store.c"
+$serviceParamStoreSource = Join-Path $serviceDir "service_param_store.c"
+$fakeTargetFlashSource = Join-Path $testDir "fake_target_flash.c"
+$serviceParamStoreExecutablePath = Join-Path $outputDir "test_service_param_store.exe"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
+        "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" `
+        $serviceParamStoreTestSource $serviceParamStoreSource $fakeTargetFlashSource $axdrCommandCoreSource `
+        -o $serviceParamStoreExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "service_param_store 编译失败" }
+& $serviceParamStoreExecutablePath
+if ($LASTEXITCODE -ne 0) { throw "service_param_store 测试运行失败" }
+Write-Host "Host C11/S5 参数持久化装载校验与保存边沿测试通过。"
+
 $serviceUsbTestSource = Join-Path $testDir "test_service_usb.c"
 $serviceUsbExecutablePath = Join-Path $outputDir "test_service_usb.exe"
 
