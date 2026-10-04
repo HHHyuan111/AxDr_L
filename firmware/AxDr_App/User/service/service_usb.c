@@ -10,6 +10,7 @@
 
 #include "axdr_command_core.h"
 #include "axdr_command_contract.h"
+#include "service_command.h"
 
 #define SVC_RX_RING_SIZE 512u
 #define SVC_RX_RING_MASK (SVC_RX_RING_SIZE - 1u)
@@ -26,15 +27,6 @@ static uint16_t parser_length;
 static axdr_command_core_t command_core;
 static service_usb_tx_fn tx_fn;
 static service_usb_stats_t stats;
-
-/* ---- S3 分发器的外部入口（当前 S2 阶段为桩，S3 填充 14 opcode） ---- */
-uint8_t service_command_dispatch(void *context, uint16_t opcode,
-                                 const uint8_t *request_payload,
-                                 uint16_t request_payload_length,
-                                 uint8_t *response_payload,
-                                 uint16_t response_payload_capacity,
-                                 uint16_t *response_payload_length,
-                                 uint8_t *ack_state);
 
 static uint8_t rx_pop(uint8_t *value)
 {
@@ -204,13 +196,3 @@ const service_usb_stats_t *service_usb_stats(void)
 {
     return &stats;
 }
-
-/* S3 真身分发器在 service_command.c（本文件只引用） */
-extern uint8_t service_command_dispatch(
-    void *context, uint16_t opcode,
-    const uint8_t *request_payload,
-    uint16_t request_payload_length,
-    uint8_t *response_payload,
-    uint16_t response_payload_capacity,
-    uint16_t *response_payload_length,
-    uint8_t *ack_state);

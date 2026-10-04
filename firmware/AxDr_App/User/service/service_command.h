@@ -1,8 +1,10 @@
 /**
  * @file service_command.h
- * @brief S3：14 opcode 分发器 + 安全会话（对接 drive/motor 的桥）。
+ * @brief S3/S3.5：15 opcode 分发器 + 安全会话（对接 drive/motor 的桥）。
  * @note  依赖方向：service → drive/motor/config（向下）。协议编解码在
  *        service_usb/command_core；本文件只做"opcode → 框架动作"的翻译。
+ *        会话门卫（方案A）：首次 ARM 成功前 service_safety_poll 不执法，
+ *        台架/调试器手动运行不受影响；首次 ARM 后全程执法（租约/心跳/互锁）。
  */
 
 #ifndef SERVICE_COMMAND_H
@@ -13,13 +15,9 @@
 #include "axdr_command_contract.h"
 #include "axdr_safety_runtime.h"
 
-/* ---- 安全会话（单例，与 drive 共享生命周期） ---- */
-
-/** @brief 每快速周期调用：观察互锁（fault/输出关断）+ 心跳租约超时检查。 */
-void service_safety_tick(uint32_t now_ms);
-
-/** @brief 主循环低频调用（now_ms 来自 target_time_us/1000）。 */
-void service_safety_poll(uint32_t now_ms);
+/** @brief 主循环低频调用（1kHz 量级）。观察互锁 + 心跳/命令租约超时检查；
+ *         租约超时 → revoke+停机（fail-closed）。时钟取 fast_seq/20。 */
+void service_safety_poll(void);
 
 /** @brief 当前 run 是否被安全链授权（SetSpeed/SetCurrent 的门卫）。 */
 uint8_t service_safety_run_authorized(void);
