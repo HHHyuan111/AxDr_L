@@ -578,6 +578,21 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Host C11/ABZ 位置链与影子测速测试通过。"
 
+$driveAlignTestSource = Join-Path $testDir "test_drive_align.c"
+$driveAlignExecutablePath = Join-Path $outputDir "test_drive_align.exe"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" "-I$motorDir" "-I$driveDir" `
+        $driveAlignTestSource $driveSource $driveProtectionSource `
+        -o $driveAlignExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "drive_align 编译失败" }
+& $driveAlignExecutablePath
+if ($LASTEXITCODE -ne 0) { throw "drive_align 测试运行失败" }
+Write-Host "Host C11/ABZ 上电自动对齐测试通过。"
+
 $motorChenshaTestSource = Join-Path $testDir "test_motor_chensha.c"
 $motorProfileSource = Join-Path $configDir "motor_profile.c"
 $motorChenshaExecutablePath = Join-Path $outputDir "test_motor_chensha.exe"

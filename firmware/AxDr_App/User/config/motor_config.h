@@ -116,6 +116,9 @@
 /* 台架限幅（B 库 target_config 沉沙段）。 */
 #define CHENSHA_COMMAND_CURRENT_LIMIT_A       (8.0f)    /* 指令电流 */
 #define CHENSHA_ALIGN_CURRENT_LIMIT_A        (5.0f)    /* 对齐电流 */
+/* 自动对齐使用电流：空载 2A 起步（B 库联轴工况 3A 失败/4A 通过，本台空载足够；
+ * 上限受上面 LIMIT 宏约束语义：若 2A 吸不合，按 B 库路径升 3~4A）。 */
+#define CHENSHA_ALIGN_CURRENT_A               (2.0f)
 #define CHENSHA_ACCEL_LIMIT_RAD_S2           (1200.0f)
 
 /* 保护阈值（B 库沉沙定版，0.1s 延时滤波由 prot_cfg_init 统一配置）。 */

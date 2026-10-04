@@ -8,6 +8,7 @@
 #include <math.h>
 
 #include "common.h"
+#include "fast_trig.h"
 #include "drive_diag.h"
 #include "drive_mode.h"
 #include "drive_pwm.h"
@@ -151,16 +152,91 @@ static _RAM_FUNC void drive_stop_pwm(foc_t *foc)
  * @param[in,out] foc 电机控制对象。
  * @param[in] req 本周期入口锁存的请求。
  */
+/*
+ * ABZ 上电自动对齐（B 库门控哲学落地）：START 期间以固定电角度 0 注入
+ * 档案对齐电流（foc_cur_step 的角度参数与编码器无关）——转子被吸到
+ * "真实电角度=0"位置；后段对 fb.theta_e 做圆均值，e_off = -均值 (mod 2pi)。
+ * 完成：置 enc_aligned 并自动晋升 req=RUN（本设计的显式行为，代码库中
+ * 唯一的 RUN 写入点）。时长 = 保持 1.2s + 取平均 0.3s（B 库契约 >=300ms）。
+ */
+#define DRIVE_ALIGN_SETTLE_S   (1.2f)
+#define DRIVE_ALIGN_AVG_S      (0.3f)
+
+static _RAM_FUNC void drive_align_reset(foc_t *foc)
+{
+    foc->align_ticks = 0U;
+    foc->align_sin_sum = 0.0f;
+    foc->align_cos_sum = 0.0f;
+}
+
+static _RAM_FUNC void drive_align_tick(foc_t *foc)
+{
+    const uint32_t settle_ticks =
+        (uint32_t)(DRIVE_ALIGN_SETTLE_S * foc->rate.foc_fs);
+    const uint32_t avg_ticks =
+        (uint32_t)(DRIVE_ALIGN_AVG_S * foc->rate.foc_fs);
+    float s;
+    float c;
+
+    /* 固定角 0 的 id 场：角度参数恒 0（开环），与编码器反馈无关 */
+    if (foc_cur_step(foc, foc->motor.align_current_a, 0.0f, 0.0f))
+    {
+        (void)drive_pwm_commit(foc);
+    }
+
+    if (foc->align_ticks < settle_ticks + avg_ticks)
+    {
+        foc->align_ticks++;
+        if (foc->align_ticks > settle_ticks)
+        {
+            /* 保持期后取平均：theta_e 圆均值（规避 0/2pi 边界线性均值失效） */
+            fast_sincos(foc->fb.theta_e, &s, &c);
+            foc->align_sin_sum += s;
+            foc->align_cos_sum += c;
+        }
+        return;
+    }
+
+    {
+        float e_off = atan2f(-foc->align_sin_sum, foc->align_cos_sum);
+        if (e_off < 0.0f)
+        {
+            e_off += 6.28318530718f;
+        }
+        foc->motor.e_off = e_off;
+    }
+    foc->enc_aligned = true;
+    foc->req = DRIVE_REQ_RUN; /* 自动晋升：对齐完成即进 RUN */
+}
+
 static _RAM_FUNC void drive_exec_action(foc_t *foc, drive_req_e req)
 {
     switch (req)
     {
         case DRIVE_REQ_STOP:
             drive_stop_pwm(foc);
+            if (!foc->enc_aligned)
+            {
+                drive_align_reset(foc); /* 中断对齐则进度作废，下次重来 */
+            }
             break;
 
         case DRIVE_REQ_START:
-            drive_start_pwm(foc);
+            drive_start_pwm(foc); /* 内部一次性动作：中性占空比+启动+置 pwm_active */
+            if (foc->pwm_active)
+            {
+                if ((foc->enc.primary == ENCODER_TYPE_ABZ) &&
+                    !foc->enc_aligned)
+                {
+                    /* STARTING 期间逐拍执行自动对齐；完成时内部晋升 RUN */
+                    drive_align_tick(foc);
+                }
+                else
+                {
+                    /* 绝对编码器或本上电周期已对齐：直接进 RUN */
+                    foc->req = DRIVE_REQ_RUN;
+                }
+            }
             break;
 
         case DRIVE_REQ_RUN:
@@ -287,11 +363,7 @@ _RAM_FUNC void drive_fast_step(foc_t *foc)
 
     drive_update_state(foc, req);
 
-    /* START 是一次性请求；启动成功后，下一快速周期进入正常 RUN。 */
-    if ((req == DRIVE_REQ_START) &&
-        (foc->req == DRIVE_REQ_START) &&
-        (foc->state == DRIVE_STATE_STARTING))
-    {
-        foc->req = DRIVE_REQ_RUN;
-    }
+    /* START 一次性语义由 exec_action 内完成晋升（非对齐场景启动即置 RUN；
+     * ABZ 对齐场景保持 START 直到对齐完成由 drive_align_tick 晋升——
+     * 此处原先的尾部自动晋升会把对齐第一拍后 premature 晋升，已移除）。 */
 }

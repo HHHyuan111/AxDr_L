@@ -43,6 +43,7 @@ static void motor_pr60_init(foc_t *foc)
 
     foc->motor.phase_order = PR60_PHASE_ORDER;
     foc->motor.e_off = PR60_ELECTRICAL_OFFSET_RAD;
+    foc->motor.align_current_a = 1.0f; /* 绝对磁编无对齐需求，占位 */
     foc->motor.r_off = PR60_ROTOR_OFFSET_RAD;
     foc->motor.m_off = PR60_MECHANICAL_OFFSET_RAD;
 
@@ -107,6 +108,7 @@ static void motor_2312s_init(foc_t *foc)
 
     foc->motor.phase_order = MOTOR_2312S_PHASE_ORDER;
     foc->motor.e_off = MOTOR_2312S_ELECTRICAL_OFFSET_RAD;
+    foc->motor.align_current_a = 1.0f; /* 绝对磁编无对齐需求，占位 */
     foc->motor.r_off = MOTOR_2312S_ROTOR_OFFSET_RAD;
     foc->motor.m_off = MOTOR_2312S_MECHANICAL_OFFSET_RAD;
 
@@ -173,6 +175,7 @@ static void motor_chensha_init(foc_t *foc)
     foc->ref.dec_m = CHENSHA_ACCEL_LIMIT_RAD_S2;
 
     foc->motor.phase_order = CHENSHA_PHASE_ORDER;
+    foc->motor.align_current_a = CHENSHA_ALIGN_CURRENT_A;
     foc->motor.e_off = CHENSHA_ELECTRICAL_OFFSET_RAD;
     foc->motor.r_off = CHENSHA_ROTOR_OFFSET_RAD;
     foc->motor.m_off = CHENSHA_MECHANICAL_OFFSET_RAD;

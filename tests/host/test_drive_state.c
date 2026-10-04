@@ -71,6 +71,16 @@ void drive_diag_on_fault(void)
 {
 }
 
+/* 对齐路径桩：返回 false 使 drive_align_tick 不提交占空比（该测试不验证对齐行为） */
+bool foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float angle)
+{
+    (void)foc;
+    (void)id_ref;
+    (void)iq_ref;
+    (void)angle;
+    return false;
+}
+
 bool drive_mode_prepare(foc_t *foc)
 {
     (void)foc;
@@ -114,6 +124,12 @@ static bool test_expect_events(const test_event_e *expected, size_t expected_cou
         }
     }
 
+    return true;
+}
+
+bool drive_pwm_commit(foc_t *foc)
+{
+    (void)foc;
     return true;
 }
 

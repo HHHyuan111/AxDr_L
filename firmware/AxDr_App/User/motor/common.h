@@ -261,6 +261,7 @@ typedef struct
     float Kt;
     float div_Kt;
     float e_off;
+    float align_current_a; /* 编码器对齐电流 [A]，档案装载 */
     float r_off;
     float m_off;
     float Gr;
@@ -464,6 +465,13 @@ struct foc
     drive_protection_config_t prot_cfg;
     drive_protection_state_t prot_state;
     encoder_state_t enc;
+
+    /* ABZ 上电自动对齐状态（Drive 层 START 期间执行，对齐完成置 enc_aligned；
+     * RAM 语义：复位/掉电清零，STOP/START 不重复对齐）。 */
+    bool enc_aligned;
+    uint32_t align_ticks;   /* 对齐计时（先保持后取平均） */
+    float align_sin_sum;    /* 对齐期 fb.theta_e 圆均值累积 */
+    float align_cos_sum;
 
     pid_para_t id_pi;
     pid_para_t iq_pi;
