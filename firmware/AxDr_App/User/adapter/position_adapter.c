@@ -102,11 +102,6 @@ _RAM_FUNC void position_update_single_encoder(foc_t *foc)
         state->rev++;
     }
 
-    state->enc_theta_e = state->enc_pos_r * motor->pn
-        - (uint32_t)(state->enc_pos_r * motor->pnd_2pi) * M_2PI
-        + motor->e_off;
-    wrap_0_2pi(state->enc_theta_e);
-
     state->theta_e = state->enc_pos_r * motor->pn
         - (uint32_t)(state->enc_pos_r * motor->pnd_2pi) * M_2PI
         + motor->e_off;

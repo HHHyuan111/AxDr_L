@@ -34,9 +34,6 @@ static void qenc_gpio_init(void)
     HAL_GPIO_Init(GPIOB, &gpio);
 }
 
-/* 坑③：10000 计数需要 14 位表达；此常量供 device 层换算，本文件不参与位宽裁剪 */
-#define QENC_COUNTS_PER_REV 10000U
-
 static volatile uint32_t qenc_z_count = 0U;
 
 void target_qenc_init(void)

@@ -85,7 +85,6 @@ typedef struct
     int rev;
     int m_rev;
     float enc_pos_r;
-    float enc_theta_e;
     float theta_e;
     float pos_r_1t;
     float pos_r;
