@@ -46,6 +46,10 @@ $publicHeadersTestSource = Join-Path $testDir "test_public_headers.c"
 $controlCycleSource = Join-Path $appDir "control_cycle.c"
 $fastLoopSource = Join-Path $appDir "fast_loop.c"
 $targetIrqSource = Join-Path $bspDir "target_irq.c"
+# service 层源（fast_loop 集成块在 service 变量段之前用到，提前定义）
+$serviceDirEarly = Join-Path $repoRoot "firmware/AxDr_App/User/service"
+$serviceTelemetrySourceEarly = Join-Path $serviceDirEarly "service_telemetry.c"
+$axdrCommandCoreSourceEarly = Join-Path $serviceDirEarly "axdr_command_core.c"
 $boardAdapterSource = Join-Path $adapterDir "board_adapter.c"
 $observerAdapterSource = Join-Path $adapterDir "observer_adapter.c"
 $debugSnapshotSource = Join-Path $appDir "debug_snapshot.c"
@@ -319,9 +323,9 @@ Write-Host "Host C11/控制链 STOP-START-RUN-FAULT 离线回放测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
-        "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
+        "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" "-I$serviceDirEarly" `
         $fastLoopTestSource $fastLoopSource $targetIrqSource $controlCycleSource `
-        $speedAdapterSource `
+        $speedAdapterSource $serviceTelemetrySourceEarly $axdrCommandCoreSourceEarly `
         -o $fastLoopExecutablePath 2>&1 |
         ForEach-Object { $_.ToString() }
 )

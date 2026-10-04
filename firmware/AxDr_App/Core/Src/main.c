@@ -34,6 +34,10 @@
 #include "target_adc.h"
 #include "modlue.h"
 #include "lcd.h"
+#include "service_command.h"
+#include "service_telemetry.h"
+#include "service_usb.h"
+#include "usbd_cdc_if.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -65,6 +69,18 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+/* CDC 发送缝适配：service 的 0=OK/1=BUSY/其他=错误 ←→ USBD 状态码。
+ * 组装层专属：唯一允许同时看见 service 缝与 CDC 的地方。 */
+static int usb_cdc_tx_status(const uint8_t *data, uint16_t length)
+{
+    const uint8_t status = CDC_Transmit_FS((uint8_t *)data, length);
+    return (status == USBD_OK) ? 0 : ((status == USBD_BUSY) ? 1 : 2);
+}
+
+static void usb_cdc_tx(const uint8_t *data, uint16_t length)
+{
+    (void)usb_cdc_tx_status(data, length);
+}
 /* USER CODE END 0 */
 
 /**
@@ -108,7 +124,6 @@ int main(void)
   MX_SPI3_Init();
   /* USER CODE BEGIN 2 */
   HAL_Delay(1000);
-    uint32_t time = HAL_GetTick();
   HAL_TIM_Base_Start(&htim3);
   // HAL_TIM_Base_Start_IT(&htim1);
 
@@ -125,8 +140,13 @@ int main(void)
 
   foc_init(&g_foc);
   fast_loop_enable();
-  
-  
+
+  /* S4/S3 service 装配：发送缝绑定 + 遥测复位。CDC 收路径在
+   * usbd_cdc_if.c 的 CDC_Receive_FS（USB 中断 → service_usb_rx 环）。 */
+  service_telemetry_init();
+  service_usb_bind_tx(usb_cdc_tx);
+  service_telemetry_bind_tx(usb_cdc_tx_status);
+
   LCD_Init();
   LCD_Fill(0,0,LCD_W,LCD_H,BLACK);
   HAL_Delay(1000);
@@ -137,11 +157,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if(HAL_GetTick() - time > 1)
-      {
-      	time = HAL_GetTick();
-//		  vofa_start();
-      }
+    /* service 慢路径三 poll（自由节拍）：安全链执法（ARM 后生效）、
+     * 命令帧解析分发、遥测取帧发送。均设计为空转廉价。 */
+    service_safety_poll();
+    service_usb_poll();
+    service_telemetry_poll();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

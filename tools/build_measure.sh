@@ -10,7 +10,7 @@ B=$ROOT/build/rpt
 CC=arm-none-eabi-gcc
 FLAGS="-mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -Os -g -gdwarf-4 -Wall -Wextra -fdata-sections -ffunction-sections -fstack-usage"
 DEFS="-DUSE_HAL_DRIVER -DSTM32G474xx"
-INC="-I$ROOT/User/adapter -I$ROOT/User/app -I$ROOT/User/bsp/inc -I$ROOT/User/common -I$ROOT/User/config -I$ROOT/User/control -I$ROOT/User/algorithm -I$ROOT/User/diagnostic/include -I$ROOT/User/drive -I$ROOT/User/motor -I$ROOT/User/moldue/inc -I$ROOT/Core/Inc -I$ROOT/USB_Device/App -I$ROOT/USB_Device/Target -I$ROOT/Drivers/STM32G4xx_HAL_Driver/Inc -I$ROOT/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I$ROOT/Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I$ROOT/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I$ROOT/Drivers/CMSIS/Device/ST/STM32G4xx/Include -I$ROOT/Drivers/CMSIS/Include"
+INC="-I$ROOT/User/adapter -I$ROOT/User/app -I$ROOT/User/bsp/inc -I$ROOT/User/common -I$ROOT/User/config -I$ROOT/User/control -I$ROOT/User/algorithm -I$ROOT/User/diagnostic/include -I$ROOT/User/drive -I$ROOT/User/motor -I$ROOT/User/service -I$ROOT/User/moldue/inc -I$ROOT/Core/Inc -I$ROOT/USB_Device/App -I$ROOT/USB_Device/Target -I$ROOT/Drivers/STM32G4xx_HAL_Driver/Inc -I$ROOT/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I$ROOT/Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I$ROOT/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I$ROOT/Drivers/CMSIS/Device/ST/STM32G4xx/Include -I$ROOT/Drivers/CMSIS/Include"
 
 rm -rf "$B"; mkdir -p "$B/obj"
 cd "$ROOT" || exit 1

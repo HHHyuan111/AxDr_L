@@ -7,6 +7,7 @@
 #include "fast_loop.h"
 #include "foc.h"
 #include "main.h"
+#include "service_telemetry.h"
 
 /*
  * 中断优先级表（冻结，15 号规范）。
@@ -42,4 +43,7 @@ PLATFORM_FAST_CODE void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *ha
 {
     (void)hadc;
     fast_loop_step(&g_foc);
+    /* 遥测抽取（20kHz 分频组帧，S4）。组装缝：与 fast_loop_step 同为先例——
+     * 本文件是快速路径的装配点，service 不反向依赖 bsp。 */
+    service_telemetry_capture();
 }
