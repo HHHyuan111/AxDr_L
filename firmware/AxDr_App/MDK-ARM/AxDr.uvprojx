@@ -639,6 +639,11 @@
               <FileType>1</FileType>
               <FilePath>..\User\service\service_command.c</FilePath>
             </File>
+            <File>
+              <FileName>service_telemetry.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\service\service_telemetry.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

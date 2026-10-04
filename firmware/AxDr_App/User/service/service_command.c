@@ -28,6 +28,7 @@
 #include "common.h"
 #include "motor_config.h"
 #include "encoder_type.h"
+#include "service_telemetry.h"
 
 /* 档案版本（B 库 chensha_config L28=rev2；主线宏暂未定义，本地别名，S5 收编） */
 #define CHENSHA_ARCHIVE_REVISION 2u
@@ -297,6 +298,10 @@ static uint8_t provide_runtime_state(uint8_t *resp, uint16_t cap,
     p.encoder_type = (uint8_t)g_foc.enc.primary;
     p.phase_order = (uint8_t)g_foc.motor.phase_order;
     p.fault_bits = g_foc.fault.all;
+    p.telemetry_decimation = service_telemetry_decimation();
+    p.telemetry_capture_count = service_telemetry_capture_count();
+    p.telemetry_sent_count = service_telemetry_sent_count();
+    p.telemetry_drop_count = service_telemetry_drop_count();
     return payload_out(&p, sizeof(p), resp, cap, len);
 }
 

@@ -582,6 +582,7 @@ $serviceDir = Join-Path $repoRoot "firmware/AxDr_App/User/service"
 $axdrCommandCoreSource = Join-Path $serviceDir "axdr_command_core.c"
 $axdrSafetyRuntimeSource = Join-Path $serviceDir "axdr_safety_runtime.c"
 $serviceUsbSource = Join-Path $serviceDir "service_usb.c"
+$serviceTelemetrySource = Join-Path $serviceDir "service_telemetry.c"
 $serviceCommandTestSource = Join-Path $testDir "test_service_command.c"
 $serviceCommandSource = Join-Path $serviceDir "service_command.c"
 $serviceCommandExecutablePath = Join-Path $outputDir "test_service_command.exe"
@@ -590,7 +591,7 @@ $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" `
-        $serviceCommandTestSource $serviceUsbSource $serviceCommandSource $axdrCommandCoreSource $axdrSafetyRuntimeSource `
+        $serviceCommandTestSource $serviceUsbSource $serviceCommandSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
         -o $serviceCommandExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )
@@ -599,6 +600,22 @@ if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; th
 if ($LASTEXITCODE -ne 0) { throw "service_command 测试运行失败" }
 Write-Host "Host C11/S3 命令分发器与安全链旅程测试通过。"
 
+$serviceTelemetryTestSource = Join-Path $testDir "test_service_telemetry.c"
+$serviceTelemetryExecutablePath = Join-Path $outputDir "test_service_telemetry.exe"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
+        "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" `
+        $serviceTelemetryTestSource $serviceTelemetrySource $axdrCommandCoreSource `
+        -o $serviceTelemetryExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "service_telemetry 编译失败" }
+& $serviceTelemetryExecutablePath
+if ($LASTEXITCODE -ne 0) { throw "service_telemetry 测试运行失败" }
+Write-Host "Host C11/S4 遥测帧组包与发送缝测试通过。"
+
 $serviceUsbTestSource = Join-Path $testDir "test_service_usb.c"
 $serviceUsbExecutablePath = Join-Path $outputDir "test_service_usb.exe"
 
@@ -606,7 +623,7 @@ $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" `
-        $serviceUsbTestSource $serviceUsbSource $serviceCommandSource $axdrCommandCoreSource $axdrSafetyRuntimeSource `
+        $serviceUsbTestSource $serviceUsbSource $serviceCommandSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
         -o $serviceUsbExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )
