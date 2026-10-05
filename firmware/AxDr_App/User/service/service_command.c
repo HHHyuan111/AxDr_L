@@ -325,7 +325,9 @@ static uint8_t provide_control_limits(uint8_t *resp, uint16_t cap,
     axdr_control_limits_payload_t p;
     build_profile_once(); /* 指纹与档案应答同源（缺它宿主绑定校验必失败） */
     memset(&p, 0, sizeof(p));
-    p.schema_version = 1u;
+    /* V2=84B 含 V/F、I/F 限幅字段；宿主 V1=76B 无这两项——标错版本号
+     * 会因"schema 与长度自相矛盾"被整帧拒收（上一轮解析失败根因之一）。 */
+    p.schema_version = 2u;
     p.payload_size = sizeof(p);
     p.profile_id = MOTOR_PROFILE_ID;
     p.profile_revision = MOTOR_PROFILE_REVISION;
@@ -333,7 +335,24 @@ static uint8_t provide_control_limits(uint8_t *resp, uint16_t cap,
     p.maximum_current_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
     p.maximum_speed_rad_s = CHENSHA_PEAK_SPEED_RAD_S;
     p.maximum_speed_iq_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
+    /* 宿主合同要求全部 16 项限幅有限且为正：零值=非法包络，整帧拒收
+     * （上一轮解析失败根因之二）。本固件不提供位置/MIT/VF/IF 命令，
+     * 但包络是电机物理描述而非模式开关——按 motor_config 真值填写，
+     * 模式有无仍由 opcode 掩码门控。 */
+    p.maximum_position_rad = MOTOR_MAX_POSITION_RAD;
+    p.maximum_position_velocity_rad_s = CHENSHA_PEAK_SPEED_RAD_S;
+    p.maximum_position_acceleration_rad_s2 = CHENSHA_ACCEL_LIMIT_RAD_S2;
+    p.maximum_position_iq_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
+    p.maximum_mit_position_rad = MOTOR_MAX_POSITION_RAD;
+    p.maximum_mit_velocity_rad_s = CHENSHA_PEAK_SPEED_RAD_S;
+    /* 增益上限按饱和域推：Kp=8A/0.5rad、Kd=8A/160rad/s（推导域写死注释） */
+    p.maximum_mit_kp_A_per_rad = 16.0f;
+    p.maximum_mit_kd_A_per_rad_s = 0.05f;
+    p.maximum_mit_feedforward_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
+    p.maximum_mit_iq_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
     p.maximum_alignment_current_A = CHENSHA_ALIGN_CURRENT_A;
+    p.maximum_vf_voltage_V = CHENSHA_UNDER_VOLTAGE_V; /* 不超最低母线 */
+    p.maximum_if_current_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
     return payload_out(&p, sizeof(p), resp, cap, len);
 }
 
@@ -353,18 +372,41 @@ static uint8_t provide_link_diagnostics(uint8_t *resp, uint16_t cap,
     return payload_out(&p, sizeof(p), resp, cap, len);
 }
 
+/* 控制模式协议编号：上位机合同（速度=1/电流=2）与固件内部
+ * debug_mode_e（spd_curr_cl=4/curr_cl=3）是两套编号空间，上报前必须翻译。 */
+static uint8_t protocol_control_mode(uint8_t debug_mode)
+{
+    if (debug_mode == (uint8_t)spd_curr_cl)
+    {
+        return 1u;
+    }
+    if (debug_mode == (uint8_t)curr_cl)
+    {
+        return 2u;
+    }
+    return 0u;
+}
+
 static uint8_t provide_control_state(uint8_t *resp, uint16_t cap,
                                      uint16_t *len)
 {
     axdr_control_state_payload_t p;
+    /* active/mode 反映"已下达的控制状态"而非驱动状态机瞬态：
+     * Applied 响应构建时电机可能尚未转到 RUN（START 刚下发），
+     * 也可能 STOP 刚下发尚未减速完（state 仍 RUN）。以 req 为准，
+     * STOP 后 active=0/mode=0，Set* 后 active=1/mode=协议编号。 */
+    const uint8_t commanded =
+        ((g_foc.req == DRIVE_REQ_RUN) || (g_foc.req == DRIVE_REQ_START))
+            ? 1u
+            : 0u;
     memset(&p, 0, sizeof(p));
     p.tick_ms = now_ms();
     p.session_id = safety.session_id;
     p.command_deadline_ms = command_deadline_ms;
     p.applied_count = applied_count;
     p.timeout_count = lease_timeout_count;
-    p.mode = (uint8_t)g_foc.mode.debug;
-    p.active = (g_foc.state == DRIVE_STATE_RUN) ? 1u : 0u;
+    p.mode = commanded ? protocol_control_mode((uint8_t)g_foc.mode.debug) : 0u;
+    p.active = commanded;
     p.stop_reason = last_stop_reason;
     p.alignment_valid = (g_foc.enc_aligned != 0u) ? 1u : 0u;
     p.speed_target_rad_s = g_foc.ref.spd_r;
@@ -481,8 +523,12 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
                 return reason;
             }
             session_ever_active = 1u; /* F3：从现在起 poll 开始执法 */
+            /* 合同：Arm 的 Applied 响应必须携带 40B 安全快照——
+             * 宿主从它学习 session_id（后续心跳携带）与 armed 态。 */
             *ack_state = AXDR_ACK_APPLIED;
-            return AXDR_REASON_NONE;
+            return provide_safety_state(response_payload,
+                                        response_payload_capacity,
+                                        response_payload_length);
         }
 
         case AXDR_OPCODE_SAFETY_DISARM:
@@ -499,8 +545,12 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 g_foc.req = DRIVE_REQ_STOP;
             }
+            /* 合同：Disarm 的 Applied 响应携带 40B 安全快照，宿主校验
+             * state=0/session=0/无运行授权后才承认失能完成。 */
             *ack_state = AXDR_ACK_APPLIED;
-            return AXDR_REASON_NONE;
+            return provide_safety_state(response_payload,
+                                        response_payload_capacity,
+                                        response_payload_length);
 
         case AXDR_OPCODE_SAFETY_HEARTBEAT:
         {
@@ -517,8 +567,11 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 return reason;
             }
+            /* 合同：心跳 Applied 响应携带安全快照（宿主刷新租约状态）。 */
             *ack_state = AXDR_ACK_APPLIED;
-            return AXDR_REASON_NONE;
+            return provide_safety_state(response_payload,
+                                        response_payload_capacity,
+                                        response_payload_length);
         }
 
         case AXDR_OPCODE_GET_MOTOR_PROFILE:
@@ -545,6 +598,7 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
         {
             const axdr_motor_profile_confirm_request_t *req = payload_in(
                 request_payload, request_payload_length, sizeof(*req));
+            axdr_motor_profile_confirmation_payload_t confirmation;
             uint8_t reason;
             if (req == NULL)
             {
@@ -552,6 +606,22 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             }
             ensure_profile_configured();
             reason = axdr_safety_runtime_confirm_motor_profile(&safety, req);
+            if (reason != AXDR_REASON_NONE)
+            {
+                return reason;
+            }
+            /* 确认应答必须携带 16B 载荷（合同 §confirm）：宿主
+             * parseMotorProfileConfirmation 校验三元组+confirmed 位，
+             * 空载荷会被判"确认响应无效"，使能旅程到此中断。 */
+            memset(&confirmation, 0, sizeof(confirmation));
+            confirmation.profile_id = MOTOR_PROFILE_ID;
+            confirmation.profile_revision = MOTOR_PROFILE_REVISION;
+            confirmation.profile_crc32 = profile_payload.profile_crc32;
+            confirmation.confirmed = 1u;
+            reason = payload_out(&confirmation, sizeof(confirmation),
+                                 response_payload,
+                                 response_payload_capacity,
+                                 response_payload_length);
             if (reason != AXDR_REASON_NONE)
             {
                 return reason;
@@ -581,8 +651,12 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             last_stop_reason = AXDR_CONTROL_STOP_HOST_REQUEST;
             /* 撤销运行授权：下次运动命令重新过入口互锁（fail-safe 方向） */
             (void)axdr_safety_runtime_revoke_run(&safety, now_ms());
+            /* 合同：STOP 的 Applied 响应携带 40B 控制快照，宿主校验
+             * active=0/mode=0 才承认停机完成（req 已置 STOP 故快照为 0）。 */
             *ack_state = AXDR_ACK_APPLIED;
-            return AXDR_REASON_NONE;
+            return provide_control_state(response_payload,
+                                         response_payload_capacity,
+                                         response_payload_length);
 
         case AXDR_OPCODE_SET_SPEED:
         {
@@ -613,8 +687,12 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 g_foc.req = DRIVE_REQ_START;
             }
+            /* 合同：Set* 的 Applied 响应携带 40B 控制快照（active=1，
+             * mode=协议编号），宿主校验一致才承认生效。 */
             *ack_state = AXDR_ACK_APPLIED;
-            return AXDR_REASON_NONE;
+            return provide_control_state(response_payload,
+                                         response_payload_capacity,
+                                         response_payload_length);
         }
 
         case AXDR_OPCODE_SET_CURRENT:
@@ -646,8 +724,11 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 g_foc.req = DRIVE_REQ_START;
             }
+            /* 同 SET_SPEED：Applied 携带控制快照（active=1，mode=2）。 */
             *ack_state = AXDR_ACK_APPLIED;
-            return AXDR_REASON_NONE;
+            return provide_control_state(response_payload,
+                                         response_payload_capacity,
+                                         response_payload_length);
         }
 
         default:
