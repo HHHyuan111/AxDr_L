@@ -51,6 +51,7 @@
 #define SS_OFF_TIMEOUT_COUNT 32u
 #define SS_OFF_STATE 36u
 #define SS_OFF_DISARM_REASON 37u
+#define SS_OFF_INTERLOCK 38u
 #define SS_OFF_RUN_AUTHORIZED 39u
 
 /* control_state payload 内偏移（40B） */
@@ -241,6 +242,11 @@ static uint8_t st_handler(void *ctx, uint16_t opcode,
             wr_u32(&p[SS_OFF_SESSION], st_session);
             p[SS_OFF_STATE] = st_armed ? AXDR_SAFETY_ARMED
                                        : AXDR_SAFETY_DISARMED;
+            /* 与修复后固件同语义：查询即评估互锁——静止(相输出关断+无
+             * 故障)三位全齐；运行中相输出使能位清零 */
+            p[SS_OFF_INTERLOCK] =
+                (st_authorized != 0) ? AXDR_SAFETY_INTERLOCK_FAULTS_CLEAR
+                                     : AXDR_SAFETY_INTERLOCK_READY_TO_ARM;
             p[SS_OFF_RUN_AUTHORIZED] = st_authorized ? 1u : 0u;
             memcpy(resp, p, sizeof(p));
             *resp_len = (uint16_t)sizeof(p);
@@ -779,6 +785,22 @@ static int run_arm(int with_negative)
         return 0;
     }
     g_challenge = rd_u32(&g_last_resp.payload[SS_OFF_CHALLENGE]);
+
+    /* 上位机闸门模拟（Mit_Tool requestArm 同款前置）：interlock 不到位
+     * 就不发起 ARM——固件若把互锁刷新只留在 ARM/poll 内部，此处即红，
+     * 死锁类回归在回环里直接暴露，不等上机。 */
+    {
+        const uint8_t interlock = g_last_resp.payload[SS_OFF_INTERLOCK];
+        expect("ARM 前置互锁就绪（interlock==READY_TO_ARM）",
+               interlock == (uint8_t)AXDR_SAFETY_INTERLOCK_READY_TO_ARM);
+        if (interlock != (uint8_t)AXDR_SAFETY_INTERLOCK_READY_TO_ARM)
+        {
+            printf("[FAIL] 上位机闸门拦截：interlock=0x%02X ≠ READY_TO_ARM，"
+                   "不发 ARM（固件未在 GetSafetyState 刷新互锁？）\n",
+                   interlock);
+            return 0;
+        }
+    }
 
     if (with_negative)
     {

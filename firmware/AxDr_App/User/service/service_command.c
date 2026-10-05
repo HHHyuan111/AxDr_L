@@ -434,6 +434,18 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 return AXDR_REASON_INVALID_PAYLOAD;
             }
+            /* 查询即评估：会话门卫模式下（首次 ARM 前）poll 不执法，
+             * interlock 停在 init 的 0；而上位机 ARM 前靠本应答判断互锁
+             * 就绪（要求 READY_TO_ARM 三位全齐）→ 互相等待死锁。
+             * 与 ARM 路径同款现场 observe：静止时两位硬件位齐，只刷新
+             * 快照；DISARM 后 PWM 关断窗口由 20ms 停机宽限期覆盖。 */
+            {
+                const uint8_t outputs_disabled =
+                    (g_foc.pwm_active == 0u) ? 1u : 0u;
+                axdr_safety_runtime_observe(&safety, now_ms(),
+                                            g_foc.fault.all, outputs_disabled,
+                                            outputs_disabled);
+            }
             *ack_state = AXDR_ACK_ACCEPTED;
             return provide_safety_state(response_payload,
                                         response_payload_capacity,
