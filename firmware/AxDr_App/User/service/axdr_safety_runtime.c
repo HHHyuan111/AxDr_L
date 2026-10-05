@@ -345,15 +345,17 @@ uint8_t axdr_safety_runtime_disarm(axdr_safety_runtime_t *runtime,
         return AXDR_REASON_INVALID_PAYLOAD;
     }
     runtime->tick_ms = now_ms;
-    if (runtime->state == AXDR_SAFETY_FAULT_LOCKED)
-    {
-        runtime->session_id = 0u;
-        runtime->run_authorized = 0u;
-        runtime->shutdown_requested = 1u;
-        return AXDR_REASON_NONE;
-    }
+    /* FAULT_LOCKED 可被 DISARM 解除：命令合同没有独立的 CLEAR_FAULTS
+     * 动词，DISARM（操作员显式结束会话）就是故障确认与恢复动词——
+     * 否则任何一次故障锁存都只能断电重启。disarm_reason 保留
+     * FAULT_ACTIVE 留痕；session/档案确认由 transition 清零，重 ARM
+     * 需重新确认（宿主已有静默重确认旅程）。驱动故障锁存位的清理由
+     * 调用方（service 层）在 PWM 确认关断后执行。 */
     transition(runtime, AXDR_SAFETY_DISARMED,
-               AXDR_SAFETY_DISARM_HOST_REQUEST, 1u);
+               runtime->state == AXDR_SAFETY_FAULT_LOCKED
+                   ? AXDR_SAFETY_DISARM_FAULT_ACTIVE
+                   : AXDR_SAFETY_DISARM_HOST_REQUEST,
+               1u);
     return AXDR_REASON_NONE;
 }
 

@@ -26,6 +26,7 @@
 
 #include "axdr_command_core.h"
 #include "common.h"
+#include "drive.h" /* drive_fault_clear：DISARM 故障恢复路径清驱动锁存位 */
 #include "motor_config.h"
 #include "encoder_type.h"
 #include "service_telemetry.h"
@@ -37,9 +38,12 @@
 /* S6 互锁现场评估 + S8 限幅指纹 + S9 确认载荷在 0.7.1；S10 修复 0x08
  * 上电首查互锁清零（ensure 懒初始化晚于 observe，见 GET_SAFETY_STATE）。
  * 0.7.3 补 ENCODER_ALIGNMENT 能力位（双闸）；0.7.4 修 AlignEncoder 字段
- * 顺序（id@8/angle@12，读反恒拒 13）。
+ * 顺序（id@8/angle@12，读反恒拒 13）；0.7.5 DISARM 故障恢复语义：
+ * DISARM 即故障确认动词——解除 FAULT_LOCKED + 清驱动锁存位（PWM 未
+ * 关断由 poll 挂起落地），应答前现场 observe。修"跑一次故障/失能后
+ * 再也使能不了，只能断电重启"的死局。
  * 上位机只按 major/minor 判兼容，patch 递增仅供操作员分辨新旧固件。 */
-#define SVC_FW_PATCH 4u
+#define SVC_FW_PATCH 5u
 #define SVC_DEVICE_FAMILY 0x00000001u /* 沉沙/AxDrive-L 驱动 */
 #define SVC_BOARD_PROFILE 0x00000003u /* hw_rev v1.3 */
 #define SVC_PRODUCT_NAME "AxDrService"
@@ -76,6 +80,11 @@ static uint8_t command_active;
 static uint32_t applied_count;
 static uint32_t lease_timeout_count;
 static uint8_t last_stop_reason = AXDR_CONTROL_STOP_NONE;
+
+/* 故障恢复挂起：DISARM 到达时驱动有锁存故障但 PWM 尚未物理关断
+ * （STOP×3 同批竞态，drive_fault_clear 拒绝清零）——由 poll 确认
+ * 关断后落地恢复，防止"故障清了但功率级还开着"的假恢复。 */
+static uint8_t fault_recovery_pending;
 
 /* F2 档案 payload：只构造一次，CRC 注册与应答同源 */
 static axdr_motor_profile_payload_t profile_payload;
@@ -154,6 +163,17 @@ void service_safety_poll(void)
         return; /* F3 台架模式：USB 会话从未建立，不执法（调试器手动运行不受影响） */
     }
     ensure_profile_configured();
+
+    /* 挂起的故障恢复落地：PWM 已确认关断才清驱动锁存故障并解除
+     * FAULT_LOCKED（DISARM 处理时因竞态没能同步完成的收尾）。 */
+    if ((fault_recovery_pending != 0u) && (g_foc.pwm_active == 0u))
+    {
+        if (drive_fault_clear(&g_foc))
+        {
+            fault_recovery_pending = 0u;
+            (void)axdr_safety_runtime_disarm(&safety, now);
+        }
+    }
 
     /* 互锁观察：fault 全零 + PWM 未激活（相输出关断）+ 栅极拉低（PWM 停=低） */
     {
@@ -555,6 +575,20 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 return AXDR_REASON_INVALID_PAYLOAD;
             }
+            ensure_profile_configured();
+            /* 故障恢复：命令合同没有 CLEAR_FAULTS 动词，DISARM（操作员
+             * 显式结束会话）就是故障确认动词。驱动有锁存故障或 runtime
+             * 已 FAULT_LOCKED 时，先清驱动锁存位再解除——否则任何一次
+             * 瞬态故障锁存都只能断电重启。drive_fault_clear 自带
+             * "PWM 必须已关断"守卫：同批竞态（STOP×3 与 DISARM 同趟
+             * 处理，快环还没关功率级）清不掉 → 挂起，由
+             * service_safety_poll 确认关断后落地。 */
+            if ((g_foc.fault.all != 0u) ||
+                (safety.state == AXDR_SAFETY_FAULT_LOCKED))
+            {
+                fault_recovery_pending =
+                    (drive_fault_clear(&g_foc) == true) ? 0u : 1u;
+            }
             (void)axdr_safety_runtime_disarm(&safety, now_ms());
             command_active = 0u;
             last_stop_reason = AXDR_CONTROL_STOP_SAFETY_SESSION;
@@ -563,6 +597,16 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
                 (g_foc.req == DRIVE_REQ_START))
             {
                 g_foc.req = DRIVE_REQ_STOP;
+            }
+            /* 应答前现场观察一次（与 GET_SAFETY_STATE/ARM 同款）：常态
+             * 下互锁立即回 READY_TO_ARM；同批竞态（PWM 尚未关断）如实
+             * 报 0x04，宿主周期刷新会拿到恢复后的真值。 */
+            {
+                const uint8_t outputs_disabled =
+                    (g_foc.pwm_active == 0u) ? 1u : 0u;
+                axdr_safety_runtime_observe(&safety, now_ms(),
+                                            g_foc.fault.all, outputs_disabled,
+                                            outputs_disabled);
             }
             /* 合同：Disarm 的 Applied 响应携带 40B 安全快照，宿主校验
              * state=0/session=0/无运行授权后才承认失能完成。 */

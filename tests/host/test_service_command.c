@@ -26,6 +26,20 @@
 
 foc_t g_foc;
 
+/* drive.c 替身：service_command 的 DISARM 故障恢复路径调用（真机由
+ * drive.c 提供，本测试不链 drive 源）。语义对齐 drive.c——PWM 活动期
+ * 拒绝清零，否则清锁存故障并请求 STOP。 */
+bool drive_fault_clear(foc_t *foc)
+{
+    if ((foc == NULL) || (foc->pwm_active != 0u))
+    {
+        return false;
+    }
+    foc->fault.all = 0u;
+    foc->req = DRIVE_REQ_STOP;
+    return true;
+}
+
 static int fail_count;
 static void expect(const char *name, bool cond)
 {
