@@ -34,9 +34,10 @@
 /* ---- 板级/固件身份（上位机 GetDeviceInfo/GetProtocolInfo 匹配用） ---- */
 #define SVC_FW_MAJOR 0u
 #define SVC_FW_MINOR 7u
-/* S6 互锁现场评估 + S8 限幅指纹 + S9 确认载荷都在 0.7.1；
+/* S6 互锁现场评估 + S8 限幅指纹 + S9 确认载荷在 0.7.1；S10 修复 0x08
+ * 上电首查互锁清零（ensure 懒初始化晚于 observe，见 GET_SAFETY_STATE）。
  * 上位机只按 major/minor 判兼容，patch 递增仅供操作员分辨新旧固件。 */
-#define SVC_FW_PATCH 1u
+#define SVC_FW_PATCH 2u
 #define SVC_DEVICE_FAMILY 0x00000001u /* 沉沙/AxDrive-L 驱动 */
 #define SVC_BOARD_PROFILE 0x00000003u /* hw_rev v1.3 */
 #define SVC_PRODUCT_NAME "AxDrService"
@@ -480,6 +481,14 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 return AXDR_REASON_INVALID_PAYLOAD;
             }
+            /* S10 顺序修复：先建档初始化，再现场评估。ensure 首次调用会
+             * init 整个 runtime（memset 清零）；预检序列 0x01/0x02/0x17/
+             * 0x18 均不触发 ensure，会话门卫下 poll 也不走到——本命令常是
+             * 上电后第一个触点。若 ensure 拖到 provide_safety_state 里才
+             * 跑，顺序就成了 observe → init(清零) → snapshot：刚评估出的
+             * 互锁位被抹掉，上电后首查恒 0x00/tick=0；上位机预检只查这
+             * 一次并缓存 → "互锁标志未就绪"死锁，每次上电/重刷必现。 */
+            ensure_profile_configured();
             /* 查询即评估：会话门卫模式下（首次 ARM 前）poll 不执法，
              * interlock 停在 init 的 0；而上位机 ARM 前靠本应答判断互锁
              * 就绪（要求 READY_TO_ARM 三位全齐）→ 互相等待死锁。
@@ -506,6 +515,10 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 return AXDR_REASON_INVALID_PAYLOAD;
             }
+            /* S10 同款顺序修复：observe/arm 之前 runtime 必须已初始化——
+             * init 的 memset 会清互锁，且 arm 的档案门依赖 ensure 注册的
+             * expected_profile_id。先 ensure 再评估，任何命令序都稳。 */
+            ensure_profile_configured();
             /* challenge 从上次 GetSafetyState 快照来；会话由 arm 内部建立。
              * ARM 前现场 observe 一次：会话门卫模式下 poll 在首次 ARM 前不
              * 执法，互锁位只能在这里刷新——ARM 本就应在"电机静止"瞬间评估

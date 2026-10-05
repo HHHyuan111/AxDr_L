@@ -128,6 +128,33 @@ int main(void)
 
     service_usb_bind_tx(tx_stub);
 
+    /* ---- 0. GUI 预检序首查（S10 回归）----
+     * 真实上位机预检顺序是 0x01→0x02→0x17→0x18→0x08，档案确认(0x19)
+     * 要到点使能时才发——0x08 常是上电后第一条会触碰安全 runtime 的命令。
+     * 曾因 ensure 懒初始化排在 observe 之后，首查互锁被 init 的 memset
+     * 清零（恒 0x00/tick=0），上位机"互锁标志未就绪"死锁。下方旅程第 3
+     * 步就发 Confirm（其内部先 ensure），恰好绕开该路径，故须单独前置。 */
+    set_time_ms(316127u);
+    send_frame(NULL, 0u, 0x0100u, AXDR_OPCODE_GET_PROTOCOL_INFO);
+    expect("预检 protocol ack", ack() == AXDR_ACK_ACCEPTED);
+    send_frame(NULL, 0u, 0x0101u, AXDR_OPCODE_GET_DEVICE_INFO);
+    expect("预检 device ack", ack() == AXDR_ACK_ACCEPTED);
+    send_frame(NULL, 0u, 0x0102u, AXDR_OPCODE_GET_MOTOR_PROFILE);
+    expect("预检 profile ack", ack() == AXDR_ACK_ACCEPTED);
+    send_frame(NULL, 0u, 0x0103u, AXDR_OPCODE_GET_CONTROL_LIMITS);
+    expect("预检 limits ack", ack() == AXDR_ACK_ACCEPTED);
+    send_frame(NULL, 0u, 0x0104u, AXDR_OPCODE_GET_SAFETY_STATE);
+    expect("首查 safety ack", ack() == AXDR_ACK_ACCEPTED);
+    expect("首查互锁 READY_TO_ARM(S10)",
+           rd_u8(resp_payload(),
+                 offsetof(axdr_safety_state_payload_t, interlock_flags)) ==
+               AXDR_SAFETY_INTERLOCK_READY_TO_ARM);
+    expect("首查 tick=上电毫秒(非 init 清零)",
+           rd_u32(resp_payload(),
+                  offsetof(axdr_safety_state_payload_t, tick_ms)) == 316127u);
+    /* 回归时间轴：下方主旅程从 t=0 重新计时（租约/心跳断言依赖它） */
+    set_time_ms(0u);
+
     /* ---- 1. GetProtocolInfo（能力位含运动控制与租约） ---- */
     send_frame(NULL, 0u, 1u, AXDR_OPCODE_GET_PROTOCOL_INFO);
     expect("protocol info ack", ack() == AXDR_ACK_ACCEPTED);
