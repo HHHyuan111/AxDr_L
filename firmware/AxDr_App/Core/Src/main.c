@@ -87,14 +87,36 @@ static int usb_cdc_tx_status(const uint8_t *data, uint16_t length)
  * （≤64B 单包在返回前已整体装入端点 FIFO，故旧版只有长响应出错；
  * 遥测帧的 pending 缓冲是静态的，不受影响。）拷入静态帧再交 CDC。 */
 static uint8_t command_tx_frame[AXDR_COMMAND_MAX_RESPONSE_SIZE];
+/* 命令响应与遥测共用同一个 CDC 单发送槛（hcdc->TxState）。遥测走
+ * service_telemetry_poll 高频压发，命令响应若恰好撞上 TxState 忙，
+ * CDC_Transmit_FS 直接回 USBD_BUSY——旧版本在此处 (void) 丢弃，
+ * 宿主侧必然 ACK 超时（GetLinkDiagnostics 轮询频率高，撞车概率
+ * 最大，表现为该命令持续超时；GetControlState 偶发）。
+ * 本函数运行在主循环（service_usb_poll），非中断上下文，短暂自旋
+ * 等 TxState 让出是安全的：单包 CDC 发送通常几十到几百微秒完成，
+ * 不阻塞任何中断，不影响定时器中断里的 FOC 控制环。 */
+#define USB_CDC_TX_BUSY_RETRY_LIMIT 64u
 static void usb_cdc_tx(const uint8_t *data, uint16_t length)
 {
+    uint32_t retry;
+
     if (length == 0u || length > sizeof(command_tx_frame))
     {
         return;
     }
     memcpy(command_tx_frame, data, length);
-    (void)usb_cdc_tx_status(command_tx_frame, length);
+    for (retry = 0u; retry < USB_CDC_TX_BUSY_RETRY_LIMIT; ++retry)
+    {
+        const int status = usb_cdc_tx_status(command_tx_frame, length);
+        if (status != 1)
+        {
+            /* 0=已登记发送 / 2=其他错误（非忙碌，重试无意义） */
+            return;
+        }
+        /* status==1：USBD_BUSY，上一包（通常是遥测）仍占用 TxState */
+    }
+    /* 重试耗尽仍忙：放弃本次响应，行为退化为旧版（宿主侧重试兜底），
+     * 不在此处死等，避免极端情况下拖慢主循环其他 poll。 */
 }
 /* USER CODE END 0 */
 

@@ -24,3 +24,5 @@
 tests/csv/
 # Keil 命令行构建日志（keil_build_check.sh 产物）
 firmware/AxDr_App/MDK-ARM/build_log.txt
+# 参考工程（suanfa 等 P8 资产来源，只读不进仓）
+/reference/
