@@ -409,6 +409,18 @@ static uint8_t st_handler(void *ctx, uint16_t opcode,
             wr_u16(&p[0], 1u);  /* command_version */
             wr_u16(&p[2], 1u);  /* telemetry_version */
             wr_u16(&p[4], 160u); /* telemetry_frame_size */
+            wr_u32(&p[12], AXDR_CAPABILITY_READ_ONLY_QUERIES |
+                              AXDR_CAPABILITY_SAFETY_SESSION |
+                              AXDR_CAPABILITY_USB_MOTION_CONTROL |
+                              AXDR_CAPABILITY_CONTROL_LEASE |
+                              AXDR_CAPABILITY_ENCODER_ALIGNMENT |
+                              AXDR_CAPABILITY_MOTOR_PROFILE |
+                              AXDR_CAPABILITY_MOTOR_PROFILE_CONFIRMATION |
+                              AXDR_CAPABILITY_LINK_DIAGNOSTICS);
+            wr_u32(&p[16], (1u << AXDR_OPCODE_SET_SPEED) |
+                              (1u << AXDR_OPCODE_SET_CURRENT) |
+                              (1u << AXDR_OPCODE_ALIGN_ENCODER) |
+                              (1u << AXDR_OPCODE_CONTROL_STOP));
             memcpy(resp, p, sizeof(p));
             *resp_len = (uint16_t)sizeof(p);
             *ack = AXDR_ACK_ACCEPTED;
@@ -845,6 +857,14 @@ static void run_queries(void)
         expect("遥测版本=1/帧长=160",
                (rd_u16(&g_last_resp.payload[2]) == 1u) &&
                    (rd_u16(&g_last_resp.payload[4]) == 160u));
+        /* Mit_Tool 校准按钮同款双闸（supportsEncoderAlignment）：能力位
+         * caps bit11 与掩码位 mask 0x12 必须同时在——2026-10-05 上机
+         * "按钮灰"根因：只加了掩码位漏能力位。协议层从此处拦住同类回归。 */
+        expect("对齐能力双闸就绪（caps bit11 + mask 0x12）",
+               ((rd_u32(&g_last_resp.payload[12]) &
+                 AXDR_CAPABILITY_ENCODER_ALIGNMENT) != 0u) &&
+                   ((rd_u32(&g_last_resp.payload[16]) &
+                     (1u << AXDR_OPCODE_ALIGN_ENCODER)) != 0u));
     }
 
     (void)tx_expect(AXDR_OPCODE_GET_DEVICE_INFO, NULL, 0, AXDR_ACK_ACCEPTED,

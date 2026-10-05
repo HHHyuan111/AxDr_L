@@ -36,8 +36,10 @@
 #define SVC_FW_MINOR 7u
 /* S6 互锁现场评估 + S8 限幅指纹 + S9 确认载荷在 0.7.1；S10 修复 0x08
  * 上电首查互锁清零（ensure 懒初始化晚于 observe，见 GET_SAFETY_STATE）。
+ * 0.7.3 补 ENCODER_ALIGNMENT 能力位：上位机校准按钮判定是"caps bit11 +
+ * mask 0x12"双闸（supportsEncoderAlignment），只给掩码位按钮仍灰。
  * 上位机只按 major/minor 判兼容，patch 递增仅供操作员分辨新旧固件。 */
-#define SVC_FW_PATCH 2u
+#define SVC_FW_PATCH 3u
 #define SVC_DEVICE_FAMILY 0x00000001u /* 沉沙/AxDrive-L 驱动 */
 #define SVC_BOARD_PROFILE 0x00000003u /* hw_rev v1.3 */
 #define SVC_PRODUCT_NAME "AxDrService"
@@ -258,6 +260,7 @@ static uint8_t provide_protocol_info(uint8_t *resp, uint16_t cap,
                          AXDR_CAPABILITY_SAFETY_SESSION |
                          AXDR_CAPABILITY_USB_MOTION_CONTROL |
                          AXDR_CAPABILITY_CONTROL_LEASE |
+                         AXDR_CAPABILITY_ENCODER_ALIGNMENT |
                          AXDR_CAPABILITY_MOTOR_PROFILE |
                          AXDR_CAPABILITY_MOTOR_PROFILE_CONFIRMATION |
                          AXDR_CAPABILITY_LINK_DIAGNOSTICS;
