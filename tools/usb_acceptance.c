@@ -372,7 +372,8 @@ static uint8_t st_handler(void *ctx, uint16_t opcode,
             *resp_len = st_control_state(resp);
             return AXDR_REASON_NONE;
         case AXDR_OPCODE_ALIGN_ENCODER:
-            /* 布局同速度请求：session/lease/ramp/id/forced_angle(=0) */
+            /* 宿主布局（makeEncoderAlignmentRequest）：
+             * session/lease/ramp/id_target_A@8/forced_angle@12(=0) */
             if (req_len != 16u)
             {
                 return AXDR_REASON_INVALID_PAYLOAD;
@@ -381,9 +382,9 @@ static uint8_t st_handler(void *ctx, uint16_t opcode,
             {
                 return AXDR_REASON_SESSION_MISMATCH;
             }
-            if ((rd_f32(&req_payload[12]) <= 0.0f) ||
-                (rd_f32(&req_payload[12]) > 2.0f) ||
-                (rd_f32(&req_payload[8]) != 0.0f))
+            if ((rd_f32(&req_payload[8]) <= 0.0f) ||
+                (rd_f32(&req_payload[8]) > 2.0f) ||
+                (rd_f32(&req_payload[12]) != 0.0f))
             {
                 return AXDR_REASON_OUT_OF_RANGE;
             }
@@ -991,12 +992,12 @@ static int run_align(void)
     uint32_t t_done = 0u;
     int had_starting = 0;
 
-    /* 负 path：错会话拒 */
+    /* 负 path：错会话拒（宿主布局 id@8/forced_angle@12） */
     wr_u32(&req[0], 0xDEADu);
     wr_u16(&req[4], 1000u);
     wr_u16(&req[6], 300u);
-    wr_f32(&req[8], 0.0f);
-    wr_f32(&req[12], 2.0f);
+    wr_f32(&req[8], 2.0f);
+    wr_f32(&req[12], 0.0f);
     (void)tx_expect(AXDR_OPCODE_ALIGN_ENCODER, req, 16, AXDR_ACK_REJECTED,
                     0xFFu, "错会话校准拒");
 

@@ -36,10 +36,10 @@
 #define SVC_FW_MINOR 7u
 /* S6 互锁现场评估 + S8 限幅指纹 + S9 确认载荷在 0.7.1；S10 修复 0x08
  * 上电首查互锁清零（ensure 懒初始化晚于 observe，见 GET_SAFETY_STATE）。
- * 0.7.3 补 ENCODER_ALIGNMENT 能力位：上位机校准按钮判定是"caps bit11 +
- * mask 0x12"双闸（supportsEncoderAlignment），只给掩码位按钮仍灰。
+ * 0.7.3 补 ENCODER_ALIGNMENT 能力位（双闸）；0.7.4 修 AlignEncoder 字段
+ * 顺序（id@8/angle@12，读反恒拒 13）。
  * 上位机只按 major/minor 判兼容，patch 递增仅供操作员分辨新旧固件。 */
-#define SVC_FW_PATCH 3u
+#define SVC_FW_PATCH 4u
 #define SVC_DEVICE_FAMILY 0x00000001u /* 沉沙/AxDrive-L 驱动 */
 #define SVC_BOARD_PROFILE 0x00000003u /* hw_rev v1.3 */
 #define SVC_PRODUCT_NAME "AxDrService"
@@ -752,21 +752,21 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
 
         case AXDR_OPCODE_ALIGN_ENCODER:
         {
-            /* 布局与速度请求同构（宿主合同）：session/lease/ramp/
-             * id_target_A/forced_electrical_angle_rad。宿主固定发
+            /* 布局按宿主合同（id@8/forced_angle@12，与速度请求的
+             * target/iq 顺序相反——用专用结构防混读）。宿主固定发
              * forced_angle=0（电气零位）——与 drive 内置对齐语义一致；
              * 非零角不支持，显式拒。对齐电流用档案绑定值，请求 id 只做
              * 值域校验（上限即 limits 报的 CHENSHA_ALIGN_CURRENT_A）。 */
-            const axdr_speed_request_t *req = payload_in(
+            const axdr_alignment_request_t *req = payload_in(
                 request_payload, request_payload_length, sizeof(*req));
             uint8_t reason;
             if (req == NULL)
             {
                 return AXDR_REASON_INVALID_PAYLOAD;
             }
-            if ((req->iq_limit_A <= 0.0f) ||
-                (req->iq_limit_A > CHENSHA_ALIGN_CURRENT_A) ||
-                (req->target_rad_s != 0.0f)) /* NaN 比较恒真，一并拒 */
+            if ((req->id_target_A <= 0.0f) ||
+                (req->id_target_A > CHENSHA_ALIGN_CURRENT_A) ||
+                (req->forced_electrical_angle_rad != 0.0f)) /* NaN 恒真，一并拒 */
             {
                 return AXDR_REASON_OUT_OF_RANGE;
             }

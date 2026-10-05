@@ -598,6 +598,18 @@ typedef struct __attribute__((packed))
     uint32_t session_id;
     uint16_t lease_ms;
     uint16_t ramp_ms;
+    /* 宿主合同（makeEncoderAlignmentRequest）：d 轴电流在前、强制电角
+     * 在后——与速度请求 target/iq 的顺序相反。2026-10-05 上机拒 13
+     * 根因：按速度请求结构解读导致恒 OUT_OF_RANGE，禁止混用。 */
+    float id_target_A;
+    float forced_electrical_angle_rad;
+} axdr_alignment_request_t;
+
+typedef struct __attribute__((packed))
+{
+    uint32_t session_id;
+    uint16_t lease_ms;
+    uint16_t ramp_ms;
     /* Output-shaft mechanical speed and q-axis voltage magnitude. */
     float target_rad_s;
     float voltage_q_V;
