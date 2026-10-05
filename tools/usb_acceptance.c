@@ -498,6 +498,7 @@ typedef struct
 } splitter_t;
 
 static splitter_t g_sp;
+static unsigned long g_raw_bytes; /* 诊断：transport 层实际收到的原始字节 */
 static response_t g_last_resp;
 static telem_t g_last_tel;
 static uint32_t g_tel_first_seq;
@@ -607,6 +608,7 @@ static int pump(unsigned ms)
         if (n > 0)
         {
             unsigned i;
+            g_raw_bytes += (unsigned long)n;
             for (i = 0; i < (unsigned)n; i++)
             {
                 if (g_sp.len < sizeof(g_sp.buf))
@@ -622,10 +624,13 @@ static int pump(unsigned ms)
             {
                 got_resp = 1;
             }
-            if (r <= 0)
+            if (r == 0)
             {
-                break;
+                break; /* 帧未凑满：等下一轮字节 */
             }
+            /* r==1 出一帧；r==-1 滑动 1 字节重新对齐帧头——必须继续
+             * 循环，否则每轮 ReadFile 只滑 1 字节，真机字节流一旦有
+             * 偏移就永远追不上帧头（2026-10-05 上机 frames=0 根因）。 */
         }
         if (got_resp != 0)
         {
@@ -714,11 +719,20 @@ static int run_probe(unsigned ms, const char *tag)
     g_tel_frames = 0;
     g_sp.bad_crc = 0u;
     g_sp.seq_gap = 0u;
+    g_raw_bytes = 0u;
+    /* 真机行为（2026-10-05 上机定位）：固件 CDC 遥测流在主机长时间
+     * 纯读（无命令活动）时吐完 16 槽队列积压即静默；任意主机写
+     * （哪怕 4 字节）即恢复 20Hz 全速推流。GUI 连接即发预检所以
+     * 从不复现。探针先发一个只读查询唤醒推流，再计时采样。 */
+    (void)transact(AXDR_OPCODE_GET_PROTOCOL_INFO, NULL, 0);
+    g_tel_frames = 0;
+    g_sp.bad_crc = 0u;
     pump(ms);
     printf("--- %s: frames=%u bad_crc=%u seq_gaps=%u state=%u fault=0x%x "
-           "vbus=%.2f\n",
+           "vbus=%.2f raw=%lu residual=%u\n",
            tag, g_tel_frames, g_sp.bad_crc, g_sp.seq_gap, g_last_tel.state,
-           g_last_tel.fault, (double)g_last_tel.vbus);
+           g_last_tel.fault, (double)g_last_tel.vbus, g_raw_bytes,
+           (unsigned)g_sp.len);
     expect("遥测帧数达标", (g_tel_frames * 1000u) >= (15u * ms));
     expect("遥测 CRC 零错", g_sp.bad_crc == 0u);
     expect("遥测序列零跳号", g_sp.seq_gap == 0u);
