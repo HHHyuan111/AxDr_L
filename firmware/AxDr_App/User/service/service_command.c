@@ -323,11 +323,13 @@ static uint8_t provide_control_limits(uint8_t *resp, uint16_t cap,
                                       uint16_t *len)
 {
     axdr_control_limits_payload_t p;
+    build_profile_once(); /* 指纹与档案应答同源（缺它宿主绑定校验必失败） */
     memset(&p, 0, sizeof(p));
     p.schema_version = 1u;
     p.payload_size = sizeof(p);
     p.profile_id = MOTOR_PROFILE_ID;
     p.profile_revision = MOTOR_PROFILE_REVISION;
+    p.profile_crc32 = profile_payload.profile_crc32;
     p.maximum_current_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
     p.maximum_speed_rad_s = CHENSHA_PEAK_SPEED_RAD_S;
     p.maximum_speed_iq_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
