@@ -22,6 +22,7 @@
 
 #include "service_command.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "axdr_command_core.h"
@@ -42,8 +43,10 @@
  * DISARM 即故障确认动词——解除 FAULT_LOCKED + 清驱动锁存位（PWM 未
  * 关断由 poll 挂起落地），应答前现场 observe。修"跑一次故障/失能后
  * 再也使能不了，只能断电重启"的死局。
- * 上位机只按 major/minor 判兼容，patch 递增仅供操作员分辨新旧固件。 */
-#define SVC_FW_PATCH 5u
+ * 上位机只按 major/minor 判兼容，patch 递增仅供操作员分辨新旧固件。
+ * 0.7.6：SET_SPEED/SET_CURRENT 补 isfinite——NaN 与任何数比较恒假，
+ * 纯范围检查放行 NaN 会毒化速度/电流参考（14 号政策阴招③）。 */
+#define SVC_FW_PATCH 6u
 #define SVC_DEVICE_FAMILY 0x00000001u /* 沉沙/AxDrive-L 驱动 */
 #define SVC_BOARD_PROFILE 0x00000003u /* hw_rev v1.3 */
 #define SVC_PRODUCT_NAME "AxDrService"
@@ -730,7 +733,11 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 return AXDR_REASON_INVALID_PAYLOAD;
             }
-            if ((req->target_rad_s > CHENSHA_PEAK_SPEED_RAD_S) ||
+            /* isfinite 先行：NaN 与任何数比较恒假，纯范围检查挡不住
+             * （14 号数值政策阴招③；ALIGN_ENCODER 同款防护）。 */
+            if (!isfinite(req->target_rad_s) ||
+                !isfinite(req->iq_limit_A) ||
+                (req->target_rad_s > CHENSHA_PEAK_SPEED_RAD_S) ||
                 (req->target_rad_s < -CHENSHA_PEAK_SPEED_RAD_S) ||
                 (req->iq_limit_A <= 0.0f) ||
                 (req->iq_limit_A > CHENSHA_COMMAND_CURRENT_LIMIT_A))
@@ -767,7 +774,9 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 return AXDR_REASON_INVALID_PAYLOAD;
             }
-            if ((req->iq_target_A > CHENSHA_COMMAND_CURRENT_LIMIT_A) ||
+            if (!isfinite(req->iq_target_A) || /* NaN 防护同 SET_SPEED */
+                !isfinite(req->id_target_A) ||
+                (req->iq_target_A > CHENSHA_COMMAND_CURRENT_LIMIT_A) ||
                 (req->iq_target_A < -CHENSHA_COMMAND_CURRENT_LIMIT_A) ||
                 (req->id_target_A > CHENSHA_COMMAND_CURRENT_LIMIT_A) ||
                 (req->id_target_A < -CHENSHA_COMMAND_CURRENT_LIMIT_A))

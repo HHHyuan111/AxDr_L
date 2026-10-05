@@ -377,6 +377,37 @@ int main(void)
     expect("非法 lease 拒", ack() == AXDR_ACK_REJECTED);
     expect("拒因 INVALID_PAYLOAD", reason() == AXDR_REASON_INVALID_PAYLOAD);
 
+    /* ---- 18. NaN 校验（0.7.6）：NaN 与任何数比较恒假，纯范围检查
+     * 挡不住，必须 isfinite 先行（14 号数值政策；ALIGN_ENCODER 同款）。
+     * volatile 防编译器常量折叠，确保运行时真 NaN。 ---- */
+    {
+        volatile float zero = 0.0f;
+        const float nan_v = zero / zero;
+
+        spd.lease_ms = 300u;
+        spd.iq_limit_A = 8.0f;
+        spd.target_rad_s = nan_v;
+        send_frame((const uint8_t *)&spd, sizeof(spd), 28u,
+                   AXDR_OPCODE_SET_SPEED);
+        expect("NaN 转速目标拒", ack() == AXDR_ACK_REJECTED);
+        expect("拒因 OUT_OF_RANGE", reason() == AXDR_REASON_OUT_OF_RANGE);
+        spd.target_rad_s = 52.36f;
+        spd.iq_limit_A = nan_v;
+        send_frame((const uint8_t *)&spd, sizeof(spd), 29u,
+                   AXDR_OPCODE_SET_SPEED);
+        expect("NaN iq_limit 拒", ack() == AXDR_ACK_REJECTED);
+        expect("拒因 OUT_OF_RANGE", reason() == AXDR_REASON_OUT_OF_RANGE);
+        memset(&cur, 0, sizeof(cur));
+        cur.session_id = session_id;
+        cur.lease_ms = 300u;
+        cur.iq_target_A = nan_v;
+        cur.id_target_A = 1.0f;
+        send_frame((const uint8_t *)&cur, sizeof(cur), 30u,
+                   AXDR_OPCODE_SET_CURRENT);
+        expect("NaN 电流目标拒", ack() == AXDR_ACK_REJECTED);
+        expect("拒因 OUT_OF_RANGE", reason() == AXDR_REASON_OUT_OF_RANGE);
+    }
+
     if (fail_count == 0)
     {
         (void)printf("test_service_command: all pass\n");
