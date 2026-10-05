@@ -565,6 +565,11 @@
               <FilePath>..\User\diagnostic\core\mc_flux_observer.c</FilePath>
             </File>
             <File>
+              <FileName>mc_param_ident.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\diagnostic\core\mc_param_ident.c</FilePath>
+            </File>
+            <File>
               <FileName>mc_pole_pair_ident.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\diagnostic\core\mc_pole_pair_ident.c</FilePath>

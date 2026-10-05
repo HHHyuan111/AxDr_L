@@ -90,6 +90,7 @@ set(AXDR_USER_SOURCES
     User/diagnostic/core/mc_diag_manager.c
     User/diagnostic/core/mc_encoder_alignment.c
     User/diagnostic/core/mc_flux_observer.c
+    User/diagnostic/core/mc_param_ident.c
     User/diagnostic/core/mc_pole_pair_ident.c
     User/diagnostic/core/mc_rs_ident.c
     User/drive/drive.c

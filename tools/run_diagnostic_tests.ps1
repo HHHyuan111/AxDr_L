@@ -14,9 +14,11 @@ $outputDir = Join-Path $repoRoot "firmware/AxDr_App/build/host-tests"
 $controlTest = Join-Path $testRoot "test_mc_control_and_sweep.c"
 $identTest = Join-Path $testRoot "test_mc_ident_algorithms.c"
 $runtimeTest = Join-Path $testRoot "test_diag_runtime.c"
+$paramTest = Join-Path $testRoot "test_mc_param_ident.c"
 $controlExe = Join-Path $outputDir "test_mc_control_and_sweep.exe"
 $identExe = Join-Path $outputDir "test_mc_ident_algorithms.exe"
 $runtimeExe = Join-Path $outputDir "test_diag_runtime.exe"
+$paramExe = Join-Path $outputDir "test_mc_param_ident.exe"
 
 $compilerCommand = Get-Command $Compiler -ErrorAction SilentlyContinue
 if ($null -eq $compilerCommand)
@@ -110,3 +112,24 @@ if ($LASTEXITCODE -ne 0)
 }
 
 Write-Host "Host C11/诊断任务状态机与PI单位转换测试通过。"
+
+$paramSources = @(
+    $paramTest,
+    (Join-Path $diagCore "mc_common.c"),
+    (Join-Path $diagCore "mc_param_ident.c")
+)
+
+& $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+    "-I$diagInclude" $paramSources -o $paramExe -lm
+if ($LASTEXITCODE -ne 0)
+{
+    throw "G11 参数辨识测试编译失败，退出码：$LASTEXITCODE"
+}
+
+& $paramExe
+if ($LASTEXITCODE -ne 0)
+{
+    throw "G11 参数辨识测试运行失败，退出码：$LASTEXITCODE"
+}
+
+Write-Host "Host C11/G11 分阶段参数辨识测试通过。"
