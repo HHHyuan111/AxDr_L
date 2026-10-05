@@ -39,6 +39,8 @@
 #include "service_telemetry.h"
 #include "service_usb.h"
 #include "usbd_cdc_if.h"
+#include "axdr_command_contract.h"
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -78,9 +80,21 @@ static int usb_cdc_tx_status(const uint8_t *data, uint16_t length)
     return (status == USBD_OK) ? 0 : ((status == USBD_BUSY) ? 1 : 2);
 }
 
+/* 命令响应发送缝：CDC_Transmit_FS 只登记调用方指针、由 USB 中断异步
+ * 分包取数，而 service_usb 的响应缓冲是 process_request 的栈帧——函数
+ * 返回即失效。>64B 的响应（电机档案 104B/控制限幅 108B）第 2 包起读
+ * 到的是复用后的栈垃圾：CRC 必错，宿主静默丢弃后必然 ACK 超时。
+ * （≤64B 单包在返回前已整体装入端点 FIFO，故旧版只有长响应出错；
+ * 遥测帧的 pending 缓冲是静态的，不受影响。）拷入静态帧再交 CDC。 */
+static uint8_t command_tx_frame[AXDR_COMMAND_MAX_RESPONSE_SIZE];
 static void usb_cdc_tx(const uint8_t *data, uint16_t length)
 {
-    (void)usb_cdc_tx_status(data, length);
+    if (length == 0u || length > sizeof(command_tx_frame))
+    {
+        return;
+    }
+    memcpy(command_tx_frame, data, length);
+    (void)usb_cdc_tx_status(command_tx_frame, length);
 }
 /* USER CODE END 0 */
 
