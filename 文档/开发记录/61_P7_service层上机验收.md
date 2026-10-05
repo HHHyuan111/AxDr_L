@@ -49,8 +49,9 @@ G474RET6（512KB flash / 128KB RAM）余量充足。
 
 ```
 P0 遥测探针（帧率/CRC/跳号/故障位） → P1 协议查询（版本/档案/确认）
-→ P2 ARM（错 challenge 拒 → 正确 ARM → 未授权断言）
-→ P3 运动旅程（首上电对齐进 RUN → 3s 速度曲线 CSV → ControlStop）
+→ P2 ARM（互锁闸门 → 错 challenge 拒 → 正确 ARM → 未授权断言）
+→ P2.5 编码器校准（AlignEncoder → 对齐 ~1.5s → alignment_valid → 收尾）
+→ P3 运动旅程（已对齐免对齐直进 RUN → 3s 速度曲线 CSV → ControlStop）
 → P4 租约超时（零速续租停发 → 自动撤权 stop_reason=2）
 → P5 心跳超时（停发心跳 → 自动 DISARMED disarm_reason=3 → 失效会话拒绝）
 → P6 收尾（DISARM → STOP + fault=0）

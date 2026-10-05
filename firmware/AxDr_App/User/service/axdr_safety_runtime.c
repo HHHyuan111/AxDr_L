@@ -183,7 +183,11 @@ void axdr_safety_runtime_tick(axdr_safety_runtime_t *runtime,
         return;
     }
     runtime->tick_ms = now_ms;
+    /* 心跳超时只对未授权态执法：运动授权态的保活责任归命令租约
+     * （宿主合同：运动中靠周期命令续租、心跳停发；对齐单发命令
+     * 配固定宽租约）。授权态若也按心跳超时 DISARM，租约语义被架空。 */
     if ((runtime->state == AXDR_SAFETY_ARMED) &&
+        (runtime->run_authorized == 0u) &&
         ((uint32_t)(now_ms - runtime->last_heartbeat_ms) >
          runtime->heartbeat_timeout_ms))
     {
@@ -453,6 +457,8 @@ uint8_t axdr_safety_runtime_authorize_run(
     }
     runtime->tick_ms = now_ms;
     runtime->run_authorized = 1u;
+    runtime->last_heartbeat_ms = now_ms; /* 运动命令即心跳续期：
+        授权瞬间重置心跳钟，杜绝"授权前心跳已濒临超时"的边界误杀 */
     runtime->shutdown_requested = 0u;
     runtime->shutdown_deadline_ms = 0u;
     return AXDR_REASON_NONE;

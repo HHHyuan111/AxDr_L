@@ -219,11 +219,50 @@ static int st_armed;
 static uint32_t st_session;
 static const uint32_t st_challenge = 0xA5A51234u;
 static uint32_t st_tel_state;
-static uint32_t st_start_ms; /* SetSpeed 时刻：模拟 1.6s 对齐到 RUN */
+static uint32_t st_start_ms; /* SetSpeed/校准时刻：模拟 1.6s 对齐到 RUN */
 static int st_authorized;    /* 模拟 run_authorized：SetSpeed 置位/停机清零 */
 static int st_profile_ok;    /* ConfirmProfile 已通过 */
+static int st_aligned;       /* enc_aligned：对齐完成（STARTING→RUN 置位） */
+static int st_stop_reason;   /* control_state.stop_reason 快照 */
+static int st_lease_count;   /* control_state.timeout_count：租约超时计数 */
+static int st_applied_count; /* control_state.applied_count */
+static uint32_t st_lease_deadline; /* 授权到期时刻（模拟命令租约） */
 
 /* safety/控制状态只有被测固件是权威；模拟端按旅程需要给出最小状态 */
+
+/* 模拟命令租约执法：授权到期未续 → 撤权 + LEASE_TIMEOUT 停机
+ * （与固件 service_safety_poll 的 revoke+强制 STOP 同语义） */
+static void st_lease_poll(void)
+{
+    if ((st_authorized != 0) &&
+        ((int32_t)(now_ms() - st_lease_deadline) >= 0))
+    {
+        st_authorized = 0;
+        st_stop_reason = (int)AXDR_CONTROL_STOP_LEASE_TIMEOUT;
+        st_tel_state = DRIVE_STATE_STOP;
+        st_lease_count++;
+    }
+}
+
+/* control_state 40B 快照（与固件 provide_control_state 同布局） */
+static uint16_t st_control_state(uint8_t *resp)
+{
+    uint8_t p[40];
+    memset(p, 0, sizeof(p));
+    wr_u32(&p[0], now_ms());
+    wr_u32(&p[4], st_session);
+    wr_u32(&p[8], (st_authorized != 0) ? st_lease_deadline : 0u);
+    wr_u32(&p[12], (uint32_t)st_applied_count);
+    wr_u32(&p[16], (uint32_t)st_lease_count);
+    p[20] = 2u; /* mode=速度 */
+    p[21] = ((st_tel_state == DRIVE_STATE_RUN) ||
+             (st_tel_state == DRIVE_STATE_STARTING)) ? 1u : 0u;
+    p[22] = (uint8_t)st_stop_reason;
+    p[23] = (st_aligned != 0) ? 1u : 0u;
+    memcpy(resp, p, sizeof(p));
+    return (uint16_t)sizeof(p);
+}
+
 static uint8_t st_handler(void *ctx, uint16_t opcode,
                           const uint8_t *req_payload, uint16_t req_len,
                           uint8_t *resp, uint16_t cap, uint16_t *resp_len,
@@ -319,7 +358,49 @@ static uint8_t st_handler(void *ctx, uint16_t opcode,
                 return AXDR_REASON_OUT_OF_RANGE;
             }
             st_authorized = 1; /* 模拟 authorize_run 副作用 */
+            st_lease_deadline = now_ms() + rd_u16(&req_payload[4]);
+            st_applied_count++;
+            st_stop_reason = 0;
+            if (st_tel_state == DRIVE_STATE_STOP)
+            {
+                /* 未对齐首启动走 STARTING（1.6s 对齐）；已对齐直进 RUN */
+                st_tel_state = (st_aligned != 0) ? DRIVE_STATE_RUN
+                                                : DRIVE_STATE_STARTING;
+                st_start_ms = now_ms();
+            }
             *ack = AXDR_ACK_APPLIED;
+            *resp_len = st_control_state(resp);
+            return AXDR_REASON_NONE;
+        case AXDR_OPCODE_ALIGN_ENCODER:
+            /* 布局同速度请求：session/lease/ramp/id/forced_angle(=0) */
+            if (req_len != 16u)
+            {
+                return AXDR_REASON_INVALID_PAYLOAD;
+            }
+            if ((!st_armed) || (rd_u32(req_payload) != st_session))
+            {
+                return AXDR_REASON_SESSION_MISMATCH;
+            }
+            if ((rd_f32(&req_payload[12]) <= 0.0f) ||
+                (rd_f32(&req_payload[12]) > 2.0f) ||
+                (rd_f32(&req_payload[8]) != 0.0f))
+            {
+                return AXDR_REASON_OUT_OF_RANGE;
+            }
+            /* 与固件同语义：授权 + 固定 2s 租约（覆盖 1.6s 对齐） */
+            st_authorized = 1;
+            st_lease_deadline = now_ms() + 2000u;
+            if (st_aligned == 0)
+            {
+                st_tel_state = DRIVE_STATE_STARTING;
+                st_start_ms = now_ms();
+            }
+            *ack = AXDR_ACK_APPLIED;
+            *resp_len = st_control_state(resp);
+            return AXDR_REASON_NONE;
+        case AXDR_OPCODE_GET_CONTROL_STATE:
+            *ack = AXDR_ACK_ACCEPTED;
+            *resp_len = st_control_state(resp);
             return AXDR_REASON_NONE;
         case AXDR_OPCODE_GET_PROTOCOL_INFO:
         {
@@ -334,11 +415,18 @@ static uint8_t st_handler(void *ctx, uint16_t opcode,
             return AXDR_REASON_NONE;
         }
         case AXDR_OPCODE_CONTROL_STOP:
+            /* 只撤运行授权不停会话（与固件同语义：session 归 ARM 层） */
+            st_stop_reason = (int)AXDR_CONTROL_STOP_HOST_REQUEST;
+            st_authorized = 0;
+            st_tel_state = DRIVE_STATE_STOP;
+            *ack = AXDR_ACK_APPLIED;
+            return AXDR_REASON_NONE;
         case AXDR_OPCODE_SAFETY_DISARM:
             st_armed = 0;
             st_session = 0u;
-            st_authorized = 0;
             st_profile_ok = 0;
+            st_stop_reason = 3; /* SAFETY_SESSION */
+            st_authorized = 0;
             st_tel_state = DRIVE_STATE_STOP;
             *ack = AXDR_ACK_APPLIED;
             return AXDR_REASON_NONE;
@@ -353,11 +441,13 @@ static void st_inject_telemetry(void)
     uint8_t f[AXDR_TELEMETRY_V1_FRAME_SIZE];
     uint8_t state = (uint8_t)st_tel_state;
 
-    /* 模拟对齐时序：SetSpeed 后 STARTING 停留 1.6s 再转 RUN */
+    st_lease_poll();
+    /* 模拟对齐时序：STARTING 停留 1.6s 再转 RUN（对齐完成置位） */
     if ((st_tel_state == DRIVE_STATE_STARTING) &&
         ((now_ms() - st_start_ms) > 1600u))
     {
         st_tel_state = DRIVE_STATE_RUN;
+        st_aligned = 1; /* 与固件 drive 对齐完成语义一致 */
     }
     state = (uint8_t)st_tel_state;
     memset(f, 0, sizeof(f));
@@ -383,6 +473,13 @@ static int st_open(const char *name)
     st_armed = 0;
     st_session = 0u;
     st_tel_state = DRIVE_STATE_STOP;
+    st_authorized = 0;
+    st_profile_ok = 0;
+    st_aligned = 0;
+    st_stop_reason = 0;
+    st_lease_count = 0;
+    st_applied_count = 0;
+    st_lease_deadline = 0u;
     axdr_command_core_init(&st_core);
     return 1;
 }
@@ -394,15 +491,8 @@ static int st_write(const uint8_t *data, unsigned len)
         &st_core, data, (uint16_t)len, st_handler, NULL, resp,
         (uint16_t)sizeof(resp));
 
-    /* SetSpeed 被接受后模拟状态推进：只在 STOP 起步进 STARTING（真固件
-     * START 重入不重启对齐），1.6s 后注入侧转 RUN */
-    if ((data[12] == (uint8_t)AXDR_OPCODE_SET_SPEED) &&
-        (framesz > 0u) && (resp[14] == AXDR_ACK_APPLIED) &&
-        (st_tel_state == DRIVE_STATE_STOP))
-    {
-        st_tel_state = DRIVE_STATE_STARTING;
-        st_start_ms = now_ms();
-    }
+    /* 状态推进（STARTING 起步/租约计时）全在 st_handler 各 case 内，
+     * 与真固件"命令处理即生效"同构 */
     if (framesz > 0u)
     {
         if ((st_rx_len + framesz) <= sizeof(st_rx))
@@ -873,6 +963,73 @@ static int refresh_session(void)
     return g_session != 0;
 }
 
+/* P2.5：编码器校准旅程（Mit_Tool"开始对齐"同款命令链）。返回 1=已对齐 */
+static int run_align(void)
+{
+    uint8_t req[16];
+    uint32_t t0;
+    uint32_t t_done = 0u;
+    int had_starting = 0;
+
+    /* 负 path：错会话拒 */
+    wr_u32(&req[0], 0xDEADu);
+    wr_u16(&req[4], 1000u);
+    wr_u16(&req[6], 300u);
+    wr_f32(&req[8], 0.0f);
+    wr_f32(&req[12], 2.0f);
+    (void)tx_expect(AXDR_OPCODE_ALIGN_ENCODER, req, 16, AXDR_ACK_REJECTED,
+                    0xFFu, "错会话校准拒");
+
+    if (!refresh_session())
+    {
+        expect("校准前会话有效", 0);
+        return 0;
+    }
+    wr_u32(&req[0], (uint32_t)g_session);
+    if (!tx_expect(AXDR_OPCODE_ALIGN_ENCODER, req, 16, AXDR_ACK_APPLIED, 0xFFu,
+                   "校准命令 Applied"))
+    {
+        return 0;
+    }
+
+    /* 轮询 control_state.alignment_valid：固件对齐 1.5s + 轮询余量 */
+    t0 = now_ms();
+    while ((now_ms() - t0) < 3500u)
+    {
+        pump(100);
+        heartbeat_keepalive(800u); /* 真机保活：授权态虽归租约，ARM 钟别断 */
+        if (g_last_tel.state == DRIVE_STATE_STARTING)
+        {
+            had_starting = 1;
+        }
+        if (tx_expect(AXDR_OPCODE_GET_CONTROL_STATE, NULL, 0,
+                      AXDR_ACK_ACCEPTED, 0xFFu, NULL) &&
+            (g_last_resp.payload_length >= 24u) &&
+            (g_last_resp.payload[23] == 1u))
+        {
+            t_done = now_ms() - t0;
+            break;
+        }
+    }
+    if (t_done != 0u)
+    {
+        printf("[INFO] 校准完成耗时 %u ms（had_starting=%d）\n", t_done,
+               had_starting);
+        expect("校准：alignment_valid 置位", 1);
+    }
+    else
+    {
+        expect("校准：3.5s 内 alignment_valid 置位", 0);
+        return 0;
+    }
+
+    (void)tx_expect(AXDR_OPCODE_CONTROL_STOP, NULL, 0, AXDR_ACK_APPLIED, 0xFFu,
+                    "校准收尾 ControlStop");
+    pump(300);
+    expect("校准后回到 STOP", g_last_tel.state == DRIVE_STATE_STOP);
+    return 1;
+}
+
 /* P3：运动 + 曲线 CSV + 停止。expect_slow_start=1 验首上电对齐时序，
  * =0 验免对齐直进 RUN。 */
 static void run_motion(const char *csv_path, float speed, float iq,
@@ -1231,6 +1388,13 @@ int main(int argc, char **argv)
         tr->close_port();
         return 5;
     }
+    /* 校准旅程（对齐已完成则幂等）→ 之后的运动按"已对齐直进 RUN"断言 */
+    if (run_align() == 0)
+    {
+        emergency_stop();
+        tr->close_port();
+        return 5;
+    }
     run_motion_negative();
 
     if (reboot_check != 0)
@@ -1240,14 +1404,15 @@ int main(int argc, char **argv)
     }
     else if (selftest != 0)
     {
-        /* 模拟端无租约/心跳超时语义（那是被测 safety runtime 的职责，
-         * selftest 不伪造它）——P4/P5 只在真机上跑。 */
-        run_motion(csv, speed, iq, 1);
+        /* 模拟端已具备租约撤权语义（P4 回环覆盖）；心跳超时是被测
+         * safety runtime 的职责，selftest 不伪造——P5 只在真机上跑。 */
+        run_motion(csv, speed, iq, 0);
+        run_lease_timeout();
         run_finalize();
     }
     else
     {
-        run_motion(csv, speed, iq, 1);
+        run_motion(csv, speed, iq, 0);
         run_lease_timeout();
         run_heartbeat_timeout();
         run_finalize();

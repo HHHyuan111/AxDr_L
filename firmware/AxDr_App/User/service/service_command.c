@@ -59,7 +59,8 @@
      (1u << AXDR_OPCODE_GET_CONTROL_STATE) |                                \
      (1u << AXDR_OPCODE_CONTROL_STOP) |                                     \
      (1u << AXDR_OPCODE_SET_SPEED) |                                        \
-     (1u << AXDR_OPCODE_SET_CURRENT))
+     (1u << AXDR_OPCODE_SET_CURRENT) |                                      \
+     (1u << AXDR_OPCODE_ALIGN_ENCODER))
 
 /* ---- 安全会话单例 ---- */
 static axdr_safety_runtime_t safety;
@@ -740,6 +741,55 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
                 g_foc.req = DRIVE_REQ_START;
             }
             /* 同 SET_SPEED：Applied 携带控制快照（active=1，mode=2）。 */
+            *ack_state = AXDR_ACK_APPLIED;
+            return provide_control_state(response_payload,
+                                         response_payload_capacity,
+                                         response_payload_length);
+        }
+
+        case AXDR_OPCODE_ALIGN_ENCODER:
+        {
+            /* 布局与速度请求同构（宿主合同）：session/lease/ramp/
+             * id_target_A/forced_electrical_angle_rad。宿主固定发
+             * forced_angle=0（电气零位）——与 drive 内置对齐语义一致；
+             * 非零角不支持，显式拒。对齐电流用档案绑定值，请求 id 只做
+             * 值域校验（上限即 limits 报的 CHENSHA_ALIGN_CURRENT_A）。 */
+            const axdr_speed_request_t *req = payload_in(
+                request_payload, request_payload_length, sizeof(*req));
+            uint8_t reason;
+            if (req == NULL)
+            {
+                return AXDR_REASON_INVALID_PAYLOAD;
+            }
+            if ((req->iq_limit_A <= 0.0f) ||
+                (req->iq_limit_A > CHENSHA_ALIGN_CURRENT_A) ||
+                (req->target_rad_s != 0.0f)) /* NaN 比较恒真，一并拒 */
+            {
+                return AXDR_REASON_OUT_OF_RANGE;
+            }
+            /* 对齐授权+租约：不套 authorize_motion 的请求域校验——宿主
+             * 租约合同上限 1s，短于内置对齐 1.5s（会被腰斩）；对齐是
+             * 单发命令无续租，租约由固件按时序定死 2s（对齐 1.5s +
+             * 宿主 500ms 轮询余量）。到期 revoke → 强制 STOP 双保险。 */
+            reason = axdr_safety_runtime_authorize_run(
+                &safety, now_ms(), req->session_id);
+            if (reason != AXDR_REASON_NONE)
+            {
+                return reason;
+            }
+            command_deadline_ms = now_ms() + 2000u;
+            command_active = 1u;
+            if (g_foc.enc_aligned == 0u)
+            {
+                /* 触发内置对齐：零速速度模式 START → STARTING 对齐
+                 * （1.2s 保持 + 0.3s 采样）→ 完成自动晋升 RUN（零速）。 */
+                g_foc.mode.sys = debug_mode;
+                g_foc.mode.debug = spd_curr_cl;
+                g_foc.ref.iq = CHENSHA_ALIGN_CURRENT_A;
+                g_foc.ref.spd_r = 0.0f;
+                g_foc.req = DRIVE_REQ_START;
+            }
+            /* 已对齐：幂等成功，宿主轮询 alignment_valid 即刻完成。 */
             *ack_state = AXDR_ACK_APPLIED;
             return provide_control_state(response_payload,
                                          response_payload_capacity,
