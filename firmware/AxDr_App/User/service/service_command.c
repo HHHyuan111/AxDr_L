@@ -34,7 +34,9 @@
 /* ---- 板级/固件身份（上位机 GetDeviceInfo/GetProtocolInfo 匹配用） ---- */
 #define SVC_FW_MAJOR 0u
 #define SVC_FW_MINOR 7u
-#define SVC_FW_PATCH 0u
+/* S6 互锁现场评估 + S8 限幅指纹 + S9 确认载荷都在 0.7.1；
+ * 上位机只按 major/minor 判兼容，patch 递增仅供操作员分辨新旧固件。 */
+#define SVC_FW_PATCH 1u
 #define SVC_DEVICE_FAMILY 0x00000001u /* 沉沙/AxDrive-L 驱动 */
 #define SVC_BOARD_PROFILE 0x00000003u /* hw_rev v1.3 */
 #define SVC_PRODUCT_NAME "AxDrService"
@@ -131,7 +133,7 @@ static void ensure_profile_configured(void)
     if (profile_configured == 0u)
     {
         build_profile_once();
-        axdr_safety_runtime_init(&safety, 0u, 0x20261004u);
+        axdr_safety_runtime_init(&safety, 0u, 0x20261005u);
         axdr_safety_runtime_configure_motor_profile(
             &safety, MOTOR_PROFILE_ID, MOTOR_PROFILE_REVISION,
             profile_payload.profile_crc32);
@@ -274,7 +276,7 @@ static uint8_t provide_device_info(uint8_t *resp, uint16_t cap,
     p.firmware_patch = SVC_FW_PATCH;
     p.telemetry_version = 1u;
     p.command_version = AXDR_COMMAND_VERSION;
-    p.build_id = 0x20261004u;
+    p.build_id = 0x20261005u; /* 手写日期戳：重编译即代表当日修复集，供上位机分辨 */
     /* strncpy 语义：源短于目标时补零（packed char[16]） */
     { const char *src = SVC_PRODUCT_NAME; uint16_t i = 0u;
       while (src[i] != 0 && i < sizeof(p.product_name)) { p.product_name[i] = src[i]; i++; } }
