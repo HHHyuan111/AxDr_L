@@ -172,6 +172,20 @@ void diag_runtime_confirm_stopped(diag_runtime_t *runtime,
                                   bool platform_ready_and_disabled);
 
 /**
+ * @brief 通信层任务门面：写入启动请求（不直写 request 字段，13 号规范）。
+ *
+ * 只做早拒（请求槽占用 / 任务运行中 / 非法 job）；PWM/状态/故障的权威
+ * 门禁仍在快环 drive_diag_poll_request。requested_job 先于 request 写入
+ * （消费侧先读 request 再取 job，单写者无竞态）。
+ * 返回 MC_OK=已受理 / MC_REJECTED=忙 / MC_INVALID_ARGUMENT=非法 job。
+ */
+mc_status_t diag_runtime_request_start(diag_runtime_t *runtime,
+                                       diag_job_e job);
+
+/** @brief 通信层任务门面：写入停止请求（后写胜，覆盖未消费的启动请求）。 */
+void diag_runtime_request_stop(diag_runtime_t *runtime);
+
+/**
  * @brief 按本项目 PI 定义计算连续积分增益。
  *
  * HJY 核心返回每拍 Ki，本项目 PID 内部还会乘采样周期，因此这里除以 Ts 后

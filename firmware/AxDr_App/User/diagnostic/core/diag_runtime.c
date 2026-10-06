@@ -648,6 +648,50 @@ void diag_runtime_confirm_stopped(diag_runtime_t *runtime,
     memset(&runtime->command, 0, sizeof(runtime->command));
 }
 
+static bool diag_job_is_known(diag_job_e job)
+{
+    switch (job)
+    {
+        case DIAG_JOB_CURRENT_SWEEP:
+        case DIAG_JOB_POLE_PAIR_IDENT:
+        case DIAG_JOB_ENCODER_ALIGN:
+        case DIAG_JOB_DEADTIME_TEST:
+        case DIAG_JOB_PARAM_IDENT:
+        case DIAG_JOB_PARAM_IDENT_LQ:
+            return true;
+
+        case DIAG_JOB_NONE:
+        default:
+            return false; /* 含 2/3 退役空洞：旧脚本误触即拒 */
+    }
+}
+
+mc_status_t diag_runtime_request_start(diag_runtime_t *runtime,
+                                       diag_job_e job)
+{
+    if ((runtime == NULL) || !diag_job_is_known(job))
+    {
+        return MC_INVALID_ARGUMENT;
+    }
+    if (runtime->active || (runtime->request != DIAG_REQUEST_NONE))
+    {
+        return MC_REJECTED;
+    }
+
+    runtime->requested_job = (uint32_t)job;
+    runtime->request = DIAG_REQUEST_START;
+    return MC_OK;
+}
+
+void diag_runtime_request_stop(diag_runtime_t *runtime)
+{
+    if (runtime == NULL)
+    {
+        return;
+    }
+    runtime->request = DIAG_REQUEST_STOP;
+}
+
 mc_status_t diag_current_pi_for_project(float bandwidth_hz,
                                         float sample_time_s,
                                         float rs_ohm,

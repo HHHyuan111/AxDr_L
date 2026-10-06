@@ -192,6 +192,44 @@ static void test_project_pi_unit_conversion(void)
     assert(kp_q > kp_d);
 }
 
+static void test_request_facade_gate(void)
+{
+    const diag_seed_t seed = make_pr60_seed();
+    diag_runtime_t runtime;
+
+    diag_runtime_init(&runtime, &seed);
+
+    /* 合法 job：占请求槽，requested_job 同步 */
+    assert(diag_runtime_request_start(&runtime, DIAG_JOB_PARAM_IDENT)
+           == MC_OK);
+    assert(runtime.request == DIAG_REQUEST_START);
+    assert(runtime.requested_job == (uint32_t)DIAG_JOB_PARAM_IDENT);
+
+    /* 请求槽占用：早拒，防覆盖未消费请求 */
+    assert(diag_runtime_request_start(&runtime, DIAG_JOB_DEADTIME_TEST)
+           == MC_REJECTED);
+    runtime.request = DIAG_REQUEST_NONE;
+
+    /* 运行中：早拒（权威门禁仍在快环） */
+    runtime.active = true;
+    assert(diag_runtime_request_start(&runtime, DIAG_JOB_PARAM_IDENT_LQ)
+           == MC_REJECTED);
+    runtime.active = false;
+
+    /* 非法 job：NONE / 2 与 3 退役空洞 / NULL */
+    assert(diag_runtime_request_start(&runtime, DIAG_JOB_NONE)
+           == MC_INVALID_ARGUMENT);
+    assert(diag_runtime_request_start(&runtime, (diag_job_e)3)
+           == MC_INVALID_ARGUMENT);
+    assert(diag_runtime_request_start(NULL, DIAG_JOB_PARAM_IDENT)
+           == MC_INVALID_ARGUMENT);
+
+    /* stop 恒写（后写胜），NULL 安全 */
+    diag_runtime_request_stop(&runtime);
+    assert(runtime.request == DIAG_REQUEST_STOP);
+    diag_runtime_request_stop(NULL);
+}
+
 int main(void)
 {
     test_default_profile_cannot_start_power();
@@ -199,6 +237,7 @@ int main(void)
     test_param_ident_gate_and_bridge();
     test_all_active_job_routes();
     test_project_pi_unit_conversion();
+    test_request_facade_gate();
     puts("diagnostic runtime tests: PASS");
     return 0;
 }
