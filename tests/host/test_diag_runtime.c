@@ -88,24 +88,37 @@ static void test_sweep_start_abort_and_stop(void)
     assert(runtime.last_status == MC_ABORTED);
 }
 
-static void test_rs_requires_explicit_current_points(void)
+static void test_param_ident_gate_and_bridge(void)
 {
     const diag_seed_t seed = make_pr60_seed();
     diag_runtime_t runtime;
     mc_command_t command;
 
     diag_runtime_init(&runtime, &seed);
-    set_test_limits(&runtime);
-    runtime.requested_job = DIAG_JOB_RS_IDENT;
+    runtime.requested_job = DIAG_JOB_PARAM_IDENT;
+    /* 闸门未开（默认限值 0）：runtime 层拒绝，与核的 start 校验同语义。 */
     assert(diag_runtime_start(&runtime, 24.0f, true)
            == MC_INVALID_ARGUMENT);
+    assert(!runtime.active);
 
-    runtime.profile.rs.current_min_a = 0.2f;
-    runtime.profile.rs.current_max_a = 0.4f;
-    runtime.profile.rs.total_duration_s = 0.1f;
+    /* 限值开后可启动；桥接断言：seed 透传、profile 限值覆盖核默认。 */
+    set_test_limits(&runtime);
     assert(diag_runtime_start(&runtime, 24.0f, true) == MC_OK);
+    assert(runtime.active);
+    assert(runtime.manager.owner == MC_DIAG_OWNER_PARAM);
+    assert(runtime.param_ident.state == MC_PARAM_IDENT_PREPARE);
+    assert(runtime.param_ident.cfg.control_period_s
+           == seed.control_period_s);
+    assert(runtime.param_ident.cfg.pole_pairs
+           == (float)seed.pole_pairs);
+    assert(runtime.param_ident.cfg.current_limit_a == 1.0f);
+    assert(runtime.param_ident.cfg.voltage_limit_v == 2.0f);
+    assert(runtime.param_ident.cfg.vbus_min_v == 10.0f);
+
     assert(diag_runtime_abort(&runtime, &command) == MC_ABORTED);
+    assert(command.disable_request);
     diag_runtime_confirm_stopped(&runtime, true);
+    assert(!runtime.active);
 }
 
 static void start_abort_and_release(diag_runtime_t *runtime)
@@ -127,7 +140,12 @@ static void test_all_active_job_routes(void)
 
     diag_runtime_init(&runtime, &seed);
     set_test_limits(&runtime);
-    runtime.requested_job = DIAG_JOB_L_IDENT;
+    runtime.requested_job = DIAG_JOB_PARAM_IDENT;
+    start_abort_and_release(&runtime);
+
+    diag_runtime_init(&runtime, &seed);
+    set_test_limits(&runtime);
+    runtime.requested_job = DIAG_JOB_PARAM_IDENT_LQ;
     start_abort_and_release(&runtime);
 
     diag_runtime_init(&runtime, &seed);
@@ -178,7 +196,7 @@ int main(void)
 {
     test_default_profile_cannot_start_power();
     test_sweep_start_abort_and_stop();
-    test_rs_requires_explicit_current_points();
+    test_param_ident_gate_and_bridge();
     test_all_active_job_routes();
     test_project_pi_unit_conversion();
     puts("diagnostic runtime tests: PASS");

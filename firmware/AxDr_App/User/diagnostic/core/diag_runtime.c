@@ -17,11 +17,9 @@ static mc_diag_owner_t diag_owner_from_job(diag_job_e job)
         case DIAG_JOB_CURRENT_SWEEP:
             return MC_DIAG_OWNER_CURRENT_SWEEP;
 
-        case DIAG_JOB_RS_IDENT:
-            return MC_DIAG_OWNER_RS;
-
-        case DIAG_JOB_L_IDENT:
-            return MC_DIAG_OWNER_L;
+        case DIAG_JOB_PARAM_IDENT:
+        case DIAG_JOB_PARAM_IDENT_LQ:
+            return MC_DIAG_OWNER_PARAM;
 
         case DIAG_JOB_POLE_PAIR_IDENT:
             return MC_DIAG_OWNER_POLE_PAIR;
@@ -100,65 +98,9 @@ static void diag_profile_init(diag_profile_t *profile,
     profile->sweep.reject_saturated_points =
         DIAG_SWEEP_REJECT_SATURATED_POINTS;
 
-    mc_rs_ident_default_config(&profile->rs);
-    profile->rs.current_min_a = DIAG_RS_CURRENT_MIN_A;
-    profile->rs.current_max_a = DIAG_RS_CURRENT_MAX_A;
-    profile->rs.point_count = DIAG_RS_POINT_COUNT;
-    profile->rs.total_duration_s = DIAG_RS_TOTAL_DURATION_S;
-    profile->rs.settling_fraction = DIAG_RS_SETTLING_FRACTION;
-    profile->rs.integral_gain_v_per_a_s =
-        DIAG_RS_INTEGRAL_GAIN_V_PER_A_S;
-    profile->rs.control_period_s = seed->control_period_s;
-    profile->rs.denominator_epsilon = DIAG_RS_DENOMINATOR_EPSILON;
-
-    mc_biased_l_ident_default_config(&profile->inductance);
-    profile->inductance.control_period_s = seed->control_period_s;
-    profile->inductance.auto_tune = DIAG_L_AUTO_TUNE;
-    profile->inductance.bias_ratio = DIAG_L_BIAS_RATIO;
-    profile->inductance.ripple_ratio = DIAG_L_RIPPLE_RATIO;
-    profile->inductance.manual_bias_current_a =
-        DIAG_L_MANUAL_BIAS_CURRENT_A;
-    profile->inductance.initial_injection_voltage_v =
-        DIAG_L_INITIAL_INJECTION_VOLTAGE_V;
-    profile->inductance.level_ticks = DIAG_L_LEVEL_TICKS;
-    profile->inductance.edge_skip_ticks = DIAG_L_EDGE_SKIP_TICKS;
-    profile->inductance.bias_settle_ticks = DIAG_L_BIAS_SETTLE_TICKS;
-    profile->inductance.bias_stable_ticks = DIAG_L_BIAS_STABLE_TICKS;
-    profile->inductance.bias_timeout_ticks = DIAG_L_BIAS_TIMEOUT_TICKS;
-    profile->inductance.bias_tolerance_ratio =
-        DIAG_L_BIAS_TOLERANCE_RATIO;
-    profile->inductance.bias_integral_gain_v_per_a_s =
-        DIAG_L_BIAS_INTEGRAL_GAIN_V_PER_A_S;
-    profile->inductance.tune_pairs = DIAG_L_TUNE_PAIRS;
-    profile->inductance.target_accepted_pairs =
-        DIAG_L_TARGET_ACCEPTED_PAIRS;
-    profile->inductance.max_measure_pair_multiplier =
-        DIAG_L_MAX_MEASURE_PAIR_MULTIPLIER;
-    profile->inductance.min_bias_current_a = DIAG_L_MIN_BIAS_CURRENT_A;
-    profile->inductance.max_bias_current_limit_ratio =
-        DIAG_L_MAX_BIAS_CURRENT_LIMIT_RATIO;
-    profile->inductance.min_target_ripple_a =
-        DIAG_L_MIN_TARGET_RIPPLE_A;
-    profile->inductance.min_current_delta_a =
-        DIAG_L_MIN_CURRENT_DELTA_A;
-    profile->inductance.min_positive_current_ratio =
-        DIAG_L_MIN_POSITIVE_CURRENT_RATIO;
-    profile->inductance.min_injection_voltage_v =
-        DIAG_L_MIN_INJECTION_VOLTAGE_V;
-    profile->inductance.max_injection_vbus_ratio =
-        DIAG_L_MAX_INJECTION_VBUS_RATIO;
-    profile->inductance.tune_scale_min = DIAG_L_TUNE_SCALE_MIN;
-    profile->inductance.tune_scale_max = DIAG_L_TUNE_SCALE_MAX;
-    profile->inductance.tune_ripple_floor_a =
-        DIAG_L_TUNE_RIPPLE_FLOOR_A;
-    profile->inductance.min_slope_difference_a_s =
-        DIAG_L_MIN_SLOPE_DIFFERENCE_A_S;
-    profile->inductance.min_valid_inductance_h =
-        DIAG_L_MIN_VALID_INDUCTANCE_H;
-    profile->inductance.max_valid_inductance_h =
-        DIAG_L_MAX_VALID_INDUCTANCE_H;
-    profile->inductance.request_deadtime_compensation =
-        DIAG_L_REQUEST_DEADTIME_COMPENSATION;
+    /* 参数辨识（mc_param_ident）无 profile 种子：激励层用核内置沉沙
+     * 默认档案，平台参数与安全限值在 diag_start_job 桥接时由 seed 与
+     * profile 限值覆盖。 */
 
     mc_pole_pair_ident_default_config(&profile->pole_pair);
     profile->pole_pair.control_period_s = seed->control_period_s;
@@ -275,8 +217,7 @@ static mc_status_t diag_align_start(diag_runtime_t *runtime)
     return MC_OK;
 }
 
-static mc_status_t diag_start_job(diag_runtime_t *runtime,
-                                  float initial_vbus_v)
+static mc_status_t diag_start_job(diag_runtime_t *runtime)
 {
     switch (runtime->active_job)
     {
@@ -292,29 +233,27 @@ static mc_status_t diag_start_job(diag_runtime_t *runtime,
                                           &runtime->command);
         }
 
-        case DIAG_JOB_RS_IDENT:
+        case DIAG_JOB_PARAM_IDENT:
+        case DIAG_JOB_PARAM_IDENT_LQ:
         {
-            mc_rs_ident_config_t config = runtime->profile.rs;
+            mc_param_ident_config_t config;
+            mc_param_ident_mode_t mode =
+                (runtime->active_job == DIAG_JOB_PARAM_IDENT_LQ)
+                    ? MC_PARAM_IDENT_MODE_LQ
+                    : MC_PARAM_IDENT_MODE_FULL;
 
-            config.safe_current_limit_a = runtime->profile.current_limit_a;
-            config.max_abs_voltage_v = runtime->profile.voltage_limit_v;
-            config.min_vbus_v = runtime->profile.minimum_vbus_v;
-            return mc_rs_ident_start(&runtime->rs, &config);
-        }
-
-        case DIAG_JOB_L_IDENT:
-        {
-            mc_biased_l_ident_config_t config =
-                runtime->profile.inductance;
-
+            /* 激励层用核内置沉沙默认档案；控制周期/极对数取 seed，
+             * 安全限值与母线下限取 profile 闸门（0=禁止启动的语义
+             * 两层一致）。 */
+            mc_param_ident_default_config(&config);
+            config.control_period_s = runtime->profile.control_period_s;
+            config.pole_pairs = (float)runtime->profile.pole_pairs;
             config.current_limit_a = runtime->profile.current_limit_a;
             config.voltage_limit_v = runtime->profile.voltage_limit_v;
-            config.min_vbus_v = runtime->profile.minimum_vbus_v;
-            return mc_biased_l_ident_start(
-                &runtime->inductance,
-                &config,
-                runtime->profile.phase_resistance_ohm,
-                initial_vbus_v);
+            config.vbus_min_v = runtime->profile.minimum_vbus_v;
+            return mc_param_ident_start(&runtime->param_ident,
+                                        &config,
+                                        mode);
         }
 
         case DIAG_JOB_POLE_PAIR_IDENT:
@@ -405,7 +344,7 @@ mc_status_t diag_runtime_start(diag_runtime_t *runtime,
     memset(&runtime->command, 0, sizeof(runtime->command));
     runtime->command_primed = false;
     runtime->voltage_saturated = false;
-    status = diag_start_job(runtime, initial_vbus_v);
+    status = diag_start_job(runtime);
     if (status != MC_OK)
     {
         diag_finish_start_failure(runtime, owner, status);
@@ -547,14 +486,11 @@ static mc_status_t diag_step_job(diag_runtime_t *runtime,
         case DIAG_JOB_CURRENT_SWEEP:
             return mc_current_sweep_step(&runtime->sweep, sample, command);
 
-        case DIAG_JOB_RS_IDENT:
-            return mc_rs_ident_step(&runtime->rs, sample, command);
-
-        case DIAG_JOB_L_IDENT:
-            return mc_biased_l_ident_step(
-                &runtime->inductance,
-                sample,
-                command);
+        case DIAG_JOB_PARAM_IDENT:
+        case DIAG_JOB_PARAM_IDENT_LQ:
+            return mc_param_ident_step(&runtime->param_ident,
+                                       sample,
+                                       command);
 
         case DIAG_JOB_POLE_PAIR_IDENT:
             return mc_pole_pair_ident_step(
@@ -637,14 +573,9 @@ mc_status_t diag_runtime_abort(diag_runtime_t *runtime,
             status = mc_current_sweep_abort(&runtime->sweep, command);
             break;
 
-        case DIAG_JOB_RS_IDENT:
-            status = mc_rs_ident_abort(&runtime->rs, command);
-            break;
-
-        case DIAG_JOB_L_IDENT:
-            status = mc_biased_l_ident_abort(
-                &runtime->inductance,
-                command);
+        case DIAG_JOB_PARAM_IDENT:
+        case DIAG_JOB_PARAM_IDENT_LQ:
+            status = mc_param_ident_abort(&runtime->param_ident, command);
             break;
 
         case DIAG_JOB_POLE_PAIR_IDENT:

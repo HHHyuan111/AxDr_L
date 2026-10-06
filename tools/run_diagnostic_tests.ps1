@@ -85,7 +85,6 @@ $runtimeSources = @(
     (Join-Path $diagCore "diag_runtime.c"),
     (Join-Path $diagCore "mc_common.c"),
     (Join-Path $diagCore "mc_bias_bandwidth.c"),
-    (Join-Path $diagCore "mc_biased_l_ident.c"),
     (Join-Path $diagCore "mc_current_pi.c"),
     (Join-Path $diagCore "mc_current_sweep.c"),
     (Join-Path $diagCore "mc_deadtime_comp.c"),
@@ -94,8 +93,8 @@ $runtimeSources = @(
     (Join-Path $diagCore "mc_diag_manager.c"),
     (Join-Path $diagCore "mc_encoder_alignment.c"),
     (Join-Path $diagCore "mc_flux_observer.c"),
-    (Join-Path $diagCore "mc_pole_pair_ident.c"),
-    (Join-Path $diagCore "mc_rs_ident.c")
+    (Join-Path $diagCore "mc_param_ident.c"),
+    (Join-Path $diagCore "mc_pole_pair_ident.c")
 )
 
 & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `

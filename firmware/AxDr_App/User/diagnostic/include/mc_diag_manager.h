@@ -7,16 +7,17 @@
 extern "C" {
 #endif
 
+/* RS/L 两个 owner 已随 HJY 旧辨识退役移除；本枚举仅作 RAM 运行态互斥
+ * 标识，无持久化/协议数值依赖。 */
 typedef enum {
     MC_DIAG_OWNER_NONE = 0,
-    MC_DIAG_OWNER_RS,
-    MC_DIAG_OWNER_L,
     MC_DIAG_OWNER_POLE_PAIR,
     MC_DIAG_OWNER_ENCODER_ALIGN,
     MC_DIAG_OWNER_CURRENT_SWEEP,
     MC_DIAG_OWNER_BIAS_SWEEP,
     MC_DIAG_OWNER_FLUX,
-    MC_DIAG_OWNER_DEADTIME
+    MC_DIAG_OWNER_DEADTIME,
+    MC_DIAG_OWNER_PARAM
 } mc_diag_owner_t;
 
 typedef enum {

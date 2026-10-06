@@ -10,7 +10,6 @@
 #include <stdint.h>
 
 #include "mc_bias_bandwidth.h"
-#include "mc_biased_l_ident.h"
 #include "mc_current_pi.h"
 #include "mc_current_sweep.h"
 #include "mc_deadtime_comp.h"
@@ -19,8 +18,8 @@
 #include "mc_diag_manager.h"
 #include "mc_encoder_alignment.h"
 #include "mc_flux_observer.h"
+#include "mc_param_ident.h"
 #include "mc_pole_pair_ident.h"
-#include "mc_rs_ident.h"
 
 #define DIAG_ALIGN_MAX_SAMPLES (256U)
 
@@ -32,16 +31,20 @@ typedef enum
     DIAG_REQUEST_STOP = 2,
 } diag_request_e;
 
-/** 同一时间只能运行其中一个主动激励任务。 */
+/** 同一时间只能运行其中一个主动激励任务。
+ *
+ * 2/3 是已退役的 RS_IDENT/L_IDENT（HJY 血脉，随 G11 参数辨识接入由
+ * mc_param_ident 取代），编号留空洞防止旧调试脚本误触新任务。
+ */
 typedef enum
 {
     DIAG_JOB_NONE = 0,
     DIAG_JOB_CURRENT_SWEEP = 1,
-    DIAG_JOB_RS_IDENT = 2,
-    DIAG_JOB_L_IDENT = 3,
     DIAG_JOB_POLE_PAIR_IDENT = 4,
     DIAG_JOB_ENCODER_ALIGN = 5,
     DIAG_JOB_DEADTIME_TEST = 6,
+    DIAG_JOB_PARAM_IDENT = 7,
+    DIAG_JOB_PARAM_IDENT_LQ = 8,
 } diag_job_e;
 
 typedef enum
@@ -98,8 +101,6 @@ typedef struct
     int8_t encoder_direction;
 
     mc_current_sweep_config_t sweep;
-    mc_rs_ident_config_t rs;
-    mc_biased_l_ident_config_t inductance;
     mc_pole_pair_ident_config_t pole_pair;
     diag_align_config_t encoder_align;
     mc_deadtime_test_config_t deadtime_test;
@@ -145,8 +146,7 @@ typedef struct diag_runtime
     mc_sample_t last_sample;
 
     mc_current_sweep_t sweep;
-    mc_rs_ident_t rs;
-    mc_biased_l_ident_t inductance;
+    mc_param_ident_t param_ident;
     mc_pole_pair_ident_t pole_pair;
     diag_align_runtime_t encoder_align;
     mc_deadtime_test_t deadtime_test;
