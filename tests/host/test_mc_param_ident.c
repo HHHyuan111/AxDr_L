@@ -69,6 +69,13 @@ static float rng_gauss(void)
 #define PLANT_FLUX_TRUE  (0.0058f)
 #define PLANT_DT         (50e-6f)
 #define PLANT_THETA0     (0.7f)     /* 非零锁存角：验证 openloop 角不变量 */
+/* 3/π ≈ 0.9549：旋转几何下电流矢量方向的逆变器死区等效压降
+ * (4/π)·v_phase 与锁轴 per-axis 等效 (4/3)·v_phase 之比。镜像核
+ * call site 的 MC_IDENT_FLUX_VDT_DQ_SCALE：L 段（VOLTAGE 模式锁轴）
+ * 解出 per-axis 值，FLUX 段（CURRENT 模式旋转）毛电压携带 ×本因子
+ * 的分量——host 由此验证换算机制自洽，因子本身靠真机
+ * DEADTIME_TEST 交叉验证。 */
+#define PLANT_VDT_ROT_SCALE (0.9549296586f)
 
 typedef struct {
     float rs, ld, lq, vdt, flux, pp;
@@ -135,17 +142,25 @@ static void plant_tick(plant_t *p, const mc_command_t *cmd, float dt)
     p->iq_prev = p->iq;
 
     if (cmd->mode == MC_CONTROL_CURRENT) {
-        /* 完美电流环：一阶跟踪指令；回报电压=端电压净值（死区由电流环
-         * 自动顶掉，等价 G11 foc_core 死区补偿后的回报）。磁链链的 vq
-         * 含 Lq·diq/dt 与 ωe·ψ 项。死区只活在 VOLTAGE 模式的电流动态里
-         * （L 回归从命令电压-电流响应差中解出 VDT）。 */
+        /* 完美电流环：一阶跟踪指令；回报电压=毛电压（PI 输出含顶掉
+         * 逆变器死区扰动的分量，与固件 build_sample 取 foc->out.vd 的
+         * 语义一致）。死区沿电流矢量方向的等效分量按运动状态分两档：
+         * 静止锁轴（PREPARE/RS）= vdt（锁轴几何，与 L 段 VOLTAGE 注入
+         * 同语义）；旋转（FLUX 拖转）= vdt×3/π（旋转几何基波等效）。
+         * 两档比值即核 call site 3/π 换算的物理依据；host 由此验证换
+         * 算机制自洽，因子本身靠真机 DEADTIME_TEST 交叉验证。Rs 双档
+         * 电流同号，死区分量在差分中共模消掉，不影响电阻。 */
         const float a = 1.0f - expf(-dt / p->tau_cl);
+        const float vdt_cur = p->vdt *
+            ((fabsf(p->omega_mech) > 1.0f) ? PLANT_VDT_ROT_SCALE : 1.0f);
         p->id += (cmd->id_ref_a - p->id) * a;
         p->iq += (cmd->iq_ref_a - p->iq) * a;
         p->vd_actual = p->rs * p->id + p->ld * (p->id - p->id_prev) / dt
-                       - omega_e * p->lq * p->iq;
+                       - omega_e * p->lq * p->iq
+                       + vdt_cur * plant_signf(p->id);
         p->vq_actual = p->rs * p->iq + p->lq * (p->iq - p->iq_prev) / dt
-                       + omega_e * (p->ld * p->id + p->flux);
+                       + omega_e * (p->ld * p->id + p->flux)
+                       + vdt_cur * plant_signf(p->iq);
     } else {
         p->id = plant_step_axis(p->id, cmd->vd_ref_v, dt, p->rs, p->ld, p->vdt);
         p->iq = plant_step_axis(p->iq, cmd->vq_ref_v, dt, p->rs, p->lq, p->vdt);
@@ -587,8 +602,11 @@ static void test_rs_two_plateau(void)
         mc_param_ident_get_quality(&ident, &q);
         CHECK_NEAR(q.rs_current_lo_a, 4.0f, 0.05f);
         CHECK_NEAR(q.rs_current_hi_a, 10.0f, 0.05f);
-        CHECK_NEAR(q.rs_voltage_lo_v, 0.069f * 4.0f, 0.01f);
-        CHECK_NEAR(q.rs_voltage_hi_v, 0.069f * 10.0f, 0.01f);
+        /* 毛电压语义：平台电压 = R·i + 死区锁轴等效分量（差分共模消掉）。 */
+        CHECK_NEAR(q.rs_voltage_lo_v,
+                   0.069f * 4.0f + PLANT_VDT_TRUE, 0.01f);
+        CHECK_NEAR(q.rs_voltage_hi_v,
+                   0.069f * 10.0f + PLANT_VDT_TRUE, 0.01f);
     }
 }
 
@@ -713,6 +731,117 @@ static void test_full_chain_flux(void)
 }
 
 /* =============================================================================
+ * 6b. 磁链死区修正（毛电压 plant；估计器单点 + 全链扫描 + 零死区）
+ * ============================================================================ */
+
+static void test_flux_deadtime_correction(void)
+{
+    /* 单点对照：毛电压 vq 输入，不修正 λ̂ 偏 +vdt_rot/ωe（沉沙量级
+     * ≈ +77%），修正后精确恢复——符号/量级错误在此露馅。 */
+    {
+        mc_param_ident_flux_eval_input_t in;
+        float lambda = 0.0f;
+        const float omega_e = 5.0f * (900.0f / 60.0f * 6.2831853f); /* 900eRPM */
+        const float vdt_rot = PLANT_VDT_TRUE * PLANT_VDT_ROT_SCALE;
+
+        memset(&in, 0, sizeof(in));
+        in.iq = 2.0f;
+        in.id = 0.1f;
+        in.omega_e = omega_e;
+        in.phase_resistance = PLANT_RS_TRUE;
+        in.phase_inductance = PLANT_L_TRUE;
+        in.vq = PLANT_RS_TRUE * in.iq
+                + omega_e * (PLANT_L_TRUE * in.id + PLANT_FLUX_TRUE)
+                + vdt_rot; /* 毛电压（PI 输出含死区顶掉分量） */
+
+        in.deadtime_v = 0.0f;
+        CHECK_TRUE(mc_param_ident_eval_flux_sample(&in, &lambda));
+        CHECK_NEAR(lambda, PLANT_FLUX_TRUE + vdt_rot / omega_e,
+                   0.02f * PLANT_FLUX_TRUE);
+        in.deadtime_v = vdt_rot;
+        CHECK_TRUE(mc_param_ident_eval_flux_sample(&in, &lambda));
+        CHECK_NEAR(lambda, PLANT_FLUX_TRUE, 0.01f * PLANT_FLUX_TRUE);
+    }
+
+    /* 全链扫描：vdt ∈ {0.2, 0.42, 0.8}V，核自动取 L 段解出的死区值
+     * （×3/π）修正，flux 误差 <5%（修正失效则分别偏 +38%/+80%/+152%，
+     * 符号反则 λ<=0 直接拒绝）。 */
+    {
+        static const float vdts[3] = { 0.20f, 0.42f, 0.80f };
+        int k;
+        for (k = 0; k < 3; ++k) {
+            mc_param_ident_config_t cfg;
+            mc_param_ident_t ident;
+            plant_t plant;
+            const mc_param_ident_result_t *result;
+
+            fast_config(&cfg);
+            plant_reset(&plant);
+            plant.vdt = vdts[k];
+            CHECK_TRUE(run_chain(&ident, &plant, &cfg,
+                                 MC_PARAM_IDENT_MODE_FULL, 0.0f, 7u,
+                                 INJECT_NONE, MC_PARAM_IDENT_IDLE, 0, NULL)
+                       == MC_DONE);
+            result = mc_param_ident_get_result(&ident);
+            CHECK_NEAR(result->flux_linkage_wb, PLANT_FLUX_TRUE,
+                       0.05f * PLANT_FLUX_TRUE);
+            /* 交叉核对：Rs 平台残差直测的死区值应跟随 plant 设定
+             * （L 段回归值有梯形积分系统偏差，不作此断言）。 */
+            CHECK_NEAR(ident.rt.vdt_platform_v, vdts[k], 0.02f);
+        }
+    }
+
+    /* 零死区：L 段解出 deadtime≈0 不过修，flux 不受损。 */
+    {
+        mc_param_ident_config_t cfg;
+        mc_param_ident_t ident;
+        plant_t plant;
+        const mc_param_ident_result_t *result;
+
+        fast_config(&cfg);
+        plant_reset(&plant);
+        plant.vdt = 0.0f;
+        CHECK_TRUE(run_chain(&ident, &plant, &cfg, MC_PARAM_IDENT_MODE_FULL,
+                             0.0f, 7u, INJECT_NONE, MC_PARAM_IDENT_IDLE,
+                             0, NULL) == MC_DONE);
+        result = mc_param_ident_get_result(&ident);
+        CHECK_NEAR(result->flux_linkage_wb, PLANT_FLUX_TRUE,
+                   0.01f * PLANT_FLUX_TRUE);
+    }
+}
+
+/* =============================================================================
+ * 6c. FULL 链 Monte Carlo（毛电压 plant，20 seed）
+ * ============================================================================ */
+
+static void test_full_chain_flux_monte_carlo(void)
+{
+    mc_param_ident_config_t cfg;
+    mc_param_ident_t ident;
+    plant_t plant;
+    enum { FLUX_SEEDS = 20 };
+    double flux_est[FLUX_SEEDS];
+    int seed;
+    int all_done = 1;
+
+    fast_config(&cfg);
+    for (seed = 0; seed < FLUX_SEEDS; ++seed) {
+        plant_reset(&plant);
+        if (run_chain(&ident, &plant, &cfg, MC_PARAM_IDENT_MODE_FULL, 0.025f,
+                      (uint32_t)(seed + 1u), INJECT_NONE,
+                      MC_PARAM_IDENT_IDLE, 0, NULL) != MC_DONE) {
+            all_done = 0;
+            continue;
+        }
+        flux_est[seed] = (double)ident.result.flux_linkage_wb;
+    }
+    CHECK_TRUE(all_done);
+    CHECK_NEAR(mean_of(flux_est, FLUX_SEEDS), PLANT_FLUX_TRUE,
+               0.05f * PLANT_FLUX_TRUE);
+    CHECK_TRUE(pstdev_of(flux_est, FLUX_SEEDS) / PLANT_FLUX_TRUE < 0.10);
+}
+
+/* =============================================================================
  * 7. 故障路径（注入式，表驱动）
  * ============================================================================ */
 
@@ -772,6 +901,8 @@ int main(void)
     test_command_invariants();
     test_full_chain_lq_monte_carlo();
     test_full_chain_flux();
+    test_flux_deadtime_correction();
+    test_full_chain_flux_monte_carlo();
     test_fault_paths();
 
     if (g_failures == 0) {

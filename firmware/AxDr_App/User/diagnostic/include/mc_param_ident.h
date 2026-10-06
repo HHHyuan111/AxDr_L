@@ -32,10 +32,14 @@
  *    支持控制频率约 10~40kHz（host 数值基准锁 20kHz/50us）。
  *  - Ke 约定：线线 RMS / 机械 rad/s（Ke = flux * pp * sqrt(3/2)）；
  *    Kt 约定：dq 峰值电流（Kt = 1.5 * pp * flux）。
- *  - 磁链公式按端电压净值建模：驱动回报的 vq 若含逆变器死区压降
- *    （未补偿），λ̂ 将带上 vdt/ωe 正偏置（小磁链/低速电机可达数十
- *    百分点）——adapt 段须确认 vd/vq 回报语义（配套死区补偿或提高
- *    flux_target_erpm 压低该项）。
+ *  - 磁链死区修正：驱动回报的 vq 为电流环 PI 输出（毛电压，自动顶掉
+ *    逆变器死区压降），λ̂ 若不扣除该项会带 +vdt/ωe 正偏置（小磁链/
+ *    低速电机可达数十百分点）。FLUX 段自动取 Rs 平台残差直测的死区
+ *    压降（rt.vdt_platform_v = vd−Rs·id 两档平均）乘 3/π（锁轴→旋转
+ *    几何换算，见 mc_param_ident.c MC_IDENT_FLUX_VDT_DQ_SCALE 注释）
+ *    注入估计器；一阶近似残差 3~4%（A5 死区补偿回流 foc 链后消除）。
+ *    L 段回归的 quality.ld.deadtime_drop_v 因梯形积分误差有 -5~-10%
+ *    系统偏差，仅作诊断输出，不用于修正。
  */
 
 #ifndef MC_PARAM_IDENT_H
@@ -118,12 +122,13 @@ typedef struct {
 
 /* 磁链单样本估计器输入（algo_ops 可替换）。 */
 typedef struct {
-    float vq;                       /* q 轴实际电压(V)，有符号 */
+    float vq;                       /* q 轴实际电压(V)，有符号（电流环 PI 输出=毛电压） */
     float iq;                       /* q 轴电流(A)，有符号 */
     float id;                       /* d 轴电流(A)，有符号 */
     float omega_e;                  /* 实测电角速度(rad/s)，有符号 */
     float phase_resistance;         /* 相电阻(Ω) */
     float phase_inductance;         /* d 轴电感(H) */
+    float deadtime_v;               /* q 轴等效死区压降(V)；0=不修正 */
 } mc_param_ident_flux_eval_input_t;
 
 typedef struct {
@@ -291,6 +296,7 @@ typedef struct {
     uint8_t rs_level;               /* Rs 双档：0=低电平级 1=高电平级 */
     float rs_v_lvl0, rs_i_lvl0;     /* Rs 低档 (vd,id) 均值缓存 */
     float rs_std_lvl0;
+    float vdt_platform_v;           /* Rs 平台残差直测死区(V)：vd−Rs·id 两档平均 */
     float rs_current_cmd;           /* Rs 电流指令（含软启动斜坡） */
     uint8_t l_level;                /* L 双档：0=低 1=高 */
     uint8_t l_phase;                /* 0=零电压退流 1=双极脉冲采样 */
@@ -412,7 +418,8 @@ bool mc_param_ident_l_reg_solve_level(const mc_param_ident_l_reg_t *reg,
 /* 相邻采样间 avg(sign(i)) 的线性插值（电流过零的处理）。 */
 float mc_param_ident_sign_average(float i0_a, float i1_a);
 
-/* 内置磁链估计器：λ=(vq-Rs·iq)/ωe - Ld·id；|ωe|<=5rad/s 或 λ<=0 拒绝。 */
+/* 内置磁链估计器：λ=(vq-Rs·iq-deadtime_v·sign(iq))/ωe - Ld·id；
+ * |ωe|<=5rad/s 或 λ<=0 拒绝；deadtime_v=0 时不做死区修正。 */
 bool mc_param_ident_eval_flux_sample(const mc_param_ident_flux_eval_input_t *in,
                                      float *out_flux_wb);
 

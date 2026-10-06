@@ -47,6 +47,11 @@
 #define MC_IDENT_FLUX_MIN_SAMPLES           (200u)
 #define MC_IDENT_FLUX_FILTER_SETTLE_S       (0.05f)
 #define MC_IDENT_FLUX_SQRT_3_2              (1.2247448714f)
+/* 死区压降 dq 几何换算：L 段锁 d 轴脉冲下回归解出的等效开关压降为
+ * (4/3)·v_phase，而旋转基波电流矢量（近 q 轴）下逆变器扰动等效为
+ * (4/π)·v_phase，两者之比 = 3/π ≈ 0.955。磁链修正用 L 段拟合值乘
+ * 本系数；一阶近似残差约 3~4%（A5 死区补偿回流 foc 链后消除）。 */
+#define MC_IDENT_FLUX_VDT_DQ_SCALE          (0.9549296586f)
 
 static inline float clamp_f(float x, float lo, float hi);
 
@@ -459,8 +464,13 @@ bool mc_param_ident_eval_flux_sample(const mc_param_ident_flux_eval_input_t *in,
     if (fabsf(in->omega_e) <= MC_IDENT_FLUX_MIN_OMEGA_RAD_S) return false;
 
     /* 转子 dq 稳态模型：vq = Rs*iq + omega_e*(Ld*id + psi_f)。
-     * 必须保留全部符号；使用绝对值会在反转/再生时产生系统性错误。 */
-    lambda = (in->vq - in->phase_resistance * in->iq) / in->omega_e
+     * 必须保留全部符号；使用绝对值会在反转/再生时产生系统性错误。
+     * vq 取驱动回报的指令电压（电流环 PI 输出）：PI 为跟踪电流会自动
+     * 顶掉逆变器死区压降，回报值因此含该分量，须按 deadtime_v·sign(iq)
+     * 扣除，否则 λ̂ 带 +vdt/ωe 正偏置（deadtime_v=0 时退化为原式）。 */
+    lambda = (in->vq - in->phase_resistance * in->iq
+              - in->deadtime_v * ((in->iq >= 0.0f) ? 1.0f : -1.0f))
+             / in->omega_e
              - in->phase_inductance * in->id;
     if (!isfinite(lambda) || lambda <= 0.0f) return false;
 
@@ -631,6 +641,14 @@ static bool ident_state_rs_sample(mc_param_ident_t *ctx,
         ctx->quality.rs_current_hi_a = id_m;
         ctx->quality.rs_voltage_hi_v = vd_m;
         ctx->quality.rs_current_std_max_a = fmaxf(id_std, ctx->rt.rs_std_lvl0);
+
+        /* 平台残差直测死区：锁 d 轴稳态下 vd − Rs·id 即逆变器死区沿
+         * 电流矢量方向的等效压降（锁轴几何），两档取平均压噪声。供磁链
+         * 段修正（×3/π 换旋转几何）；不依赖 L 段回归拟合值——后者受
+         * 梯形积分误差影响有 -5~-10% 系统偏差，仅作质量诊断输出。 */
+        ctx->rt.vdt_platform_v = 0.5f *
+            ((ctx->rt.rs_v_lvl0 - ctx->result.phase_resistance * ctx->rt.rs_i_lvl0)
+             + (vd_m - ctx->result.phase_resistance * id_m));
 
         if (ctx->result.phase_resistance < ctx->cfg.r_min ||
             ctx->result.phase_resistance > ctx->cfg.r_max) {
@@ -968,6 +986,10 @@ static bool ident_state_flux_sample(mc_param_ident_t *ctx,
             .omega_e = omega_e,
             .phase_resistance = ctx->result.phase_resistance,
             .phase_inductance = ctx->result.phase_inductance,
+            /* Rs 平台残差直测的死区压降（锁轴几何），按 dq 几何换算
+             * 到旋转 q 轴；FLUX 段 iq 恒号，等价于扣除常数偏置。 */
+            .deadtime_v = ctx->rt.vdt_platform_v
+                          * MC_IDENT_FLUX_VDT_DQ_SCALE,
         };
         const mc_param_ident_algo_ops_t *ops = &ctx->algo_ops;
         bool (*eval)(const mc_param_ident_flux_eval_input_t *, float *) =
