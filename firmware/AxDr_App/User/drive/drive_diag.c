@@ -10,45 +10,109 @@
 
 #include <math.h>
 
+#include <string.h>
+
 #include "board_config.h"
 #include "common.h"
 #include "diag_runtime.h"
 #include "drive_pwm.h"
 #include "foc.h"
 #include "foc_core.h"
+#include "service_param_store.h"
 
 diag_runtime_t g_diag;
 
-/* 参数辨识成功落档（ISR 上下文，成功收尾拍，电机随即停机）。
+/* 电机参数+电流环 PI 应用（辨识成功与 Flash 档案装载共用）。
  * 派生量按依赖顺序重算：Ls=(Ld+Lq)/2、Kt=1.5·pn·flux、div_Kt。
- * FULL 模式不测 Lq/磁链（result 留 0 哨兵），对应字段保持现值。
+ * Lq/磁链 0 哨兵（FULL 模式未测字段）不覆盖现值。
  * 电流环 PI 按 cur_pi_init 同式直写（SET_CURRENT_PI 先例），kp 分轴
  * 用辨识 Ld/Lq（原式统一用 Ls），ki=Rs·ibw（连续增益），ibw 不动；
- * 持久化（save/load）与遥测上报归 svc 段。 */
-static void drive_diag_ident_apply(const mc_param_ident_result_t *result,
-                                   void *user_ctx)
+ * ibw>0 守卫：档案链若未建 ibw，防辨识成功反把 PI 增益清零。 */
+static void drive_diag_ident_apply_motor(float rs_ohm,
+                                         float ld_h,
+                                         float lq_h,
+                                         float flux_wb)
 {
-    (void)user_ctx;
-
-    g_foc.motor.Rs = result->phase_resistance;
-    g_foc.motor.Ld = result->phase_inductance;
-    if (result->phase_inductance_q > 0.0f)
+    g_foc.motor.Rs = rs_ohm;
+    g_foc.motor.Ld = ld_h;
+    if (lq_h > 0.0f)
     {
-        g_foc.motor.Lq = result->phase_inductance_q;
+        g_foc.motor.Lq = lq_h;
     }
     g_foc.motor.Ls = 0.5f * (g_foc.motor.Ld + g_foc.motor.Lq);
 
-    if (result->flux_linkage_wb > 0.0f)
+    if (flux_wb > 0.0f)
     {
-        g_foc.motor.flux = result->flux_linkage_wb;
+        g_foc.motor.flux = flux_wb;
         g_foc.motor.Kt = 1.5f * g_foc.motor.pn * g_foc.motor.flux;
         g_foc.motor.div_Kt = 1.0f / g_foc.motor.Kt;
     }
 
-    g_foc.id_pi.kp = g_foc.motor.Ld * g_foc.motor.ibw;
-    g_foc.iq_pi.kp = g_foc.motor.Lq * g_foc.motor.ibw;
-    g_foc.id_pi.ki = g_foc.motor.Rs * g_foc.motor.ibw;
-    g_foc.iq_pi.ki = g_foc.motor.Rs * g_foc.motor.ibw;
+    if (g_foc.motor.ibw > 0.0f)
+    {
+        g_foc.id_pi.kp = g_foc.motor.Ld * g_foc.motor.ibw;
+        g_foc.iq_pi.kp = g_foc.motor.Lq * g_foc.motor.ibw;
+        g_foc.id_pi.ki = g_foc.motor.Rs * g_foc.motor.ibw;
+        g_foc.iq_pi.ki = g_foc.motor.Rs * g_foc.motor.ibw;
+    }
+}
+
+/* 参数辨识成功落 RAM（ISR 上下文，成功收尾拍，电机随即停机）。 */
+static void drive_diag_ident_apply(const mc_param_ident_result_t *result,
+                                   void *user_ctx)
+{
+    (void)user_ctx;
+    drive_diag_ident_apply_motor(result->phase_resistance,
+                                 result->phase_inductance,
+                                 result->phase_inductance_q,
+                                 result->flux_linkage_wb);
+}
+
+/* 辨识终态（ISR 上下文）：成功则把结果+质量摘要暂存待落盘；失败/中止
+ * 不动旧档案。落盘（页 2 擦写）由主循环 service_param_store_ident_poll 执行。 */
+static void drive_diag_ident_on_finish(bool success,
+                                       mc_param_ident_fault_t fault_code,
+                                       void *user_ctx)
+{
+    const mc_param_ident_result_t *result;
+    mc_param_ident_quality_t quality;
+    service_ident_data_t data;
+
+    (void)fault_code;
+    (void)user_ctx;
+    if (!success)
+    {
+        return;
+    }
+
+    result = mc_param_ident_get_result(&g_diag.param_ident);
+    mc_param_ident_get_quality(&g_diag.param_ident, &quality);
+
+    memset(&data, 0, sizeof(data));
+    data.rs_ohm = result->phase_resistance;
+    data.ld_h = result->phase_inductance;
+    data.lq_h = result->phase_inductance_q;
+    data.flux_wb = result->flux_linkage_wb;
+    data.ke_v_per_rad = result->back_emf_v_per_rad;
+    data.kt_nm_a = result->torque_kt_nm_a;
+    data.ld_r2 = quality.ld.fit_r2;
+    data.lq_r2 = quality.lq.fit_r2;
+    data.flux_std_wb = quality.flux_std_wb;
+    data.deadtime_v = quality.ld.deadtime_drop_v;
+    service_param_store_ident_stage(&data);
+}
+
+void drive_diag_ident_load(void)
+{
+    service_ident_data_t data;
+
+    if (service_param_store_ident_read(&data))
+    {
+        drive_diag_ident_apply_motor(data.rs_ohm,
+                                     data.ld_h,
+                                     data.lq_h,
+                                     data.flux_wb);
+    }
 }
 
 void drive_diag_init(const foc_t *foc)
@@ -70,9 +134,12 @@ void drive_diag_init(const foc_t *foc)
     diag_runtime_init(&g_diag, &seed);
     {
         /* attach 必须在 diag_runtime_init（memset 清 ctx，满足核的零
-         * 初始化契约）之后；io 其余回调留 NULL（svc 段再接上报）。 */
+         * 初始化契约）之后；load 回调留 NULL——档案装载由 boot 侧
+         * drive_diag_ident_load 主动做（结果要落 g_foc.motor+PI，
+         * 语义与核的手动 io.load 出参不同）。 */
         const mc_param_ident_io_t ident_io = {
             .apply_results = drive_diag_ident_apply,
+            .on_finish = drive_diag_ident_on_finish,
         };
         mc_param_ident_attach(&g_diag.param_ident, &ident_io);
     }

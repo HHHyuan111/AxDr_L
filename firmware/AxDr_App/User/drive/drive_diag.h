@@ -36,4 +36,8 @@ void drive_diag_on_stopped(void);
 /** Drive 进入故障时中止当前诊断任务。 */
 void drive_diag_on_fault(void);
 
+/** 上电装载辨识档案：校验过即应用电机参数并分轴重整定电流环
+ *  （ibw>0 守卫；在 service_param_store_boot 之后、fast_loop_enable 之前调）。 */
+void drive_diag_ident_load(void);
+
 #endif /* AXDR_DRIVE_DIAG_H */

@@ -31,6 +31,7 @@
 /* USER CODE BEGIN Includes */
 #include "fast_loop.h"
 #include "foc.h"
+#include "drive_diag.h"
 #include "target_adc.h"
 #include "modlue.h"
 #include "lcd.h"
@@ -179,6 +180,9 @@ int main(void)
   /* S5 零位装载：须在 fast_loop_enable 之前——快环一开 START 即可进来，
    * enc_aligned 得先就位（有效存储 → 免 1.5s 对齐直进 RUN）。 */
   service_param_store_boot();
+  /* 辨识档案装载（P8 A1）：有效记录即应用电机参数并分轴重整定电流环，
+   * 同样须在 fast_loop_enable 之前。 */
+  drive_diag_ident_load();
   fast_loop_enable();
 
   /* S4/S3 service 装配：发送缝绑定 + 遥测复位。CDC 收路径在
@@ -197,13 +201,15 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* service 慢路径四 poll（自由节拍）：安全链执法（ARM 后生效）、
-     * 命令帧解析分发、遥测取帧发送、对齐零位保存（边沿触发）。
+    /* service 慢路径五 poll（自由节拍）：安全链执法（ARM 后生效）、
+     * 命令帧解析分发、遥测取帧发送、对齐零位保存（边沿触发）、
+     * 辨识档案落盘（on_finish 暂存，逐字段合并）。
      * 均设计为空转廉价；save 时页擦除约 22ms（Bank2 擦写不 stall Bank1 取指）。 */
     service_safety_poll();
     service_usb_poll();
     service_telemetry_poll();
     service_param_store_poll();
+    service_param_store_ident_poll();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
