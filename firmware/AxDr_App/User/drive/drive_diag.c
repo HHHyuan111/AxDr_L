@@ -14,9 +14,42 @@
 #include "common.h"
 #include "diag_runtime.h"
 #include "drive_pwm.h"
+#include "foc.h"
 #include "foc_core.h"
 
 diag_runtime_t g_diag;
+
+/* 参数辨识成功落档（ISR 上下文，成功收尾拍，电机随即停机）。
+ * 派生量按依赖顺序重算：Ls=(Ld+Lq)/2、Kt=1.5·pn·flux、div_Kt。
+ * FULL 模式不测 Lq/磁链（result 留 0 哨兵），对应字段保持现值。
+ * 电流环 PI 按 cur_pi_init 同式直写（SET_CURRENT_PI 先例），kp 分轴
+ * 用辨识 Ld/Lq（原式统一用 Ls），ki=Rs·ibw（连续增益），ibw 不动；
+ * 持久化（save/load）与遥测上报归 svc 段。 */
+static void drive_diag_ident_apply(const mc_param_ident_result_t *result,
+                                   void *user_ctx)
+{
+    (void)user_ctx;
+
+    g_foc.motor.Rs = result->phase_resistance;
+    g_foc.motor.Ld = result->phase_inductance;
+    if (result->phase_inductance_q > 0.0f)
+    {
+        g_foc.motor.Lq = result->phase_inductance_q;
+    }
+    g_foc.motor.Ls = 0.5f * (g_foc.motor.Ld + g_foc.motor.Lq);
+
+    if (result->flux_linkage_wb > 0.0f)
+    {
+        g_foc.motor.flux = result->flux_linkage_wb;
+        g_foc.motor.Kt = 1.5f * g_foc.motor.pn * g_foc.motor.flux;
+        g_foc.motor.div_Kt = 1.0f / g_foc.motor.Kt;
+    }
+
+    g_foc.id_pi.kp = g_foc.motor.Ld * g_foc.motor.ibw;
+    g_foc.iq_pi.kp = g_foc.motor.Lq * g_foc.motor.ibw;
+    g_foc.id_pi.ki = g_foc.motor.Rs * g_foc.motor.ibw;
+    g_foc.iq_pi.ki = g_foc.motor.Rs * g_foc.motor.ibw;
+}
 
 void drive_diag_init(const foc_t *foc)
 {
@@ -35,6 +68,14 @@ void drive_diag_init(const foc_t *foc)
     };
 
     diag_runtime_init(&g_diag, &seed);
+    {
+        /* attach 必须在 diag_runtime_init（memset 清 ctx，满足核的零
+         * 初始化契约）之后；io 其余回调留 NULL（svc 段再接上报）。 */
+        const mc_param_ident_io_t ident_io = {
+            .apply_results = drive_diag_ident_apply,
+        };
+        mc_param_ident_attach(&g_diag.param_ident, &ident_io);
+    }
     g_diag.profile.current_limit_a = DRIVE_DIAG_CURRENT_LIMIT_A;
     g_diag.profile.voltage_limit_v = DRIVE_DIAG_VOLTAGE_LIMIT_V;
     g_diag.profile.minimum_vbus_v = foc->prot_cfg.under_voltage_v;
