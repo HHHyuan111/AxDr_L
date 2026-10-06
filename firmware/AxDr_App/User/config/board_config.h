@@ -25,8 +25,10 @@
 #define DRIVE_MOS_OVER_TEMPERATURE_C          (100.0f)
 #define DRIVE_COIL_OVER_TEMPERATURE_C         (100.0f)
 
-/* 主动诊断任务的独立硬上限；实物确认前保持 0。 */
-#define DRIVE_DIAG_CURRENT_LIMIT_A            (0.0f)
-#define DRIVE_DIAG_VOLTAGE_LIMIT_V            (0.0f)
+/* 主动诊断任务的独立硬上限。沉沙电机试验条件已确认（2026-10-05）：
+ * 电流 8A 覆盖核默认 Rs 平台 4A(≤0.8×限幅)；电压 11V 覆盖 L 注入
+ * 3.0V(≤0.4×限幅) 并留母线波动余量。真机条件变更时随试验重标。 */
+#define DRIVE_DIAG_CURRENT_LIMIT_A            (8.0f)
+#define DRIVE_DIAG_VOLTAGE_LIMIT_V            (11.0f)
 
 #endif /* BOARD_CONFIG_H */
