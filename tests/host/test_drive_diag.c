@@ -12,6 +12,7 @@
 #include "common.h"
 #include "diag_runtime.h"
 #include "drive_diag.h"
+#include "service_param_store.h"
 
 static mc_status_t fake_start_status;
 static mc_status_t fake_step_status;
@@ -54,6 +55,44 @@ void diag_runtime_init(diag_runtime_t *runtime, const diag_seed_t *seed)
     runtime->profile.pole_pairs = seed->pole_pairs;
     runtime->profile.encoder_full_scale = seed->encoder_full_scale;
     runtime->profile.encoder_direction = seed->encoder_direction;
+}
+
+/* ---- P8 ident 落地引入的符号桩（本测试不验辨识链） ---- */
+foc_t g_foc;
+
+void mc_param_ident_attach(mc_param_ident_t *ctx,
+                           const mc_param_ident_io_t *io)
+{
+    (void)ctx;
+    (void)io;
+}
+
+const mc_param_ident_result_t *mc_param_ident_get_result(
+    const mc_param_ident_t *ctx)
+{
+    (void)ctx;
+    return NULL;
+}
+
+void mc_param_ident_get_quality(const mc_param_ident_t *ctx,
+                                mc_param_ident_quality_t *out_quality)
+{
+    (void)ctx;
+    if (out_quality != NULL)
+    {
+        memset(out_quality, 0, sizeof(*out_quality));
+    }
+}
+
+void service_param_store_ident_stage(const service_ident_data_t *data)
+{
+    (void)data;
+}
+
+uint8_t service_param_store_ident_read(service_ident_data_t *out)
+{
+    (void)out;
+    return 0U;
 }
 
 mc_status_t diag_runtime_start(diag_runtime_t *runtime,
@@ -189,6 +228,24 @@ static bool test_init_builds_independent_profile(void)
                        "诊断电压硬上限应来自电机驱动配置。")
         && expect_true(nearly_equal(g_diag.profile.minimum_vbus_v, 15.0f),
                        "诊断对象应复用 Drive 欠压门槛。");
+}
+
+static bool test_init_abz_seed_selects_abz_struct(void)
+{
+    /* ABZ 主编码器：种子必须取 abz 结构（10000/-1），不得落 ma732
+     * 默认（16384/+1）——错标度/方向污染极对数与对齐 raw 换算。 */
+    foc_t foc = make_motor();
+
+    reset_fakes();
+    foc.enc.primary = ENCODER_TYPE_ABZ;
+    foc.enc.abz.cpr = 10000U;
+    foc.enc.abz.dir = -1;
+    drive_diag_init(&foc);
+
+    return expect_true(g_diag.profile.encoder_full_scale == 10000U,
+                       "ABZ 主编码器种子应取 abz 满量程。")
+        && expect_true(g_diag.profile.encoder_direction == -1,
+                       "ABZ 主编码器种子应取 abz 方向。");
 }
 
 static bool test_request_enters_diagnostic_mode(void)
@@ -365,11 +422,12 @@ int main(void)
 {
     reset_fakes();
     if (!test_init_builds_independent_profile()) return 1;
-    if (!test_request_enters_diagnostic_mode()) return 2;
-    if (!test_prepare_uses_stopped_platform()) return 3;
-    if (!test_current_command_uses_fresh_feedback()) return 4;
-    if (!test_openloop_voltage_uses_command_angle()) return 5;
-    if (!test_finish_and_limit_return_to_stop()) return 6;
-    if (!test_stop_and_fault_close_runtime()) return 7;
+    if (!test_init_abz_seed_selects_abz_struct()) return 2;
+    if (!test_request_enters_diagnostic_mode()) return 3;
+    if (!test_prepare_uses_stopped_platform()) return 4;
+    if (!test_current_command_uses_fresh_feedback()) return 5;
+    if (!test_openloop_voltage_uses_command_angle()) return 6;
+    if (!test_finish_and_limit_return_to_stop()) return 7;
+    if (!test_stop_and_fault_close_runtime()) return 8;
     return 0;
 }

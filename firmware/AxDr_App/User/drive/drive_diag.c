@@ -117,9 +117,17 @@ void drive_diag_ident_load(void)
 
 void drive_diag_init(const foc_t *foc)
 {
-    const encoder_data_t *encoder = (foc->enc.primary == ENCODER_TYPE_MT6816)
-        ? &foc->enc.mt6816
-        : &foc->enc.ma732;
+    /* 种子按主编码器类型取结构：ABZ 落 ma732 会带错标度/方向
+     * （16384/+1 vs 真值 10000/-1），污染极对数/对齐等 raw 换算任务。 */
+    const encoder_data_t *encoder = &foc->enc.ma732;
+    if (foc->enc.primary == ENCODER_TYPE_MT6816)
+    {
+        encoder = &foc->enc.mt6816;
+    }
+    else if (foc->enc.primary == ENCODER_TYPE_ABZ)
+    {
+        encoder = &foc->enc.abz;
+    }
     const diag_seed_t seed = {
         .control_period_s = foc->rate.foc_ts,
         .phase_resistance_ohm = foc->motor.Rs,
