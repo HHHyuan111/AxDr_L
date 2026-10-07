@@ -608,7 +608,11 @@ static bool ident_state_rs_sample(mc_param_ident_t *ctx,
         }
         ctx->rt.rs_retry_count = 0u;
 
-        if (id_std > fmaxf(0.10f, MC_IDENT_RS_MAX_CURRENT_CV * id_m)) {
+        /* [临时冒烟值] 地板 0.10→0.25：本板电流采样实测噪声 ~0.12A
+         * (2026-10-07 爆读 id_std=0.119A，vd 安静+id/vd 零相关+转子
+         * 纹丝不动=纯测量噪声；均值 10000 样本后 σ≈1mA 不损 Rs)。
+         * 长期方案待定夺：噪声源排查(ADC 采样窗) vs 阈值正式定档。 */
+        if (id_std > fmaxf(0.25f, MC_IDENT_RS_MAX_CURRENT_CV * id_m)) {
             return abort_with_fault(ctx, command, MC_PARAM_IDENT_FAULT_RS_UNSTABLE);
         }
 
