@@ -148,8 +148,8 @@ static void plant_tick(plant_t *p, const mc_command_t *cmd, float dt)
          * 静止锁轴（PREPARE/RS）= vdt（锁轴几何，与 L 段 VOLTAGE 注入
          * 同语义）；旋转（FLUX 拖转）= vdt×3/π（旋转几何基波等效）。
          * 两档比值即核 call site 3/π 换算的物理依据；host 由此验证换
-         * 算机制自洽，因子本身靠真机 DEADTIME_TEST 交叉验证。Rs 双档
-         * 电流同号，死区分量在差分中共模消掉，不影响电阻。 */
+         * 算机制自洽，因子本身靠真机 DEADTIME_TEST 交叉验证。Rs 阶梯
+         * 各档电流同号，死区分量在差分中共模消掉，不影响电阻。 */
         const float a = 1.0f - expf(-dt / p->tau_cl);
         const float vdt_cur = p->vdt *
             ((fabsf(p->omega_mech) > 1.0f) ? PLANT_VDT_ROT_SCALE : 1.0f);
@@ -255,10 +255,10 @@ static void fast_config(mc_param_ident_config_t *cfg)
     cfg->pole_pairs = 5.0f;
     cfg->current_limit_a = 15.0f;
     cfg->voltage_limit_v = 24.0f;
-    cfg->rs_current_lo_a = 4.0f;   /* py 基准双平台 */
+    cfg->rs_current_lo_a = 4.0f;   /* py 基准阶梯端点（六档 4→10A） */
     cfg->rs_current_hi_a = 10.0f;
     cfg->align_time_s = 0.12f;     /* 覆盖 4A@50A/s 软启斜坡 */
-    cfg->rs_settle_s = 0.15f;      /* 覆盖 4→10A 斜坡 120ms */
+    cfg->rs_settle_s = 0.15f;      /* 覆盖档间斜坡（ΔI=1.2A→24ms） */
     cfg->rs_sample_s = 0.1f;
     cfg->l_settle_s = 8e-3f;
     cfg->l_sample_s = 0.1f;
@@ -395,7 +395,7 @@ static void test_config_gates(void)
     mc_param_ident_default_config(&cfg);
     CHECK_NEAR(cfg.pole_pairs, 5.0f, 0.0f);
     CHECK_NEAR(cfg.rs_current_lo_a, 2.0f, 0.0f);
-    CHECK_NEAR(cfg.rs_current_hi_a, 4.0f, 0.0f);
+    CHECK_NEAR(cfg.rs_current_hi_a, 6.0f, 0.0f); /* 六点阶梯末档≤0.8×8A 闸 */
     CHECK_NEAR(cfg.l_inject_lo_v, 1.5f, 0.0f);
     CHECK_NEAR(cfg.l_inject_hi_v, 3.0f, 0.0f);
     CHECK_NEAR(cfg.l_toggle_s, 0.3e-3f, 0.0f);
@@ -468,7 +468,7 @@ static void test_config_gates(void)
 }
 
 /* =============================================================================
- * 2. 纯估计器：Rs 差分 / sign 平均 / L 回归求解 / 磁链公式
+ * 2. 纯估计器：Rs 阶梯最小二乘 / sign 平均 / L 回归求解 / 磁链公式
  * ============================================================================ */
 
 static void test_pure_estimators(void)
@@ -478,14 +478,38 @@ static void test_pure_estimators(void)
     float rs = 0.0f, l_h = 0.0f, vdt = 0.0f, r2 = 0.0f;
     int k;
 
-    /* Rs 双平台差分：死区共模在相减中消掉。 */
-    CHECK_TRUE(mc_param_ident_solve_rs(0.696f, 4.0f, 1.110f, 10.0f,
-                                       0.1f, &rs) == MC_OK);
-    CHECK_NEAR(rs, 0.069f, 1e-6f);
-    CHECK_TRUE(mc_param_ident_solve_rs(0.696f, 4.0f, 1.110f, 4.05f,
-                                       0.1f, &rs) == MC_OUT_OF_RANGE);
-    CHECK_TRUE(mc_param_ident_solve_rs(1.110f, 10.0f, 0.696f, 4.0f,
-                                       0.1f, &rs) == MC_OUT_OF_RANGE); /* dv<=0 */
+    /* Rs 六点阶梯最小二乘：v=Rs·i+Voff，常量偏置（死区/管压降/ADC 偏置）
+     * 在 C(6,2)=15 点对差分中消去，精确恢复 Rs。 */
+    {
+        static const float im[6] = { 2.0f, 2.8f, 3.6f, 4.4f, 5.2f, 6.0f };
+        float vm[6];
+        for (k = 0; k < 6; ++k) vm[k] = 0.069f * im[k] + 0.42f;
+        CHECK_TRUE(mc_param_ident_solve_rs_ls(vm, im, 6u, &rs) == MC_OK);
+        CHECK_NEAR(rs, 0.069f, 1e-5f);
+
+        /* 两点退化=旧双平台差分同值。 */
+        {
+            const float iv[2] = { 4.0f, 10.0f };
+            const float vv[2] = { 0.696f, 1.110f };
+            CHECK_TRUE(mc_param_ident_solve_rs_ls(vv, iv, 2u, &rs) == MC_OK);
+            CHECK_NEAR(rs, 0.069f, 1e-6f);
+        }
+        /* 档间电流无差异（ΣΔI²≈0）拒绝。 */
+        {
+            const float iv[2] = { 4.0f, 4.0f };
+            const float vv[2] = { 0.696f, 0.696f };
+            CHECK_TRUE(mc_param_ident_solve_rs_ls(vv, iv, 2u, &rs)
+                       == MC_OUT_OF_RANGE);
+        }
+        /* 参数防线：n<2 / 空指针 / 非有限输入。 */
+        CHECK_TRUE(mc_param_ident_solve_rs_ls(vm, im, 1u, &rs)
+                   == MC_INVALID_ARGUMENT);
+        CHECK_TRUE(mc_param_ident_solve_rs_ls(NULL, im, 6u, &rs)
+                   == MC_INVALID_ARGUMENT);
+        vm[0] = NAN;
+        CHECK_TRUE(mc_param_ident_solve_rs_ls(vm, im, 6u, &rs)
+                   == MC_NUMERIC_ERROR);
+    }
 
     /* sign 平均：过零线性插值 / 同号直通 / 零。 */
     CHECK_NEAR(mc_param_ident_sign_average(2.0f, -1.0f), 1.0f / 3.0f, 1e-7f);
@@ -578,10 +602,10 @@ static void test_flux_estimator_analytic(void)
 }
 
 /* =============================================================================
- * 3. Rs 双平台（噪声链，到 L 入口为止）
+ * 3. Rs 六点阶梯（噪声链，到 L 入口为止）
  * ============================================================================ */
 
-static void test_rs_two_plateau(void)
+static void test_rs_staircase(void)
 {
     mc_param_ident_config_t cfg;
     mc_param_ident_t ident;
@@ -594,7 +618,7 @@ static void test_rs_two_plateau(void)
                          7u, INJECT_NONE, MC_PARAM_IDENT_L_SAMPLE, 0, NULL)
                == MC_BUSY);
     CHECK_TRUE(mc_param_ident_get_state(&ident) == MC_PARAM_IDENT_L_SAMPLE);
-    /* 双平台差分消死区：|err|<1%（py 断言）。 */
+    /* 六点阶梯点对差分消死区：|err|<1%（py 断言）。 */
     CHECK_NEAR(ident.result.phase_resistance, PLANT_RS_TRUE,
                0.01f * PLANT_RS_TRUE);
     {
@@ -602,7 +626,7 @@ static void test_rs_two_plateau(void)
         mc_param_ident_get_quality(&ident, &q);
         CHECK_NEAR(q.rs_current_lo_a, 4.0f, 0.05f);
         CHECK_NEAR(q.rs_current_hi_a, 10.0f, 0.05f);
-        /* 毛电压语义：平台电压 = R·i + 死区锁轴等效分量（差分共模消掉）。 */
+        /* 阶梯端点毛电压 = R·i + 死区锁轴等效分量（差分共模消掉）。 */
         CHECK_NEAR(q.rs_voltage_lo_v,
                    0.069f * 4.0f + PLANT_VDT_TRUE, 0.01f);
         CHECK_NEAR(q.rs_voltage_hi_v,
@@ -897,7 +921,7 @@ int main(void)
     test_config_gates();
     test_pure_estimators();
     test_flux_estimator_analytic();
-    test_rs_two_plateau();
+    test_rs_staircase();
     test_command_invariants();
     test_full_chain_lq_monte_carlo();
     test_full_chain_flux();

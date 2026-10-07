@@ -14,10 +14,14 @@
  *     （control_period_s / pole_pairs）。
  *  4. Rs/磁链长和式升 double（万级样本累加精度，mc_rs_ident 先例）；
  *     L 回归统计量维持 float（与参考 Monte Carlo 基准的 f32 行为同构）。
+ *  5. Rs 两档差分升级六点阶梯（2026-10-07，参考 JY G11-50-Joint_v1.3
+ *     `calibration/joint_calibration.c` jcal）：N 档电流闭区间均匀分布，
+ *     每档末段窗采 V/I 均值，全部 C(N,2) 点对差分最小二乘
+ *     Rs=ΣΔVΔI/ΣΔI²；死区残差 vdt_platform 推广为全档均值。
  *
  * 辨识流程（全 standstill/自由旋转，无需机械锁轴）：
- *   FULL: IDLE→PREPARE→RS×2档→L(Ld)→FLUX_SPINUP→FLUX_SAMPLE→DONE/ERROR
- *   LQ:   IDLE→PREPARE→RS×2档→L(Ld)→LQ(Lq, 注入轴 d→q)→DONE/ERROR
+ *   FULL: IDLE→PREPARE→RS 六档阶梯→L(Ld)→FLUX_SPINUP→FLUX_SAMPLE→DONE/ERROR
+ *   LQ:   IDLE→PREPARE→RS 六档阶梯→L(Ld)→LQ(Lq, 注入轴 d→q)→DONE/ERROR
  */
 
 #include <math.h>
@@ -153,7 +157,15 @@ static void write_fault_snapshot_fields(mc_param_ident_t *ctx,
     ctx->fault_snapshot.filt_iq = ctx->filt.iq;
     ctx->fault_snapshot.filt_vd = ctx->filt.vd;
     ctx->fault_snapshot.filt_vq = ctx->filt.vq;
-    ctx->fault_snapshot.rs_cnt = ctx->acc.rs_cnt;
+    {
+        /* Rs 阶梯各档样本数求和（快照语义：累计样本总数）。 */
+        uint8_t k;
+        uint32_t rs_total = 0u;
+        for (k = 0u; k < MC_IDENT_RS_POINTS; ++k) {
+            rs_total += ctx->acc.rs_cnt[k];
+        }
+        ctx->fault_snapshot.rs_cnt = rs_total;
+    }
     ctx->fault_snapshot.l_cnt = ctx->acc.l_cnt;
     ctx->fault_snapshot.flux_cnt = ctx->acc.flux_cnt;
     ctx->fault_snapshot.l_est_lo = l_quality->estimate_lo_h;
@@ -339,17 +351,29 @@ static bool ident_runtime_faults_ok(mc_param_ident_t *ctx,
  * 纯估计器（公开实现，host 单测直用）
  * ============================================================================ */
 
-mc_status_t mc_param_ident_solve_rs(float vd_lo_v, float id_lo_a,
-                                    float vd_hi_v, float id_hi_a,
-                                    float min_di_a, float *out_rs_ohm)
+mc_status_t mc_param_ident_solve_rs_ls(const float *v_mean_v,
+                                       const float *i_mean_a,
+                                       uint8_t n_points, float *out_rs_ohm)
 {
-    const float dv = vd_hi_v - vd_lo_v;
-    const float di = id_hi_a - id_lo_a;
-    if (!out_rs_ohm) return MC_INVALID_ARGUMENT;
-    if (!isfinite(dv) || !isfinite(di) || di <= min_di_a || dv <= 0.0f) {
-        return MC_OUT_OF_RANGE;
+    double sum_dvdi = 0.0, sum_didi = 0.0;
+    uint8_t i, j;
+
+    if (!out_rs_ohm || !v_mean_v || !i_mean_a || n_points < 2u) {
+        return MC_INVALID_ARGUMENT;
     }
-    *out_rs_ohm = dv / di;
+    for (i = 0u; i < n_points; ++i) {
+        if (!isfinite(v_mean_v[i]) || !isfinite(i_mean_a[i])) {
+            return MC_NUMERIC_ERROR;
+        }
+        for (j = (uint8_t)(i + 1u); j < n_points; ++j) {
+            const double dv = (double)v_mean_v[i] - (double)v_mean_v[j];
+            const double di = (double)i_mean_a[i] - (double)i_mean_a[j];
+            sum_dvdi += dv * di;
+            sum_didi += di * di;
+        }
+    }
+    if (sum_didi <= 1e-9) return MC_OUT_OF_RANGE; /* 电流未建立/档间无差异 */
+    *out_rs_ohm = (float)(sum_dvdi / sum_didi);
     return MC_OK;
 }
 
@@ -520,10 +544,12 @@ static bool ident_state_rs_settle(mc_param_ident_t *ctx,
 
     if (!ident_current_is_safe(ctx, sample, command)) return false;
 
-    /* 电流闭环电阻标定：PI 建立两档稳态电流，读实际电压；
-     * 两档斜率抵消死区/器件压降的常量部分。 */
-    target_i = (ctx->rt.rs_level == 0u) ? ctx->cfg.rs_current_lo_a
-                                        : ctx->cfg.rs_current_hi_a;
+    /* 电流闭环电阻标定：PI 逐档建立阶梯稳态电流，读实际电压；
+     * 全档点对差分最小二乘抵消死区/器件压降的常量部分。 */
+    target_i = ctx->cfg.rs_current_lo_a
+             + (ctx->cfg.rs_current_hi_a - ctx->cfg.rs_current_lo_a)
+                   * ((float)ctx->rt.rs_point
+                      / (float)(MC_IDENT_RS_POINTS - 1u));
     if (target_i <= 0.0f) target_i = ctx->rt.test_current_amp;
     target_i = clamp_f(target_i, ctx->cfg.min_id_a, 0.8f * ctx->cfg.current_limit_a);
     ramp_step = MC_IDENT_RS_CURRENT_RAMP_A_PER_S * ctx->rt.dt;
@@ -555,11 +581,14 @@ static bool ident_state_rs_settle(mc_param_ident_t *ctx,
     if (++ctx->rt.tick >= ticks_from_sec(ctx, ctx->cfg.rs_settle_s) ||
         (ctx->rt.tick >= ticks_from_sec(ctx, MC_IDENT_RS_MIN_SETTLE_TIME_S) &&
          ctx->rt.rs_ready_streak >= MC_IDENT_RS_READY_STREAK_TICKS)) {
-        reset_acc(ctx);
-        reset_filters(ctx);
+        /* 阶梯逐档推进：acc 各档独立累加，档间不清（首档在 RS_SAMPLE
+         * 出口统一清零后进入，见 start/finish 路径）。 */
         enter_state(ctx, MC_PARAM_IDENT_RS_SAMPLE);
     }
-    update_progress(ctx, ctx->rt.tick, ticks_from_sec(ctx, ctx->cfg.rs_settle_s), 100u, 30u);
+    update_progress(ctx, ctx->rt.tick, ticks_from_sec(ctx, ctx->cfg.rs_settle_s),
+                    100u + (uint16_t)((uint32_t)ctx->rt.rs_point * 30u
+                                      / MC_IDENT_RS_POINTS),
+                    30u / MC_IDENT_RS_POINTS);
     return true;
 }
 
@@ -567,8 +596,10 @@ static bool ident_state_rs_sample(mc_param_ident_t *ctx,
                                   const mc_sample_t *sample,
                                   mc_command_t *command)
 {
-    float target_i = (ctx->rt.rs_level == 0u) ? ctx->cfg.rs_current_lo_a
-                                              : ctx->cfg.rs_current_hi_a;
+    const uint8_t pt = ctx->rt.rs_point;
+    float target_i = ctx->cfg.rs_current_lo_a
+                   + (ctx->cfg.rs_current_hi_a - ctx->cfg.rs_current_lo_a)
+                         * ((float)pt / (float)(MC_IDENT_RS_POINTS - 1u));
     float id_m, vd_m, id_std;
 
     if (!ident_current_is_safe(ctx, sample, command)) return false;
@@ -580,27 +611,30 @@ static bool ident_state_rs_sample(mc_param_ident_t *ctx,
     ctx->rt.rs_current_cmd = target_i;
     ctx->rt.align_v_cmd = sample->vd_v;
 
-    ctx->acc.rs_i_sum += (double)sample->id_a;
-    ctx->acc.rs_v_sum += (double)sample->vd_v;
-    ctx->acc.rs_i_sq_sum += (double)sample->id_a * (double)sample->id_a;
-    ctx->acc.rs_cnt++;
+    ctx->acc.rs_i_sum[pt] += (double)sample->id_a;
+    ctx->acc.rs_v_sum[pt] += (double)sample->vd_v;
+    ctx->acc.rs_i_sq_sum[pt] += (double)sample->id_a * (double)sample->id_a;
+    ctx->acc.rs_cnt[pt]++;
 
     if (++ctx->rt.tick >= ticks_from_sec(ctx, ctx->cfg.rs_sample_s)) {
-        /* 双平台 Rs：每级 (vd,id) 均值，两级斜率抵消共同压降。 */
-        if (ctx->acc.rs_cnt < 16u) {
+        /* 阶梯逐档：本档末段窗均值，采满转下一档；末档做全点对 LS。 */
+        if (ctx->acc.rs_cnt[pt] < 16u) {
             abort_with_fault(ctx, command, MC_PARAM_IDENT_FAULT_RS_NO_SAMPLE);
             return false;
         }
-        vd_m = (float)(ctx->acc.rs_v_sum / (double)ctx->acc.rs_cnt);
-        id_m = (float)(ctx->acc.rs_i_sum / (double)ctx->acc.rs_cnt);
-        id_std = ident_std_from_sums(ctx->acc.rs_i_sum, ctx->acc.rs_i_sq_sum,
-                                     ctx->acc.rs_cnt);
+        vd_m = (float)(ctx->acc.rs_v_sum[pt] / (double)ctx->acc.rs_cnt[pt]);
+        id_m = (float)(ctx->acc.rs_i_sum[pt] / (double)ctx->acc.rs_cnt[pt]);
+        id_std = ident_std_from_sums(ctx->acc.rs_i_sum[pt], ctx->acc.rs_i_sq_sum[pt],
+                                     ctx->acc.rs_cnt[pt]);
 
         if (id_m <= ctx->cfg.min_id_a || vd_m <= 0.0f) {
             if (ctx->rt.rs_retry_count < 1u) {
                 ctx->rt.rs_retry_count++;
-                reset_acc(ctx);
-                reset_filters(ctx);
+                /* 仅重试当前档：清本档槽位，保留已采档的累加。 */
+                ctx->acc.rs_v_sum[pt] = 0.0;
+                ctx->acc.rs_i_sum[pt] = 0.0;
+                ctx->acc.rs_i_sq_sum[pt] = 0.0;
+                ctx->acc.rs_cnt[pt] = 0u;
                 enter_state(ctx, MC_PARAM_IDENT_RS_SETTLE);
                 return true;
             }
@@ -608,51 +642,67 @@ static bool ident_state_rs_sample(mc_param_ident_t *ctx,
         }
         ctx->rt.rs_retry_count = 0u;
 
-        /* [临时冒烟值] 地板 0.10→0.25：本板电流采样实测噪声 ~0.12A
-         * (2026-10-07 爆读 id_std=0.119A，vd 安静+id/vd 零相关+转子
-         * 纹丝不动=纯测量噪声；均值 10000 样本后 σ≈1mA 不损 Rs)。
-         * 长期方案待定夺：噪声源排查(ADC 采样窗) vs 阈值正式定档。 */
-        if (id_std > fmaxf(0.25f, MC_IDENT_RS_MAX_CURRENT_CV * id_m)) {
-            return abort_with_fault(ctx, command, MC_PARAM_IDENT_FAULT_RS_UNSTABLE);
-        }
+        if (id_std > ctx->rt.rs_std_max) ctx->rt.rs_std_max = id_std;
 
-        if (ctx->rt.rs_level == 0u) {
-            /* 低电平级完成：缓存 (vd_lo,id_lo)，切高电平级重新建流。 */
-            ctx->rt.rs_v_lvl0 = vd_m;
-            ctx->rt.rs_i_lvl0 = id_m;
-            ctx->rt.rs_std_lvl0 = id_std;
+        /* 首末档均值进 quality（暴露阶梯端点跨度）。 */
+        if (pt == 0u) {
             ctx->quality.rs_current_lo_a = id_m;
             ctx->quality.rs_voltage_lo_v = vd_m;
-            ctx->rt.rs_level = 1u;
-            reset_acc(ctx);
-            reset_filters(ctx);
+        }
+        if (pt == MC_IDENT_RS_POINTS - 1u) {
+            ctx->quality.rs_current_hi_a = id_m;
+            ctx->quality.rs_voltage_hi_v = vd_m;
+        }
+
+        if (pt + 1u < MC_IDENT_RS_POINTS) {
+            ctx->rt.rs_point = pt + 1u;
             enter_state(ctx, MC_PARAM_IDENT_RS_SETTLE);
             return true;
         }
 
-        /* 高电平级完成：差分得相电阻（死区压降在相减中消掉）。 */
+        /* [临时冒烟值] 地板 0.10→0.25：本板电流采样实测噪声 ~0.12A
+         * (2026-10-07 爆读 id_std=0.119A，vd 安静+id/vd 零相关+转子
+         * 纹丝不动=纯测量噪声；均值 10000 样本后 σ≈1mA 不损 Rs)。
+         * 长期方案待定夺：噪声源排查(ADC 采样窗) vs 阈值正式定档。
+         * 基准取首档（最低电流 → 最严 CV 口径）。 */
+        if (ctx->rt.rs_std_max >
+            fmaxf(0.25f, MC_IDENT_RS_MAX_CURRENT_CV * ctx->quality.rs_current_lo_a)) {
+            return abort_with_fault(ctx, command, MC_PARAM_IDENT_FAULT_RS_UNSTABLE);
+        }
+
+        /* 全档完成：C(N,2) 点对差分最小二乘得相电阻
+         * （死区/管压降常量分量在点对差分中消掉，jcal 同构）。 */
         {
-            const float commanded_di = ctx->cfg.rs_current_hi_a - ctx->cfg.rs_current_lo_a;
-            const float min_di = fmaxf(ctx->cfg.min_id_a, 0.25f * fabsf(commanded_di));
+            float v_mean[MC_IDENT_RS_POINTS], i_mean[MC_IDENT_RS_POINTS];
             float rs = 0.0f;
-            if (mc_param_ident_solve_rs(ctx->rt.rs_v_lvl0, ctx->rt.rs_i_lvl0,
-                                        vd_m, id_m, min_di, &rs) != MC_OK) {
+            double resid_sum = 0.0;
+            uint8_t k;
+
+            for (k = 0u; k < MC_IDENT_RS_POINTS; ++k) {
+                v_mean[k] = (float)(ctx->acc.rs_v_sum[k]
+                                    / (double)ctx->acc.rs_cnt[k]);
+                i_mean[k] = (float)(ctx->acc.rs_i_sum[k]
+                                    / (double)ctx->acc.rs_cnt[k]);
+            }
+            if (mc_param_ident_solve_rs_ls(v_mean, i_mean,
+                                           MC_IDENT_RS_POINTS, &rs) != MC_OK) {
                 return abort_with_fault(ctx, command, MC_PARAM_IDENT_FAULT_RS_NO_SAMPLE);
             }
             ctx->result.phase_resistance = rs;
+            ctx->quality.rs_current_std_max_a = ctx->rt.rs_std_max;
+
+            /* 全档残差均值直测死区（原两档平均推广，数值上=LS 截距）：
+             * 锁 d 轴稳态下 vd̄ − Rs·ī 即逆变器死区沿电流矢量方向的等效
+             * 压降（锁轴几何）。供磁链段修正（×3/π 换旋转几何）；不依赖
+             * L 段回归拟合值——后者受梯形积分误差影响有 -5~-10% 系统
+             * 偏差，仅作质量诊断输出。 */
+            for (k = 0u; k < MC_IDENT_RS_POINTS; ++k) {
+                resid_sum += (double)v_mean[k]
+                           - (double)rs * (double)i_mean[k];
+            }
+            ctx->rt.vdt_platform_v =
+                (float)(resid_sum / (double)MC_IDENT_RS_POINTS);
         }
-
-        ctx->quality.rs_current_hi_a = id_m;
-        ctx->quality.rs_voltage_hi_v = vd_m;
-        ctx->quality.rs_current_std_max_a = fmaxf(id_std, ctx->rt.rs_std_lvl0);
-
-        /* 平台残差直测死区：锁 d 轴稳态下 vd − Rs·id 即逆变器死区沿
-         * 电流矢量方向的等效压降（锁轴几何），两档取平均压噪声。供磁链
-         * 段修正（×3/π 换旋转几何）；不依赖 L 段回归拟合值——后者受
-         * 梯形积分误差影响有 -5~-10% 系统偏差，仅作质量诊断输出。 */
-        ctx->rt.vdt_platform_v = 0.5f *
-            ((ctx->rt.rs_v_lvl0 - ctx->result.phase_resistance * ctx->rt.rs_i_lvl0)
-             + (vd_m - ctx->result.phase_resistance * id_m));
 
         if (ctx->result.phase_resistance < ctx->cfg.r_min ||
             ctx->result.phase_resistance > ctx->cfg.r_max) {
@@ -671,7 +721,9 @@ static bool ident_state_rs_sample(mc_param_ident_t *ctx,
         reset_filters(ctx);
         enter_state(ctx, MC_PARAM_IDENT_L_SAMPLE);
     }
-    update_progress(ctx, ctx->rt.tick, ticks_from_sec(ctx, ctx->cfg.rs_sample_s), 130u, 250u);
+    update_progress(ctx, ctx->rt.tick, ticks_from_sec(ctx, ctx->cfg.rs_sample_s),
+                    130u + (uint16_t)((uint32_t)pt * 250u / MC_IDENT_RS_POINTS),
+                    250u / MC_IDENT_RS_POINTS);
     return true;
 }
 
@@ -1105,8 +1157,10 @@ void mc_param_ident_default_config(mc_param_ident_config_t *cfg)
 
     /* 算法层：G11 原值（时序/门限）。 */
     cfg->align_time_s = 0.5f;
-    cfg->rs_settle_s = 0.5f;
-    cfg->rs_sample_s = 0.5f;
+    /* Rs 六点阶梯单档时序：0.75s 建流（含 50A/s 档间斜坡）+ 0.25s 采样
+     * （20kHz 下 5000 样本/档），全段约 2~6s（settle 可提前出）。 */
+    cfg->rs_settle_s = 0.75f;
+    cfg->rs_sample_s = 0.25f;
     cfg->l_sample_s = 0.5f;
     cfg->l_toggle_s = 0.3e-3f;       /* L 方波半周期：电流呈三角波(峰值有界) */
     cfg->l_settle_s = 0.010f;        /* 每档先退流约 8 个电气时间常数 */
@@ -1123,13 +1177,14 @@ void mc_param_ident_default_config(mc_param_ident_config_t *cfg)
     cfg->filter_alpha = 0.10f;
     cfg->vbus_min_v = 1.0f;          /* 保守阈值：仅检测完全断电 */
 
-    /* 激励层：沉沙电机档案（5 对极；平台电流指令限 8A，
-     * G11 的 Rs 4/10A 平台超限，改 2/4A）。 */
+    /* 激励层：沉沙电机档案（5 对极）。Rs 阶梯 2→6A 六档：末档
+     * 6A ≤ 0.8×8A 电流闸门（jcal 档 6→12A 属 G11-50 硬件，超限
+     * 不可照搬）；ΔI=0.8A×5 档跨度 SNR 优于旧两点 2/4A。 */
     cfg->pole_pairs = 5.0f;
     cfg->test_current_a = 3.0f;
     cfg->align_voltage_v = 3.0f;
     cfg->rs_current_lo_a = 2.0f;
-    cfg->rs_current_hi_a = 4.0f;
+    cfg->rs_current_hi_a = 6.0f;
     cfg->l_inject_lo_v = 1.5f;
     cfg->l_inject_hi_v = 3.0f;
     cfg->flux_voltage_v = 3.0f;
@@ -1195,8 +1250,8 @@ mc_status_t mc_param_ident_start(mc_param_ident_t *ctx,
     if (c.field <= 0.0f) c.field = (dval)
 
     SET_DEFAULT(align_time_s,     0.5f);
-    SET_DEFAULT(rs_settle_s,      0.5f);
-    SET_DEFAULT(rs_sample_s,      0.5f);
+    SET_DEFAULT(rs_settle_s,      0.75f);
+    SET_DEFAULT(rs_sample_s,      0.25f);
     SET_DEFAULT(l_sample_s,       0.5f);
     SET_DEFAULT(l_toggle_s,       0.3e-3f);
     SET_DEFAULT(l_settle_s,       0.010f);
@@ -1253,7 +1308,8 @@ mc_status_t mc_param_ident_start(mc_param_ident_t *ctx,
     ctx->rt.progress = 0u;
     ctx->rt.rs_retry_count = 0u;
     ctx->rt.flux_retry_count = 0u;
-    ctx->rt.rs_level = 0u;
+    ctx->rt.rs_point = 0u;
+    ctx->rt.rs_std_max = 0.0f;
     ctx->rt.l_level = 0u;
     ctx->rt.l_phase = 0u;
     ctx->rt.rs_current_cmd = 0.0f; /* 清上次残留，防 PREPARE 首拍灌入大电流 */

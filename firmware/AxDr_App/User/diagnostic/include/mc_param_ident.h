@@ -1,6 +1,6 @@
 /**
  * @file mc_param_ident.h
- * @brief 电机参数辨识（分阶段：Rs 双档差分 / Ld·Lq 二元回归 / 磁链闭环恒速）
+ * @brief 电机参数辨识（分阶段：Rs 六点阶梯最小二乘 / Ld·Lq 二元回归 / 磁链闭环恒速）
  *
  * 来源：suanfa 参考工程 G11-50 `app\User\motor_ident\motor_param_ident.c/h`
  * （1383+498 行，2026-10-05 迁入）。P8 资产回流 A1 三段拆分的第一段
@@ -35,8 +35,8 @@
  *  - 磁链死区修正：驱动回报的 vq 为电流环 PI 输出（毛电压，自动顶掉
  *    逆变器死区压降），λ̂ 若不扣除该项会带 +vdt/ωe 正偏置（小磁链/
  *    低速电机可达数十百分点）。FLUX 段自动取 Rs 平台残差直测的死区
- *    压降（rt.vdt_platform_v = vd−Rs·id 两档平均）乘 3/π（锁轴→旋转
- *    几何换算，见 mc_param_ident.c MC_IDENT_FLUX_VDT_DQ_SCALE 注释）
+ *    压降（rt.vdt_platform_v = vd−Rs·id 阶梯全档平均）乘 3/π（锁轴→
+ *    旋转几何换算，见 mc_param_ident.c MC_IDENT_FLUX_VDT_DQ_SCALE 注释）
  *    注入估计器；一阶近似残差 3~4%（A5 死区补偿回流 foc 链后消除）。
  *    L 段回归的 quality.ld.deadtime_drop_v 因梯形积分误差有 -5~-10%
  *    系统偏差，仅作诊断输出，不用于修正。
@@ -57,8 +57,8 @@
 typedef enum {
     MC_PARAM_IDENT_IDLE = 0,        /* 空闲 */
     MC_PARAM_IDENT_PREPARE,         /* 准备：固定电角度闭环 Id 锁转子 */
-    MC_PARAM_IDENT_RS_SETTLE,       /* Rs 电流平台稳定（双档各来一次） */
-    MC_PARAM_IDENT_RS_SAMPLE,       /* Rs 平台采样累积 */
+    MC_PARAM_IDENT_RS_SETTLE,       /* Rs 阶梯逐档电流稳定（六档各来一次） */
+    MC_PARAM_IDENT_RS_SAMPLE,       /* Rs 阶梯逐档采样累积 */
     MC_PARAM_IDENT_L_SAMPLE,        /* Ld 双档×双极脉冲 + 二元回归 */
     MC_PARAM_IDENT_LQ_SAMPLE,       /* Lq 双档×双极脉冲 + 二元回归 */
     MC_PARAM_IDENT_FLUX_SPINUP,     /* 磁链：编码器闭环斜坡拖转 */
@@ -178,13 +178,13 @@ typedef struct {
     float test_current_a;           /* 对齐电流及磁链速度外环基准(A) */
     float align_voltage_v;          /* PREPARE/Rs 阶段允许的最大 |Vd|(V) */
     float align_time_s;             /* 固定电角度闭环 Id 锁转子时间(s) */
-    float rs_settle_s;              /* Rs 平台稳定时间(s) */
-    float rs_sample_s;              /* Rs 平台采样时间(s) */
+    float rs_settle_s;              /* Rs 每档建流稳定时间(s) */
+    float rs_sample_s;              /* Rs 每档末段采样时间(s) */
     float l_sample_s;               /* 电感采样时间(s)，Ld/Lq 共用 */
     float l_toggle_s;               /* 电感方波注入半周期(s) */
     float l_settle_s;               /* 每注入档前零电压退流时间(s) */
-    float rs_current_lo_a;          /* Rs 双档差分低电平电流(A) */
-    float rs_current_hi_a;          /* Rs 双档差分高电平电流(A) */
+    float rs_current_lo_a;          /* Rs 阶梯最低档电流(A) */
+    float rs_current_hi_a;          /* Rs 阶梯最高档电流(A) */
     float l_inject_lo_v;            /* L 双档差分低电平注入电压(V) */
     float l_inject_hi_v;            /* L 双档差分高电平注入电压(V) */
     float flux_voltage_v;           /* 磁链闭环拖转允许的最大 |Vq|(V) */
@@ -235,11 +235,11 @@ typedef struct {
 
 /* 最近一次辨识质量诊断（成功失败均保留）。 */
 typedef struct {
-    float rs_current_lo_a;          /* Rs 低档实测均值(A) */
-    float rs_current_hi_a;          /* Rs 高档实测均值(A) */
-    float rs_voltage_lo_v;          /* Rs 低档电压均值(V) */
-    float rs_voltage_hi_v;          /* Rs 高档电压均值(V) */
-    float rs_current_std_max_a;     /* 两档电流 std 较大值(A) */
+    float rs_current_lo_a;          /* Rs 阶梯首档实测均值(A) */
+    float rs_current_hi_a;          /* Rs 阶梯末档实测均值(A) */
+    float rs_voltage_lo_v;          /* Rs 首档电压均值(V) */
+    float rs_voltage_hi_v;          /* Rs 末档电压均值(V) */
+    float rs_current_std_max_a;     /* 各档电流 std 最大值(A) */
     mc_param_ident_l_quality_t ld;
     mc_param_ident_l_quality_t lq;
     float flux_std_wb;              /* 磁链样本 std(Wb) */
@@ -262,13 +262,19 @@ typedef struct {
     float nominal_l;                /* 标称电感(H)，0=不设标称窗 */
 } mc_param_ident_l_gate_t;
 
-/* 内部累加器（Rs/磁链长和式用 double：万级样本累加精度优先）。 */
+/* Rs 阶梯辨识档位数（JY jcal 同构：N 档电流阶梯，C(N,2) 点对差分最小二乘）。 */
+#define MC_IDENT_RS_POINTS  (6u)
+
+/* 内部累加器（Rs/磁链长和式用 double：万级样本累加精度优先）。
+ * Rs 各档独立累加 V/I/I²，末段 LS 求解时再按档取均值。 */
 typedef struct {
     double flux_acc;
-    double rs_i_sum, rs_v_sum;
-    double rs_i_sq_sum;
+    double rs_v_sum[MC_IDENT_RS_POINTS];
+    double rs_i_sum[MC_IDENT_RS_POINTS];
+    double rs_i_sq_sum[MC_IDENT_RS_POINTS];
     double flux_sq_sum, flux_speed_sum;
-    uint32_t rs_cnt, l_cnt, flux_cnt;
+    uint32_t rs_cnt[MC_IDENT_RS_POINTS];
+    uint32_t l_cnt, flux_cnt;
     mc_param_ident_l_reg_t l_reg;
 } mc_param_ident_acc_t;
 
@@ -293,10 +299,9 @@ typedef struct {
     uint16_t rs_ready_streak;
     uint8_t rs_retry_count;
     uint8_t flux_retry_count;
-    uint8_t rs_level;               /* Rs 双档：0=低电平级 1=高电平级 */
-    float rs_v_lvl0, rs_i_lvl0;     /* Rs 低档 (vd,id) 均值缓存 */
-    float rs_std_lvl0;
-    float vdt_platform_v;           /* Rs 平台残差直测死区(V)：vd−Rs·id 两档平均 */
+    uint8_t rs_point;               /* Rs 阶梯当前档 0..MC_IDENT_RS_POINTS-1 */
+    float rs_std_max;               /* 各档电流 std 运行最大值(A) */
+    float vdt_platform_v;           /* Rs 平台残差直测死区(V)：vd−Rs·id 全档平均 */
     float rs_current_cmd;           /* Rs 电流指令（含软启动斜坡） */
     uint8_t l_level;                /* L 双档：0=低 1=高 */
     uint8_t l_phase;                /* 0=零电压退流 1=双极脉冲采样 */
@@ -346,9 +351,10 @@ typedef struct {
  * ============================================================================*/
 
 /* 填默认配置：算法时序/门限为 G11 原值；激励幅值为沉沙电机档案
- * （5 对极，平台电流限 8A：Rs 平台 2/4A）；current_limit_a 与
- * voltage_limit_v 保持 0（闸门：未确认试验条件禁止启动，start 拒绝）；
- * nominal/tol 全 0（待沉沙首次辨识后回填，0=不检查偏差）。 */
+ * （5 对极，电流闸门 8A：Rs 六点阶梯 2→6A，jcal 档 6→12A 超限不照搬）；
+ * current_limit_a 与 voltage_limit_v 保持 0（闸门：未确认试验条件禁止
+ * 启动，start 拒绝）；nominal/tol 全 0（待沉沙首次辨识后回填，0=不检查
+ * 偏差）。 */
 void mc_param_ident_default_config(mc_param_ident_config_t *cfg);
 
 /* 挂接回调集（可 NULL；整体拷贝）。 */
@@ -395,10 +401,13 @@ void mc_param_ident_set_algo_ops(mc_param_ident_t *ctx,
  * 纯估计器（公开供 host 单测与导入工具复用，家族 mc_rs_ident_solve 先例）
  * ============================================================================*/
 
-/* Rs 双平台差分：Rs=(vd_hi-vd_lo)/(id_hi-id_lo)，di<=min_di 返回 MC_OUT_OF_RANGE。 */
-mc_status_t mc_param_ident_solve_rs(float vd_lo_v, float id_lo_a,
-                                    float vd_hi_v, float id_hi_a,
-                                    float min_di_a, float *out_rs_ohm);
+/* Rs 阶梯多点差分最小二乘：Rs = ΣΔVΔI / ΣΔI²，对全部 C(n,2) 点对过原点
+ * 拟合（JY jcal 同构）。常量偏置（死区/管压降/ADC 偏置）在点对差分中消去；
+ * n<2 或参数非法返回 MC_INVALID_ARGUMENT，ΣΔI²≤1e-9（电流未建立/档间
+ * 无差异）返回 MC_OUT_OF_RANGE。 */
+mc_status_t mc_param_ident_solve_rs_ls(const float *v_mean_v,
+                                       const float *i_mean_a,
+                                       uint8_t n_points, float *out_rs_ohm);
 
 /* 单窗口加入 RL+开关压降回归：u_avg - Rs*i_avg = L*di/dt + Vswitch*sign_avg。
  * 门控不过（di 过小/方向异常/超标称窗/非有限）只计 rejected。 */
