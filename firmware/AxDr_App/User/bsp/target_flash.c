@@ -62,7 +62,7 @@ ret_e target_flash_erase_page(uint32_t addr)
 ret_e target_flash_write(uint32_t addr, const void *data, uint32_t len)
 {
     const uint8_t *src = (const uint8_t *)data;
-    uint32_t word;
+    uint64_t word;
     uint32_t i;
 
     if ((data == 0) || (len == 0U) || ((addr % WORD_SIZE) != 0U)
@@ -75,10 +75,19 @@ ret_e target_flash_write(uint32_t addr, const void *data, uint32_t len)
     for (i = 0U; i < len; i += WORD_SIZE)
     {
         uint32_t j;
-        word = 0xFFFFFFFFU; /* 尾部不足 8 字节时用 0xFF 填充（Flash 擦除态） */
-        for (j = 0U; (j < WORD_SIZE) && ((i + j) < len); j++)
+        uint32_t n = ((len - i) < WORD_SIZE) ? (len - i) : WORD_SIZE;
+
+        /* G4 双字编程：64 位从 0 起拼，尾部不足 8 字节补擦除态 0xFF。
+         * （勘误：旧版 uint32_t word 传 uint64_t 形参致高 32 位恒 0，
+         *  且 0xFFFFFFFF 起 OR 数据恒为全 F——写入全废，boot 必拒载。） */
+        word = 0U;
+        for (j = 0U; (j < n); j++)
         {
-            word |= ((uint32_t)src[i + j]) << (8U * j);
+            word |= ((uint64_t)src[i + j]) << (8U * j);
+        }
+        if (n < WORD_SIZE)
+        {
+            word |= 0xFFFFFFFFFFFFFFFFULL << (8U * n);
         }
         if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, addr + i, word) != HAL_OK)
         {
