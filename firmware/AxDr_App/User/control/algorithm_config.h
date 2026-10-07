@@ -90,8 +90,9 @@
 #define DIAG_POLE_PAIR_MIN_COUNT                 (1)
 #define DIAG_POLE_PAIR_MAX_COUNT                 (30)
 
-/* 编码器零位校准：校准电流为 0 时禁止启动，实物验证前必须填写。 */
-#define DIAG_ALIGN_CURRENT_A                     (0.0f)
+/* 编码器零位校准：校准电流取 mc_param_ident 核默认对齐电流（3A，
+ * 2026-10-07 真机冒烟开闸；上限仍受 board_config 8A 闸门约束）。 */
+#define DIAG_ALIGN_CURRENT_A                     (3.0f)
 #define DIAG_ALIGN_RAMP_DURATION_S               (1.0f)
 #define DIAG_ALIGN_HOLD_DURATION_S               (1.0f)
 #define DIAG_ALIGN_TARGET_ELEC_ANGLE_RAD         (0.0f)
