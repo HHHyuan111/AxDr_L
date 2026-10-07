@@ -1195,7 +1195,14 @@ void mc_param_ident_default_config(mc_param_ident_config_t *cfg)
     cfg->current_limit_a = 0.0f;
     cfg->voltage_limit_v = 0.0f;
 
-    /* 标称值与容差：待沉沙首次辨识后回填；0=不检查偏差。 */
+    /* 标称值与容差：2026-10-07 真机三次辨识回填（Rs 0.1171/0.1183/0.1188
+     * 散布 0.7%，tol 12% 覆温升与接触电阻变化；L 100µH 电桥 105µH@1kHz
+     * 小信号 vs 大电流饱和实测 97~115µ，tol 25% 覆双口径）。磁链低 SNR
+     * （900erpm BEMF 与死区同量级）暂不设门，待 A5 死区补偿后定标。 */
+    cfg->nominal_r = 0.118f;
+    cfg->tol_r = 0.12f;
+    cfg->nominal_l = 1.00e-4f;
+    cfg->tol_l = 0.25f;
 }
 
 void mc_param_ident_attach(mc_param_ident_t *ctx, const mc_param_ident_io_t *io)

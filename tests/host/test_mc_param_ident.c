@@ -266,6 +266,14 @@ static void fast_config(mc_param_ident_config_t *cfg)
     cfg->l_inject_hi_v = 3.0f;
     cfg->flux_spinup_s = 0.6f;
     cfg->flux_sample_s = 0.2f;
+    /* 默认档案已回填真机标称（Rs 0.118/L 100µ）；plant 是 0.069Ω 假电机，
+     * 偏差门必须清零隔离——host 测核算法，不测沉沙档案匹配。 */
+    cfg->nominal_r = 0.0f;
+    cfg->tol_r = 0.0f;
+    cfg->nominal_l = 0.0f;
+    cfg->tol_l = 0.0f;
+    cfg->nominal_flux = 0.0f;
+    cfg->tol_flux = 0.0f;
 }
 
 static mc_status_t run_chain(mc_param_ident_t *ident, plant_t *p,
@@ -404,6 +412,12 @@ static void test_config_gates(void)
     CHECK_NEAR(cfg.vbus_min_v, 1.0f, 0.0f);
     CHECK_NEAR(cfg.current_limit_a, 0.0f, 0.0f); /* 闸门：未确认禁止启动 */
     CHECK_NEAR(cfg.voltage_limit_v, 0.0f, 0.0f);
+    /* 真机标称档案（2026-10-07 回填）；磁链门暂缓（低 SNR）。 */
+    CHECK_NEAR(cfg.nominal_r, 0.118f, 0.0f);
+    CHECK_NEAR(cfg.tol_r, 0.12f, 0.0f);
+    CHECK_NEAR(cfg.nominal_l, 1.00e-4f, 0.0f);
+    CHECK_NEAR(cfg.tol_l, 0.25f, 0.0f);
+    CHECK_NEAR(cfg.nominal_flux, 0.0f, 0.0f);
 
     /* 闸门未开（默认 limit=0）拒绝。 */
     CHECK_TRUE(mc_param_ident_start(&ident, NULL, MC_PARAM_IDENT_MODE_LQ)
