@@ -643,6 +643,7 @@ void diag_runtime_confirm_stopped(diag_runtime_t *runtime,
 
     (void)mc_diag_release(&runtime->manager, owner);
     runtime->active = false;
+    runtime->active_job = DIAG_JOB_NONE; /* 与 diag_finish_start_failure 对齐，防残留旧 job 号 */
     runtime->command_primed = false;
     runtime->voltage_saturated = false;
     memset(&runtime->command, 0, sizeof(runtime->command));
