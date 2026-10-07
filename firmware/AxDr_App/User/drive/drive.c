@@ -155,7 +155,7 @@ static _RAM_FUNC void drive_stop_pwm(foc_t *foc)
 /*
  * ABZ 上电自动对齐（B 库门控哲学落地）：START 期间以固定电角度 0 注入
  * 档案对齐电流（foc_cur_step 的角度参数与编码器无关）——转子被吸到
- * "真实电角度=0"位置；后段对 fb.theta_e 做圆均值，e_off = -均值 (mod 2pi)。
+ * "真实电角度=0"位置；后段对 fb.theta_e 做圆均值，e_off += -均值 (mod 2pi)。
  * 完成：置 enc_aligned 并自动晋升 req=RUN（本设计的显式行为，代码库中
  * 唯一的 RUN 写入点）。时长 = 保持 1.2s + 取平均 0.3s（B 库契约 >=300ms）。
  */
@@ -219,7 +219,16 @@ static _RAM_FUNC void drive_align_tick(foc_t *foc)
 
         if (angle_converged && current_established)
         {
-            float e_off = atan2f(-foc->align_sin_sum, foc->align_cos_sum);
+            /* 增量更新：圆均值由 fb.theta_e（已含现行 e_off）算出，新零点
+             * = 旧零点 − 均值。绝对替换在重对齐（现行 e_off≠0，如 flash
+             * 装载残留）时多扣旧值，产生 e_off_old 大小的常量角误差
+             * （真机实测形态 δ=e_off_old，锁轴电流被拉开到 q 轴）。 */
+            float e_off = foc->motor.e_off
+                          + atan2f(-foc->align_sin_sum, foc->align_cos_sum);
+            if (e_off >= 6.28318530718f)
+            {
+                e_off -= 6.28318530718f;
+            }
             if (e_off < 0.0f)
             {
                 e_off += 6.28318530718f;

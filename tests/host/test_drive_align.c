@@ -213,6 +213,28 @@ int main(void)
         expect("同样置编码器故障", m4.fault.bit.enc_err == 1U);
     }
 
+    /* 场景 8：重对齐（现行 e_off=0.478 非零）→ 增量收敛而非绝对替换。
+     * 旧代码产 e_off=2pi-1.0（多扣旧值 0.478，真机 RS_NO_SAMPLE 根因）；
+     * 增量语义产 wrap(0.478-1.0)=2pi-0.522，使锁定位 fb 归零。 */
+    {
+        foc_t m5 = make_align_motor();
+        m5.motor.e_off = 0.478f;
+        m5.fb.pos_valid = true;
+        m5.fb.i_valid = true;
+        m5.fb.vbus_valid = true;
+        m5.fb.vbus = 24.0f;
+        m5.fb.id = 2.0f;
+        m5.req = DRIVE_REQ_START;
+        for (int i = 0; i < 16; i++)
+        {
+            m5.fb.theta_e = 1.0f;
+            drive_fast_step(&m5);
+        }
+        expect("重对齐完成", m5.enc_aligned);
+        expect("e_off=增量收敛 2pi-0.522",
+               fabsf(m5.motor.e_off - (6.28318530718f - 0.522f)) < 1e-4f);
+    }
+
     if (fail_count == 0)
     {
         (void)printf("test_drive_align: all pass\n");
