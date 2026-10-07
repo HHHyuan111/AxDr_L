@@ -138,20 +138,20 @@ int main(void)
     power_on();
     expect("e_off NaN 拒载", service_param_store_loaded() == 0U);
 
-    /* ---- 2. 有效装载：零位应用 + enc_aligned 置位 ---- */
+    /* ---- 2. ABZ 有效装载：e_off 仅作对齐初值，不免对齐 ---- */
     fake_flash_reset();
     rec_build(MOTOR_PROFILE_ID, MOTOR_PROFILE_REVISION, ENCODER_TYPE_ABZ, REC_E_OFF);
     rec_store();
     power_on();
-    expect("有效记录装载", service_param_store_loaded() == 1U);
-    expect("e_off 应用", g_foc.motor.e_off == REC_E_OFF);
-    expect("enc_aligned 置位（START 免对齐直进 RUN）", g_foc.enc_aligned == true);
+    expect("ABZ 装载后保持未对齐", (g_foc.enc_aligned == false) &&
+                                      (service_param_store_loaded() == 0U));
+    expect("e_off 作对齐初值装载", g_foc.motor.e_off == REC_E_OFF);
 
-    /* ---- 3. 装载后 poll 不再写页 ---- */
+    /* ---- 3. ABZ 装载后未对齐：poll 不写页（无 enc_aligned 边沿） ---- */
     service_param_store_poll();
-    expect("装载后 poll 无写动作", rd_u32(0) == 0x53585041U &&
-                                       rd_u32(28) == fake_flash_raw(28U) &&
-                                       rd_f(20) == REC_E_OFF);
+    expect("未对齐 poll 无写动作", rd_u32(0) == 0x53585041U &&
+                                     rd_u32(28) == fake_flash_raw(28U) &&
+                                     rd_f(20) == REC_E_OFF);
 
     /* ---- 4. 空页：boot 不应用 → 对齐边沿 → poll 保存 ---- */
     fake_flash_reset();
@@ -180,11 +180,22 @@ int main(void)
                rd_u32(28) == axdr_command_crc32(page_img, sizeof(page_img)));
     }
 
-    /* ---- 5. 保存后"重新上电"：直接复载成功（闭环） ---- */
+    /* ---- 5. 保存后"重新上电"（ABZ）：e_off 复载作初值，仍需重对齐 ---- */
     power_on();
-    expect("保存后复载", (service_param_store_loaded() == 1U) &&
-                            (g_foc.motor.e_off == 2.5f) &&
-                            (g_foc.enc_aligned == true));
+    expect("保存后复载（初值语义）", (service_param_store_loaded() == 0U) &&
+                                       (g_foc.motor.e_off == 2.5f) &&
+                                       (g_foc.enc_aligned == false));
+
+    /* ---- 5b. 绝对值编码器：装载即免对齐（旧行为保持） ---- */
+    fake_flash_reset();
+    rec_build(MOTOR_PROFILE_ID, MOTOR_PROFILE_REVISION, ENCODER_TYPE_MA732, 1.25f);
+    rec_store();
+    memset(&g_foc, 0, sizeof(g_foc));
+    g_foc.enc.primary = ENCODER_TYPE_MA732;
+    service_param_store_boot();
+    expect("绝对编码器装载免对齐", (service_param_store_loaded() == 1U) &&
+                                     (g_foc.motor.e_off == 1.25f) &&
+                                     (g_foc.enc_aligned == true));
 
     /* ---- 6. 擦写失败只试一次（save_tried 不可逆，放最后） ---- */
     fake_flash_reset();

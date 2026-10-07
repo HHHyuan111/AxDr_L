@@ -105,11 +105,17 @@ void service_param_store_boot(void)
     target_flash_read(&rec, PS_STORE_ADDR, sizeof(rec));
     if (ps_valid(&rec))
     {
-        /* 与 drive 对齐成功同效：START 见 enc_aligned 即免对齐直进 RUN
-         * （drive_exec_action START 分支的既有门控，drive.c 零改动）。 */
         g_foc.motor.e_off = rec.e_off;
-        g_foc.enc_aligned = true;
-        loaded = 1U;
+        if (g_foc.enc.primary != ENCODER_TYPE_ABZ)
+        {
+            /* 绝对值编码器零点随上电保持：装载即免对齐直进 RUN
+             * （drive_exec_action START 分支的既有门控）。 */
+            g_foc.enc_aligned = true;
+            loaded = 1U;
+        }
+        /* ABZ 增量：计数器原点每次上电重置，装载零点相对新原点带常量
+         * 角误差——保持未对齐，START 时重对齐（drive 对齐为增量更新，
+         * 装载值作初值必收敛），完成后 poll 回存本上电的新零点。 */
     }
     /* 无效记录：保持 foc_init 默认（e_off=0、未对齐），走对齐后 poll 保存 */
 }

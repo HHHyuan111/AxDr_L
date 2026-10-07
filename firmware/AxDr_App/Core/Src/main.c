@@ -177,8 +177,8 @@ int main(void)
   target_time_init();
 
   foc_init(&g_foc);
-  /* S5 零位装载：须在 fast_loop_enable 之前——快环一开 START 即可进来，
-   * enc_aligned 得先就位（有效存储 → 免 1.5s 对齐直进 RUN）。 */
+  /* S5 零位装载：须在 fast_loop_enable 之前——快环一开 START 即可进来。
+   * 绝对值编码器装载即免对齐；ABZ 原点每上电重置，START 时重对齐。 */
   service_param_store_boot();
   /* 辨识档案装载（P8 A1）：有效记录即应用电机参数并分轴重整定电流环，
    * 同样须在 fast_loop_enable 之前。 */
