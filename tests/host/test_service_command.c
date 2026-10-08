@@ -21,10 +21,12 @@
 #include "axdr_command_contract.h"
 #include "axdr_command_core.h"
 #include "common.h"
+#include "diag_runtime.h"
 #include "service_command.h"
 #include "service_usb.h"
 
 foc_t g_foc;
+diag_runtime_t g_diag; /* service_scope 路由引用（测试链接，不做诊断） */
 
 /* drive.c 替身：service_command 的 DISARM 故障恢复路径调用（真机由
  * drive.c 提供，本测试不链 drive 源）。语义对齐 drive.c——PWM 活动期

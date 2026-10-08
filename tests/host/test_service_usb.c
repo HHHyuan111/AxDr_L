@@ -14,8 +14,10 @@
 #include "axdr_command_core.h"
 #include "service_usb.h"
 #include "common.h"
+#include "diag_runtime.h"
 
 foc_t g_foc; /* service_command 引用（S2 测试链接） */
+diag_runtime_t g_diag; /* service_scope 路由引用（测试链接，不做诊断） */
 
 /* drive.c 替身：service_command 的 DISARM 故障恢复路径调用（本测试
  * 不链 drive 源，S2 桩分发器不会真正走到，仅需满足链接）。 */

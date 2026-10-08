@@ -589,13 +589,31 @@ $serviceUsbSource = Join-Path $serviceDir "service_usb.c"
 $serviceTelemetrySource = Join-Path $serviceDir "service_telemetry.c"
 $serviceCommandTestSource = Join-Path $testDir "test_service_command.c"
 $serviceCommandSource = Join-Path $serviceDir "service_command.c"
+$serviceScopeSource = Join-Path $serviceDir "service_scope.c"
+$diagnosticCoreDir = Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic/core"
+$diagnosticCoreSources = @(
+    "$diagnosticCoreDir/mc_common.c",
+    "$diagnosticCoreDir/mc_bias_bandwidth.c",
+    "$diagnosticCoreDir/mc_current_pi.c",
+    "$diagnosticCoreDir/mc_current_sweep.c",
+    "$diagnosticCoreDir/mc_deadtime_comp.c",
+    "$diagnosticCoreDir/mc_deadtime_test.c",
+    "$diagnosticCoreDir/mc_decoupling.c",
+    "$diagnosticCoreDir/mc_diag_manager.c",
+    "$diagnosticCoreDir/mc_encoder_alignment.c",
+    "$diagnosticCoreDir/mc_flux_observer.c",
+    "$diagnosticCoreDir/mc_param_ident.c",
+    "$diagnosticCoreDir/mc_pole_pair_ident.c",
+    "$diagnosticCoreDir/diag_runtime.c"
+)
 $serviceCommandExecutablePath = Join-Path $outputDir "test_service_command.exe"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
-        "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" `
-        $serviceCommandTestSource $serviceUsbSource $serviceCommandSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
+        "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" "-I$diagnosticIncludeDir" `
+        $serviceCommandTestSource $serviceUsbSource $serviceCommandSource $serviceScopeSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
+        $diagnosticCoreSources `
         -o $serviceCommandExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )
@@ -603,6 +621,23 @@ if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; th
 & $serviceCommandExecutablePath
 if ($LASTEXITCODE -ne 0) { throw "service_command 测试运行失败" }
 Write-Host "Host C11/S3 命令分发器与安全链旅程测试通过。"
+
+$serviceScopeTestSource = Join-Path $testDir "test_service_scope.c"
+$serviceScopeExecutablePath = Join-Path $outputDir "test_service_scope.exe"
+
+$compileOutput = @(
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
+        "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" "-I$diagnosticIncludeDir" `
+        $serviceScopeTestSource $serviceUsbSource $serviceScopeSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
+        $diagnosticCoreSources `
+        -o $serviceScopeExecutablePath -lm 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "service_scope 编译失败" }
+& $serviceScopeExecutablePath
+if ($LASTEXITCODE -ne 0) { throw "service_scope 测试运行失败" }
+Write-Host "Host C11/扫频测量会话协议链测试通过。"
 
 $serviceTelemetryTestSource = Join-Path $testDir "test_service_telemetry.c"
 $serviceTelemetryExecutablePath = Join-Path $outputDir "test_service_telemetry.exe"
@@ -644,8 +679,9 @@ $serviceUsbExecutablePath = Join-Path $outputDir "test_service_usb.exe"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
-        "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" `
-        $serviceUsbTestSource $serviceUsbSource $serviceCommandSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
+        "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" "-I$diagnosticIncludeDir" `
+        $serviceUsbTestSource $serviceUsbSource $serviceCommandSource $serviceScopeSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
+        $diagnosticCoreSources `
         -o $serviceUsbExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )

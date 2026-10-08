@@ -11,6 +11,7 @@
 #include "axdr_command_core.h"
 #include "axdr_command_contract.h"
 #include "service_command.h"
+#include "service_scope.h"
 
 #define SVC_RX_RING_SIZE 512u
 #define SVC_RX_RING_MASK (SVC_RX_RING_SIZE - 1u)
@@ -85,7 +86,7 @@ static void process_request(uint16_t request_length)
     uint8_t response[AXDR_COMMAND_MAX_RESPONSE_SIZE];
     const uint16_t response_length = axdr_command_core_process(
         &command_core, parser_buffer, request_length,
-        service_command_dispatch, NULL,
+        service_scope_route, NULL,
         response, sizeof(response));
 
     if (response_length >= AXDR_COMMAND_MIN_RESPONSE_SIZE)
