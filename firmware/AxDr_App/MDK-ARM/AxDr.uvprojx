@@ -650,6 +650,11 @@
               <FilePath>..\User\service\service_telemetry.c</FilePath>
             </File>
             <File>
+              <FileName>service_scope.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\service\service_scope.c</FilePath>
+            </File>
+            <File>
               <FileName>service_param_store.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\service\service_param_store.c</FilePath>
