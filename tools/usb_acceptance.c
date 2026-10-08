@@ -1307,10 +1307,197 @@ static void emergency_stop(void)
     printf("[INFO] 已尝试紧急 STOP+DISARM\n");
 }
 
+/* ============================================================
+ * A3 扫频测量会话（0x1B-0x1F；带宽 -3dB 判据 SOP 9.11）
+ * ============================================================ */
+#define SWEEP_ID_HANDLE 0x53574550u /* "PWSE"，与固件 SCOPE_SWEEP_ID 同值 */
+#define SWEEP_STATE_DONE 2u
+#define SWEEP_STATE_ABORTED 3u
+
+/* 宿主侧带宽复核：与固件 mc_sweep_bandwidth_hz 同判据（首个 <=-3dB
+ * 有效点与前一有效点线性插值；全频段高于 -3dB 取末点）。data 为
+ * 24B/点字节流：freq@0 closed_db@4 valid@20。 */
+static float sweep_host_bandwidth(uint32_t points, const uint8_t *data)
+{
+    uint32_t i;
+    uint32_t prev = points; /* 哨兵：尚无有效点 */
+
+    for (i = 0u; i < points; i++)
+    {
+        const uint8_t *p = &data[i * 24u];
+        if (p[20] == 0u)
+        {
+            continue;
+        }
+        if (rd_f32(&p[4]) <= -3.0f)
+        {
+            if (prev >= points)
+            {
+                return rd_f32(p);
+            }
+            {
+                const float g0 = rd_f32(&data[prev * 24u + 4u]);
+                const float g1 = rd_f32(&p[4]);
+                const float f0 = rd_f32(&data[prev * 24u]);
+                const float f1 = rd_f32(p);
+                return f0 + (f1 - f0) * (g0 + 3.0f) / (g0 - g1);
+            }
+        }
+        prev = i;
+    }
+    return (points > 0u) ? rd_f32(&data[(points - 1u) * 24u]) : 0.0f;
+}
+
+/* 全链路：0x01 capability → 0x1B 配置 → 0x1C 启动 → 0x1D 轮询 →
+ * 0x1E 分块读出 → CSV 留档。q 轴 20-1000Hz 11 点无偏置，幅值默认
+ * 0.3A（低于档案限流 1.0A，电机静止 STOP 态由快环权威门禁把关）。 */
+static void run_sweep(const char *csv_path, float amplitude_a)
+{
+    static uint8_t data[128u * 24u];
+    uint8_t req[19];
+    uint32_t total = 0u;
+    uint32_t offset = 0u;
+    uint32_t points = 0u;
+    uint32_t t0;
+    uint32_t i;
+    FILE *f;
+
+    printf("--- A3 扫频测量会话（amp=%.2fA）---\n", amplitude_a);
+
+    /* 1) 0x01：扫频 capability/mask 补位广播 */
+    if (transact(AXDR_OPCODE_GET_PROTOCOL_INFO, NULL, 0) != 0)
+    {
+        printf("[FAIL] sweep: 0x01 无应答\n");
+        g_fails++;
+        return;
+    }
+    expect("sweep capability bit17/18",
+           (rd_u32(&g_last_resp.payload[12]) &
+            (AXDR_CAPABILITY_HIGH_RATE_USB_SCOPE |
+             AXDR_CAPABILITY_SCOPE_SIGNAL_DIRECTORY)) != 0u);
+    expect("sweep mask bit27-31",
+           (rd_u32(&g_last_resp.payload[16]) & 0xF8000000u) == 0xF8000000u);
+
+    /* 2) 0x1B：配置（payload 19B：axis/start/end/points/amp/offset） */
+    memset(req, 0, sizeof(req));
+    req[0] = 1u; /* axis = Q */
+    wr_f32(&req[1], 20.0f);
+    wr_f32(&req[5], 1000.0f);
+    wr_u16(&req[9], 11u);
+    wr_f32(&req[11], amplitude_a);
+    wr_f32(&req[15], 0.0f);
+    if (tx_expect(AXDR_OPCODE_CONFIGURE_SCOPE_STREAM, req, (uint16_t)sizeof(req),
+                  AXDR_ACK_ACCEPTED, AXDR_REASON_NONE, "0x1B 配置扫频") == 0)
+    {
+        return;
+    }
+    expect("0x1B sweep_id 回显", rd_u32(g_last_resp.payload) == SWEEP_ID_HANDLE);
+
+    /* 3) 0x1C：启动（4B session 透传；会话校验待 WIP 合入） */
+    memset(req, 0, 4u);
+    if (tx_expect(AXDR_OPCODE_ARM_SCOPE_CAPTURE, req, 4u,
+                  AXDR_ACK_APPLIED, AXDR_REASON_NONE, "0x1C 启动扫频") == 0)
+    {
+        return;
+    }
+    expect("0x1C accepted", g_last_resp.payload[4] == 1u);
+
+    /* 4) 0x1D：轮询至 DONE（11 点约数秒；60s 超时兜底） */
+    t0 = now_ms();
+    while (1)
+    {
+        if (transact(AXDR_OPCODE_GET_SCOPE_CAPTURE_STATE, NULL, 0) == 0)
+        {
+            const uint8_t state = g_last_resp.payload[0];
+            points = rd_u16(&g_last_resp.payload[2]);
+            printf("  [state=%u] %u 点, 当前 %.1f Hz, %.2f dB\n", state,
+                   points, rd_f32(&g_last_resp.payload[8]),
+                   rd_f32(&g_last_resp.payload[12]));
+            if (state == SWEEP_STATE_DONE)
+            {
+                break;
+            }
+            if (state == SWEEP_STATE_ABORTED)
+            {
+                printf("[FAIL] 扫频被中止\n");
+                g_fails++;
+                return;
+            }
+        }
+        if ((now_ms() - t0) > 60000u)
+        {
+            printf("[FAIL] 扫频超时（60s）\n");
+            g_fails++;
+            return;
+        }
+        (void)pump(300u);
+    }
+    printf("[PASS] 固件带宽: %.2f Hz\n", rd_f32(&g_last_resp.payload[20]));
+    printf("  PI 建议: kp_d=%.5f ki_d=%.3f kp_q=%.5f ki_q=%.3f\n",
+           rd_f32(&g_last_resp.payload[24]), rd_f32(&g_last_resp.payload[28]),
+           rd_f32(&g_last_resp.payload[32]), rd_f32(&g_last_resp.payload[36]));
+
+    /* 5) 0x1E：分块读出直至 total 取满（末块 flags bit0=1） */
+    do
+    {
+        uint8_t creq[8];
+        uint16_t chunk_len;
+
+        wr_u32(&creq[0], SWEEP_ID_HANDLE);
+        wr_u32(&creq[4], offset);
+        if (tx_expect(AXDR_OPCODE_READ_SCOPE_CAPTURE_CHUNK, creq, 8u,
+                      AXDR_ACK_ACCEPTED, AXDR_REASON_NONE, NULL) == 0)
+        {
+            g_fails++;
+            return;
+        }
+        total = rd_u32(&g_last_resp.payload[4]);
+        chunk_len = rd_u16(&g_last_resp.payload[12]);
+        if (rd_u32(&g_last_resp.payload[8]) != offset)
+        {
+            printf("[FAIL] chunk offset 错位: %u != %u\n",
+                   rd_u32(&g_last_resp.payload[8]), offset);
+            g_fails++;
+            return;
+        }
+        if ((offset + chunk_len > sizeof(data)) || (chunk_len == 0u))
+        {
+            printf("[FAIL] chunk 越界: offset=%u len=%u\n", offset, chunk_len);
+            g_fails++;
+            return;
+        }
+        memcpy(&data[offset], &g_last_resp.payload[16], chunk_len);
+        offset += chunk_len;
+    } while (offset < total);
+    points = total / 24u;
+    printf("[PASS] 读出 %u 字节 = %u 点\n", total, points);
+
+    /* 6) CSV 留档 + 宿主带宽复核 */
+    f = fopen((csv_path != NULL) ? csv_path : "sweep_result.csv", "w");
+    if (f == NULL)
+    {
+        printf("[FAIL] CSV 打不开: %s\n",
+               (csv_path != NULL) ? csv_path : "sweep_result.csv");
+        g_fails++;
+        return;
+    }
+    fprintf(f, "freq_hz,closed_db,closed_deg,open_db,open_deg,valid\n");
+    for (i = 0u; i < points; i++)
+    {
+        const uint8_t *p = &data[i * 24u];
+        fprintf(f, "%.2f,%.4f,%.3f,%.4f,%.3f,%u\n", rd_f32(p), rd_f32(&p[4]),
+                rd_f32(&p[8]), rd_f32(&p[12]), rd_f32(&p[16]), p[20]);
+    }
+    fclose(f);
+    printf("[PASS] CSV 已写 %s\n",
+           (csv_path != NULL) ? csv_path : "sweep_result.csv");
+    printf("  宿主带宽复核: %.2f Hz\n", sweep_host_bandwidth(points, data));
+}
+
 static void print_usage(void)
 {
     printf("用法: usb_acceptance COMx [--reboot-check] [--probe-only] "
-           "[--speed X] [--iq Y] [--out file.csv]\n"
+           "[--sweep] [--speed X] [--iq Y] [--out file.csv]\n"
            "      usb_acceptance --selftest\n");
 }
 
@@ -1320,8 +1507,10 @@ int main(int argc, char **argv)
     const char *csv = NULL;
     float speed = 8.0f;
     float iq = 2.0f;
+    float amplitude = 0.3f;
     int reboot_check = 0;
     int probe_only = 0;
+    int sweep_mode = 0;
     int selftest = 0;
     int i;
 
@@ -1339,6 +1528,10 @@ int main(int argc, char **argv)
         {
             probe_only = 1;
         }
+        else if (strcmp(argv[i], "--sweep") == 0)
+        {
+            sweep_mode = 1;
+        }
         else if ((strcmp(argv[i], "--speed") == 0) && (i + 1 < argc))
         {
             speed = (float)atof(argv[++i]);
@@ -1346,6 +1539,10 @@ int main(int argc, char **argv)
         else if ((strcmp(argv[i], "--iq") == 0) && (i + 1 < argc))
         {
             iq = (float)atof(argv[++i]);
+        }
+        else if ((strcmp(argv[i], "--amp") == 0) && (i + 1 < argc))
+        {
+            amplitude = (float)atof(argv[++i]);
         }
         else if ((strcmp(argv[i], "--out") == 0) && (i + 1 < argc))
         {
@@ -1399,6 +1596,15 @@ int main(int argc, char **argv)
     {
         tr->close_port();
         printf("=== %s（probe-only）===\n", (g_fails == 0) ? "全部 PASS" : "FAIL");
+        return (g_fails == 0) ? 0 : 5;
+    }
+
+    if (sweep_mode != 0)
+    {
+        /* 扫频会话是 STOP 态诊断任务，不进运动旅程（无 ARM/对齐前置） */
+        run_sweep(csv, amplitude);
+        tr->close_port();
+        printf("=== %s（sweep）===\n", (g_fails == 0) ? "全部 PASS" : "FAIL");
         return (g_fails == 0) ? 0 : 5;
     }
 
