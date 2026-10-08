@@ -231,6 +231,108 @@ static void test_sweep(void)
     assert(nearf(sweep.result.closed_phase_deg[0], 0.0f, 0.5f));
 }
 
+static void test_bandwidth_hz(void)
+{
+    mc_current_sweep_result_t r;
+    uint32_t i;
+    memset(&r, 0, sizeof(r));
+
+    /* 空结果 */
+    assert(mc_sweep_bandwidth_hz(&r) == 0.0f);
+    assert(mc_sweep_bandwidth_hz(NULL) == 0.0f);
+
+    /* 跨越插值：100Hz 处 -2dB、200Hz 处 -4dB → -3dB 点在 150Hz */
+    r.completed_points = 5u;
+    for (i = 0u; i < 5u; ++i) {
+        r.frequency_hz[i] = (float[]){20, 50, 100, 200, 400}[i];
+        r.closed_magnitude_db[i] = (float[]){0, 0, -2, -4, -10}[i];
+        r.valid[i] = 1u;
+    }
+    assert(nearf(mc_sweep_bandwidth_hz(&r), 150.0f, 0.1f));
+
+    /* 无效点跳过：100Hz 点标无效 → 跨越取 50/200 有效对插值
+     * 50 + (200-50)*(0+3)/(0+4) = 162.5 */
+    r.valid[2] = 0u;
+    r.closed_magnitude_db[2] = 0.0f;
+    assert(nearf(mc_sweep_bandwidth_hz(&r), 162.5f, 0.1f));
+
+    /* 全频段高于 -3dB → 返回最高频点 */
+    for (i = 0u; i < 5u; ++i) {
+        r.valid[i] = 1u;
+        r.closed_magnitude_db[i] = -1.0f;
+    }
+    assert(nearf(mc_sweep_bandwidth_hz(&r), 400.0f, 0.1f));
+}
+
+/* 一阶闭环模型数值基准：G(s)=wc/(s+wc)，理论带宽 wc/2π。
+ * SOP/计划 §59 的验收基准——已知模型注入，断言 -3dB 频点恢复精度。 */
+static void test_first_order_plant(void)
+{
+    mc_current_sweep_t sweep;
+    mc_current_sweep_config_t cfg;
+    mc_command_t command;
+    mc_sample_t sample;
+    const float dt = 50.0e-6f;
+    /* 离散一阶低通：y += (u-y)*(1-exp(-dt/tau))，tau=1/(2π*200) */
+    const float tau = 1.0f / (MC_TWO_PI_F * 200.0f);
+    const float alpha = 1.0f - expf(-dt / tau);
+    float fb = 0.0f;
+    uint32_t guard;
+
+    mc_current_sweep_default_config(&cfg);
+    cfg.single_point = false;
+    cfg.axis = MC_AXIS_D;
+    cfg.start_frequency_hz = 20.0f;
+    cfg.end_frequency_hz = 2000.0f;
+    cfg.requested_points = 20u;
+    cfg.amplitude_a = 0.5f;
+    cfg.offset_a = 0.0f;
+    cfg.safe_current_limit_a = 2.0f;
+    cfg.settle_cycles = 3u;
+    cfg.measure_cycles = 20u;
+    cfg.minimum_settle_time_s = 0.0f;
+    cfg.minimum_measure_time_s = 0.0f;
+    cfg.minimum_measure_samples = 64u;
+    cfg.feedback_filter_alpha = 0.0f;
+    cfg.reject_saturated_points = false;
+
+    assert(mc_current_sweep_start(&sweep, &cfg, dt, &command) == MC_OK);
+    memset(&sample, 0, sizeof(sample));
+    for (guard = 0u; guard < 400000u; ++guard) {
+        /* 植物当拍跟随：激励直进一阶低通，输出回灌采样 */
+        fb += (command.id_ref_a - fb) * alpha;
+        sample.i_alpha_a = fb;
+        sample.i_beta_a = 0.0f;
+        sample.theta_elec_rad = 0.0f;
+        if (mc_current_sweep_step(&sweep, &sample, &command) == MC_DONE) {
+            break;
+        }
+    }
+    assert(guard < 400000u);
+    assert(sweep.result.completed_points == 20u);
+
+    /* 带宽恢复：扫频实测 -3dB 频点 ≈ 理论 200Hz（±10%） */
+    {
+        const float bw = mc_sweep_bandwidth_hz(&sweep.result);
+        assert(bw > 180.0f && bw < 220.0f);
+    }
+    /* 逐点对照一阶解析式 |G|=1/√(1+(f/200)²)、∠G=-atan(f/200)。
+     * 增益全频段 ±0.35dB；相位低频段 ±3°（离散化在高频卷绕失真）。 */
+    {
+        uint32_t k;
+        for (k = 0u; k < sweep.result.completed_points; ++k) {
+            const float ratio = sweep.result.frequency_hz[k] / 200.0f;
+            const float ref_db = -10.0f * log10f(1.0f + ratio * ratio);
+            assert(nearf(sweep.result.closed_magnitude_db[k], ref_db, 0.35f));
+            if (sweep.result.frequency_hz[k] <= 300.0f) {
+                const float phase_deg = -atanf(ratio) * 57.29577951308232f;
+                assert(nearf(sweep.result.closed_phase_deg[k], phase_deg,
+                             3.0f));
+            }
+        }
+    }
+}
+
 static void test_bandwidth(void)
 {
     mc_current_sweep_result_t sweeps[2];
@@ -264,6 +366,8 @@ int main(void)
     test_diag_manager();
     test_flux();
     test_sweep();
+    test_bandwidth_hz();
+    test_first_order_plant();
     test_bandwidth();
     puts("portable control and sweep tests: PASS");
     return 0;

@@ -282,4 +282,31 @@ mc_status_t mc_current_sweep_abort(mc_current_sweep_t *sweep,
     return MC_ABORTED;
 }
 
+/* SOP 9.11 带宽判定：闭环增益首次跌破 -3dB 的频点，取跨越前后两个
+ * 有效点线性插值。全频段都在 -3dB 之上时返回最高频点（带宽不低于
+ * 扫频上界的语义），无有效点返回 0。 */
+float mc_sweep_bandwidth_hz(const mc_current_sweep_result_t *result)
+{
+    uint32_t i;
+    uint32_t prev = MC_SWEEP_MAX_POINTS;
+
+    if (!result || result->completed_points == 0U) return 0.0f;
+    for (i = 0U; i < result->completed_points; ++i) {
+        if (!result->valid[i]) continue;
+        if (result->closed_magnitude_db[i] <= MC_SWEEP_BANDWIDTH_DB) {
+            if (prev >= i) return result->frequency_hz[i];
+            /* 频率轴对数分布，增益按线性插值即可定位跨越点 */
+            {
+                const float g0 = result->closed_magnitude_db[prev];
+                const float g1 = result->closed_magnitude_db[i];
+                const float f0 = result->frequency_hz[prev];
+                const float f1 = result->frequency_hz[i];
+                return f0 + (f1 - f0) * (g0 - MC_SWEEP_BANDWIDTH_DB) / (g0 - g1);
+            }
+        }
+        prev = i;
+    }
+    return result->frequency_hz[result->completed_points - 1U];
+}
+
 

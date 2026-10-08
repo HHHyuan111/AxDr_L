@@ -230,6 +230,70 @@ static void test_request_facade_gate(void)
     diag_runtime_request_stop(NULL);
 }
 
+static void test_configure_sweep_facade(void)
+{
+    const diag_seed_t seed = make_pr60_seed();
+    diag_runtime_t runtime;
+    mc_current_sweep_config_t cfg;
+    mc_command_t command;
+
+    diag_runtime_init(&runtime, &seed);
+    set_test_limits(&runtime);
+
+    /* 合法多点配置：暂存槽置位，profile 不动 */
+    mc_current_sweep_default_config(&cfg);
+    cfg.single_point = false;
+    cfg.start_frequency_hz = 20.0f;
+    cfg.end_frequency_hz = 1000.0f;
+    cfg.requested_points = 11u;
+    cfg.amplitude_a = 0.2f;
+    cfg.offset_a = 0.0f;
+    assert(diag_runtime_configure_sweep(&runtime, &cfg) == MC_OK);
+    assert(runtime.sweep_pending_valid == 1u);
+    assert(runtime.profile.sweep.single_point == DIAG_SWEEP_SINGLE_POINT);
+
+    /* 非法矩阵：负幅值 / 点数越界 / 超奈奎斯特 / 超限流 / 忙 / NULL */
+    cfg.amplitude_a = -1.0f;
+    assert(diag_runtime_configure_sweep(&runtime, &cfg)
+           == MC_INVALID_ARGUMENT);
+    cfg.amplitude_a = 0.2f;
+    cfg.requested_points = 0u;
+    assert(diag_runtime_configure_sweep(&runtime, &cfg)
+           == MC_INVALID_ARGUMENT);
+    cfg.requested_points = MC_SWEEP_MAX_POINTS + 1u;
+    assert(diag_runtime_configure_sweep(&runtime, &cfg)
+           == MC_INVALID_ARGUMENT);
+    cfg.requested_points = 11u;
+    cfg.end_frequency_hz = 12000.0f; /* fs=20kHz，奈奎斯特 10kHz */
+    assert(diag_runtime_configure_sweep(&runtime, &cfg)
+           == MC_INVALID_ARGUMENT);
+    cfg.end_frequency_hz = 1000.0f;
+    cfg.offset_a = 0.9f; /* 0.9+0.2 > 限流 1.0 */
+    assert(diag_runtime_configure_sweep(&runtime, &cfg)
+           == MC_OUT_OF_RANGE);
+    cfg.offset_a = 0.0f;
+    runtime.active = true;
+    assert(diag_runtime_configure_sweep(&runtime, &cfg) == MC_REJECTED);
+    runtime.active = false;
+    assert(diag_runtime_configure_sweep(NULL, &cfg) == MC_INVALID_ARGUMENT);
+    assert(runtime.sweep_pending_valid == 1u); /* 失败不冲掉已暂存配置 */
+
+    /* start 消费：pending 覆盖 profile，用后清 */
+    runtime.requested_job = DIAG_JOB_CURRENT_SWEEP;
+    assert(diag_runtime_start(&runtime, 24.0f, true) == MC_OK);
+    assert(runtime.sweep.config.start_frequency_hz == 20.0f);
+    assert(runtime.sweep.config.requested_points == 11u);
+    assert(runtime.sweep.config.safe_current_limit_a == 1.0f);
+    assert(runtime.sweep_pending_valid == 0u);
+
+    /* 二次启动回退 profile 默认（pending 已清，无残留覆盖） */
+    assert(diag_runtime_abort(&runtime, &command) == MC_ABORTED);
+    diag_runtime_confirm_stopped(&runtime, true);
+    runtime.requested_job = DIAG_JOB_CURRENT_SWEEP;
+    assert(diag_runtime_start(&runtime, 24.0f, true) == MC_OK);
+    assert(runtime.sweep.config.single_point == DIAG_SWEEP_SINGLE_POINT);
+}
+
 int main(void)
 {
     test_default_profile_cannot_start_power();
@@ -238,6 +302,7 @@ int main(void)
     test_all_active_job_routes();
     test_project_pi_unit_conversion();
     test_request_facade_gate();
+    test_configure_sweep_facade();
     puts("diagnostic runtime tests: PASS");
     return 0;
 }

@@ -225,6 +225,12 @@ static mc_status_t diag_start_job(diag_runtime_t *runtime)
         {
             mc_current_sweep_config_t config = runtime->profile.sweep;
 
+            /* 通信层 configure 的暂存配置后写胜，用后即清 */
+            if (runtime->sweep_pending_valid != 0U)
+            {
+                config = runtime->sweep_pending;
+                runtime->sweep_pending_valid = 0U;
+            }
             config.safe_current_limit_a = runtime->profile.current_limit_a;
             runtime->command_primed = true;
             return mc_current_sweep_start(&runtime->sweep,
@@ -691,6 +697,63 @@ void diag_runtime_request_stop(diag_runtime_t *runtime)
         return;
     }
     runtime->request = DIAG_REQUEST_STOP;
+}
+
+mc_status_t diag_runtime_configure_sweep(
+    diag_runtime_t *runtime,
+    const mc_current_sweep_config_t *config)
+{
+    const float period_s = (runtime != NULL)
+                               ? runtime->profile.control_period_s
+                               : 0.0f;
+
+    if ((runtime == NULL) || (config == NULL) ||
+        !mc_float_is_finite(period_s) || (period_s <= 0.0f))
+    {
+        return MC_INVALID_ARGUMENT;
+    }
+
+    /* 忙：与启动请求互斥（配置暂存后可能马上 start，中途换人易踩） */
+    if (runtime->active || (runtime->request != DIAG_REQUEST_NONE))
+    {
+        return MC_REJECTED;
+    }
+
+    /* 与 mc_current_sweep_start 同门的早拒：非法配置不占暂存槽 */
+    if (!mc_float_is_finite(config->amplitude_a)
+        || !mc_float_is_finite(config->offset_a)
+        || !mc_float_is_finite(config->start_frequency_hz)
+        || !mc_float_is_finite(config->end_frequency_hz)
+        || (config->amplitude_a < 0.0f)
+        || (config->start_frequency_hz <= 0.0f)
+        || (config->end_frequency_hz < config->start_frequency_hz)
+        || (config->requested_points == 0U)
+        || (config->requested_points > MC_SWEEP_MAX_POINTS))
+    {
+        return MC_INVALID_ARGUMENT;
+    }
+    /* 激励频率按模式取：单点查 single_frequency_hz，多点查扫频上界 */
+    {
+        const float drive_hz = config->single_point
+                                   ? config->single_frequency_hz
+                                   : config->end_frequency_hz;
+
+        if (!mc_float_is_finite(drive_hz)
+            || (drive_hz <= 0.0f)
+            || (drive_hz >= (0.5f / period_s)))
+        {
+            return MC_INVALID_ARGUMENT;
+        }
+    }
+    if ((config->offset_a + config->amplitude_a)
+        > runtime->profile.current_limit_a)
+    {
+        return MC_OUT_OF_RANGE;
+    }
+
+    runtime->sweep_pending = *config;
+    runtime->sweep_pending_valid = 1U;
+    return MC_OK;
 }
 
 mc_status_t diag_current_pi_for_project(float bandwidth_hz,

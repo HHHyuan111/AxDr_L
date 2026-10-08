@@ -152,6 +152,11 @@ typedef struct diag_runtime
     mc_deadtime_test_t deadtime_test;
     mc_flux_observer_t flux;
     mc_bias_bandwidth_result_t bias_bandwidth;
+
+    /* 通信层扫频配置暂存槽：configure 写入，start 消费后清
+     * （13 号规范——协议不直写 profile，经门面进）。 */
+    mc_current_sweep_config_t sweep_pending;
+    uint8_t sweep_pending_valid;
 } diag_runtime_t;
 
 void diag_runtime_init(diag_runtime_t *runtime,
@@ -184,6 +189,18 @@ mc_status_t diag_runtime_request_start(diag_runtime_t *runtime,
 
 /** @brief 通信层任务门面：写入停止请求（后写胜，覆盖未消费的启动请求）。 */
 void diag_runtime_request_stop(diag_runtime_t *runtime);
+
+/**
+ * @brief 通信层扫频配置门面：暂存一份扫频配置供下次启动消费。
+ *
+ * 只做早拒（非有限值 / 幅值与偏置非正 / 频点越界 / 超奈奎斯特），
+ * 不动 profile；请求槽占用或任务运行中一律拒绝（配置与启动之间
+ * 无原子性要求——消费发生在快环 start，期间二次 configure 以
+ * 后写胜覆盖）。
+ * 返回 MC_OK=已暂存 / MC_INVALID_ARGUMENT=参数非法 / MC_REJECTED=忙。
+ */
+mc_status_t diag_runtime_configure_sweep(diag_runtime_t *runtime,
+                                         const mc_current_sweep_config_t *config);
 
 /**
  * @brief 按本项目 PI 定义计算连续积分增益。

@@ -8,6 +8,8 @@ extern "C" {
 #endif
 
 #define MC_SWEEP_MAX_POINTS 128u
+/* SOP 9.11：闭环增益跌至该值即认定越过带宽 */
+#define MC_SWEEP_BANDWIDTH_DB (-3.0f)
 
 typedef struct {
     mc_axis_t axis;
@@ -72,6 +74,7 @@ mc_status_t mc_current_sweep_step(mc_current_sweep_t *sweep,
                                   mc_command_t *next_command);
 mc_status_t mc_current_sweep_abort(mc_current_sweep_t *sweep,
                                    mc_command_t *stop_command);
+float mc_sweep_bandwidth_hz(const mc_current_sweep_result_t *result);
 
 #ifdef __cplusplus
 }
