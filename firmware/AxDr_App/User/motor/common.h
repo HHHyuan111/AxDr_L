@@ -470,6 +470,12 @@ struct foc
     float align_sin_sum;    /* 对齐期 fb.theta_e 圆均值累积 */
     float align_cos_sum;
 
+    /* 启动初期速度反馈方向保护：只用于发现编码器方向/相序明显反向，
+     * 不改变运行中的正常换向语义。 */
+    bool direction_guard_armed;
+    uint32_t direction_guard_ticks;
+    uint32_t direction_mismatch_ticks;
+
     pid_para_t id_pi;
     pid_para_t iq_pi;
     pid_para_t spd_pi;

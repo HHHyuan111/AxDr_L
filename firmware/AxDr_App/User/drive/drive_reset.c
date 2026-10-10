@@ -52,6 +52,10 @@ PLATFORM_FAST_CODE void drive_control_reset(foc_t *foc)
     foc->app.vel_reached = false;
     foc->app.last_pos_pause = false;
 
+    foc->direction_guard_armed = false;
+    foc->direction_guard_ticks = 0U;
+    foc->direction_mismatch_ticks = 0U;
+
     foc->fb.id = 0.0f;
     foc->fb.iq = 0.0f;
     foc->out.vd = 0.0f;

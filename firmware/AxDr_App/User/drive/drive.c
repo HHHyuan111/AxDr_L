@@ -14,6 +14,74 @@
 #include "drive_pwm.h"
 #include "drive_reset.h"
 
+#define DRIVE_DIRECTION_TARGET_MIN_RAD_S   (5.0f)
+#define DRIVE_DIRECTION_FEEDBACK_MIN_RAD_S (5.0f)
+#define DRIVE_DIRECTION_GUARD_WINDOW_S     (0.050f)
+#define DRIVE_DIRECTION_MISMATCH_HOLD_S    (0.005f)
+
+static uint32_t drive_seconds_to_ticks(const foc_t *foc, float seconds)
+{
+    const float fs = foc->rate.foc_fs;
+    const float ticks = seconds * fs;
+
+    if (!isfinite(ticks) || (ticks < 1.0f))
+    {
+        return 1U;
+    }
+    return (uint32_t)ticks;
+}
+
+static void drive_direction_guard_step(foc_t *foc)
+{
+    const float target = foc->ref.spd_r;
+    const float feedback = foc->fb.spd_r;
+    const bool target_valid = isfinite(target) &&
+                               (fabsf(target) >=
+                                DRIVE_DIRECTION_TARGET_MIN_RAD_S);
+    const bool feedback_valid = isfinite(feedback) &&
+                                 (fabsf(feedback) >=
+                                  DRIVE_DIRECTION_FEEDBACK_MIN_RAD_S);
+    const bool opposite = target_valid && feedback_valid &&
+                          ((target * feedback) < 0.0f);
+    const uint32_t guard_window =
+        drive_seconds_to_ticks(foc, DRIVE_DIRECTION_GUARD_WINDOW_S);
+    const uint32_t mismatch_hold =
+        drive_seconds_to_ticks(foc, DRIVE_DIRECTION_MISMATCH_HOLD_S);
+
+    if (!foc->direction_guard_armed || !foc->pwm_active ||
+        (foc->req != DRIVE_REQ_RUN))
+    {
+        foc->direction_guard_ticks = 0U;
+        foc->direction_mismatch_ticks = 0U;
+        return;
+    }
+
+    if (foc->direction_guard_ticks++ >= guard_window)
+    {
+        foc->direction_guard_armed = false;
+        foc->direction_mismatch_ticks = 0U;
+        return;
+    }
+
+    if (!opposite)
+    {
+        foc->direction_mismatch_ticks = 0U;
+        return;
+    }
+
+    if (foc->direction_mismatch_ticks < mismatch_hold)
+    {
+        foc->direction_mismatch_ticks++;
+    }
+    if (foc->direction_mismatch_ticks >= mismatch_hold)
+    {
+        /* 编码器信号可能有效但方向定义相反；这里先安全停机，保留
+         * enc_err 供上位机区分，后续再单独校验 A/B 方向和相序。 */
+        foc->fault.bit.enc_err = 1U;
+        foc->direction_guard_armed = false;
+    }
+}
+
 static _RAM_FUNC void drive_update_protection(foc_t *foc)
 {
     const bool power_requested = foc->pwm_active ||
@@ -100,6 +168,10 @@ static _RAM_FUNC void drive_update_protection(foc_t *foc)
  */
 static _RAM_FUNC void drive_start_pwm(foc_t *foc)
 {
+    const bool start_from_rest = isfinite(foc->fb.spd_r) &&
+                                 (fabsf(foc->fb.spd_r) <
+                                  DRIVE_DIRECTION_FEEDBACK_MIN_RAD_S);
+
     if (foc->pwm_active || !drive_mode_prepare(foc))
     {
         return;
@@ -109,6 +181,7 @@ static _RAM_FUNC void drive_start_pwm(foc_t *foc)
     if (drive_pwm_start())
     {
         drive_control_reset_for_start(foc);
+        foc->direction_guard_armed = start_from_rest;
         foc->pwm_active = true;
     }
     else
@@ -384,6 +457,7 @@ _RAM_FUNC void drive_fast_step(foc_t *foc)
     foc->pwm_cmd.valid = false;
 
     drive_update_protection(foc);
+    drive_direction_guard_step(foc);
 
     /* 已锁存故障时，当前周期禁止执行 START 或 RUN。 */
     if (foc->fault.all > 0U)

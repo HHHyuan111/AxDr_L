@@ -261,6 +261,48 @@ static bool test_start_then_run(void)
                               sizeof(run_events) / sizeof(run_events[0]));
 }
 
+static bool test_startup_direction_mismatch_stops(void)
+{
+    static const test_event_e stop_events[] = {
+        TEST_EVENT_PWM_STOP,
+        TEST_EVENT_RESET
+    };
+    foc_t foc = {
+        .req = DRIVE_REQ_RUN,
+        .state = DRIVE_STATE_RUN,
+        .pwm_active = true,
+        .direction_guard_armed = true,
+        .rate = {.foc_fs = 1000.0f},
+        .ref = {.spd_r = 20.0f},
+        .fb = {
+            .i_valid = true,
+            .vbus_valid = true,
+            .pos_valid = true,
+            .vbus = 24.0f,
+            .spd_r = -20.0f
+        }
+    };
+
+    test_reset_fakes();
+    for (int index = 0; index < 8; index++)
+    {
+        drive_fast_step(&foc);
+        if (foc.state == DRIVE_STATE_FAULT)
+        {
+            break;
+        }
+    }
+
+    return test_expect_events(stop_events,
+                              sizeof(stop_events) / sizeof(stop_events[0])) &&
+           test_expect(foc.fault.bit.enc_err == 1U,
+                       "启动初期速度反馈反向应锁存编码器故障。") &&
+           test_expect(foc.state == DRIVE_STATE_FAULT,
+                       "启动初期速度反馈反向应进入 FAULT。") &&
+           test_expect(!foc.pwm_active,
+                       "启动初期速度反馈反向必须关闭 PWM。");
+}
+
 static bool test_stop_runs_once(void)
 {
     static const test_event_e stop_events[] = {
@@ -727,59 +769,64 @@ int main(void)
         return 2;
     }
 
-    if (!test_stop_runs_once())
+    if (!test_startup_direction_mismatch_stops())
     {
         return 3;
     }
 
-    if (!test_unsupported_mode_never_starts_pwm())
+    if (!test_stop_runs_once())
     {
         return 4;
     }
 
-    if (!test_pwm_action_failure_is_reported())
+    if (!test_unsupported_mode_never_starts_pwm())
     {
         return 5;
     }
 
-    if (!test_fault_stops_same_cycle())
+    if (!test_pwm_action_failure_is_reported())
     {
         return 6;
     }
 
-    if (!test_existing_fault_blocks_start_and_run())
+    if (!test_fault_stops_same_cycle())
     {
         return 7;
     }
 
-    if (!test_stop_request_during_mode_is_preserved())
+    if (!test_existing_fault_blocks_start_and_run())
     {
         return 8;
     }
 
-    if (!test_invalid_requests_do_not_run())
+    if (!test_stop_request_during_mode_is_preserved())
     {
         return 9;
     }
 
-    if (!test_invalid_mode_or_missing_pwm_stops())
+    if (!test_invalid_requests_do_not_run())
     {
         return 10;
     }
 
-    if (!test_protection_blocks_power_actions())
+    if (!test_invalid_mode_or_missing_pwm_stops())
     {
         return 11;
     }
 
-    if (!test_invalid_feedback_blocks_start())
+    if (!test_protection_blocks_power_actions())
     {
         return 12;
     }
 
-    if (!test_fault_clear_requires_stopped_pwm())
+    if (!test_invalid_feedback_blocks_start())
     {
         return 13;
+    }
+
+    if (!test_fault_clear_requires_stopped_pwm())
+    {
+        return 14;
     }
 
     return 0;
