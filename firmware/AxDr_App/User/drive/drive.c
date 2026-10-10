@@ -156,8 +156,10 @@ static _RAM_FUNC void drive_stop_pwm(foc_t *foc)
  * ABZ 上电自动对齐（B 库门控哲学落地）：START 期间以固定电角度 0 注入
  * 档案对齐电流（foc_cur_step 的角度参数与编码器无关）——转子被吸到
  * "真实电角度=0"位置；后段对 fb.theta_e 做圆均值，e_off += -均值 (mod 2pi)。
- * 完成：置 enc_aligned 并自动晋升 req=RUN（本设计的显式行为，代码库中
- * 唯一的 RUN 写入点）。时长 = 保持 1.2s + 取平均 0.3s（B 库契约 >=300ms）。
+ * 完成：置 enc_aligned 并回到 STOP（对齐只建立零位，不隐式启动运行）。
+ * 上位机必须在看到 alignment_valid 后再次明确请求使能；这样不会把对齐前
+ * 已缓存的速度/电流目标直接带入功率输出。时长 = 保持 1.2s + 取平均
+ * 0.3s（B 库契约 >=300ms）。
  */
 #define DRIVE_ALIGN_SETTLE_S   (1.2f)
 #define DRIVE_ALIGN_AVG_S      (0.3f)
@@ -235,7 +237,12 @@ static _RAM_FUNC void drive_align_tick(foc_t *foc)
             }
             foc->motor.e_off = e_off;
             foc->enc_aligned = true;
-            foc->req = DRIVE_REQ_RUN; /* 自动晋升：对齐完成即进 RUN */
+
+            /* 对齐是校准动作，不是运行授权。立即关闭 PWM，避免对齐命令
+             * 与此前缓存的速度/电流目标在同一个状态链中自动接通。下一次
+             * 显式 START 才允许走已对齐的正常 RUN 入口。 */
+            drive_stop_pwm(foc);
+            foc->req = DRIVE_REQ_STOP;
         }
         else
         {
@@ -266,7 +273,8 @@ static _RAM_FUNC void drive_exec_action(foc_t *foc, drive_req_e req)
                 if ((foc->enc.primary == ENCODER_TYPE_ABZ) &&
                     !foc->enc_aligned)
                 {
-                    /* STARTING 期间逐拍执行自动对齐；完成时内部晋升 RUN */
+                    /* STARTING 期间逐拍执行自动对齐；完成后由对齐逻辑
+                     * 关断 PWM 并回到 STOP，等待下一次显式 START。 */
                     drive_align_tick(foc);
                 }
                 else
@@ -402,6 +410,5 @@ _RAM_FUNC void drive_fast_step(foc_t *foc)
     drive_update_state(foc, req);
 
     /* START 一次性语义由 exec_action 内完成晋升（非对齐场景启动即置 RUN；
-     * ABZ 对齐场景保持 START 直到对齐完成由 drive_align_tick 晋升——
-     * 此处原先的尾部自动晋升会把对齐第一拍后 premature 晋升，已移除）。 */
+     * ABZ 对齐场景由 drive_align_tick 在成功后主动关断并回到 STOP）。 */
 }

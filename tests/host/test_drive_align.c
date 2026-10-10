@@ -1,7 +1,7 @@
 /**
  * @file test_drive_align.c
  * @brief ABZ 上电自动对齐验证：状态流转、固定角电流注入、e_off 圆均值数学、
- *        自动晋升 RUN、二次启动不重复对齐、绝对编码器跳过对齐。
+ *        对齐后保持 STOP、二次启动不重复对齐、绝对编码器跳过对齐。
  *
  * 用小 fs（10Hz）把 1.5s 对齐压缩为 15 拍：settle=12 拍，平均=3 拍。
  */
@@ -137,7 +137,7 @@ int main(void)
     expect("注入角度恒 0（开环）", last_align_theta == 0.0f);
     expect("iq 给定 0", last_align_iq == 0.0f);
 
-    /* 场景 2：平均期 fb.theta_e=1.0 → e_off = 2pi-1.0，完成后自动晋升 RUN。
+    /* 场景 2：平均期 fb.theta_e=1.0 → e_off = 2pi-1.0，完成后回到 STOP。
      * 时序：settle=12 + avg=3 → 第 15 拍计数满，第 16 拍收尾（含首拍共 16 次调用）。 */
     for (int i = 0; i < 15; i++)
     {
@@ -150,7 +150,8 @@ int main(void)
         drive_fast_step(&m);
     }
     expect("15 拍后对齐完成", m.enc_aligned);
-    expect("自动晋升 RUN", m.req == DRIVE_REQ_RUN);
+    expect("对齐完成保持 STOP", m.req == DRIVE_REQ_STOP);
+    expect("对齐完成关闭 PWM", !m.pwm_active && pwm_stop_calls > 0);
     expect("e_off=2pi-1.0", fabsf(m.motor.e_off - (6.28318530718f - 1.0f)) < 1e-4f);
 
     /* 场景 3：已对齐 → STOP 后再 START 直接晋升，不再注入对齐电流 */
