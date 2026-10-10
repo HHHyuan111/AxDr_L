@@ -53,7 +53,10 @@ void MX_ADC1_Init(void)
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.GainCompensation = 0;
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  /* ADC1 注入组包含 IA/IB/IC 三个 rank。快环必须等整组完成后再读
+   * JDR1..JDR3；SINGLE_CONV 会在每个 rank 产生 JEOC，导致同一 PWM
+   * 触发被错误地执行三次，并把不完整的三相样本送进 FOC。 */
+  hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
   hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.NbrOfConversion = 2;

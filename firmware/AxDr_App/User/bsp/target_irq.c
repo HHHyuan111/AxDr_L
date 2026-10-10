@@ -41,7 +41,15 @@ void target_irq_priority_apply(void)
  */
 PLATFORM_FAST_CODE void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-    (void)hadc;
+    /* ADC1 才是三相电流快环源；ADC2 的注入母线采样不启用中断。
+     * 即使底层 HAL 配置被误改为 JEOC，也必须拒绝在序列未完成时
+     * 使用半组 JDR 数据。ADC1 已固定为 ADC_EOC_SEQ_CONV。 */
+    if ((hadc == NULL) || (hadc->Instance != ADC1) ||
+        (__HAL_ADC_GET_FLAG(hadc, ADC_FLAG_JEOS) == 0U))
+    {
+        return;
+    }
+
     fast_loop_step(&g_foc);
     /* 遥测抽取（20kHz 分频组帧，S4）。组装缝：与 fast_loop_step 同为先例——
      * 本文件是快速路径的装配点，service 不反向依赖 bsp。 */
