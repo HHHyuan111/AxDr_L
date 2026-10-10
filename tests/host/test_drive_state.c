@@ -157,6 +157,12 @@ void drive_control_reset(foc_t *foc)
     test_log_event(TEST_EVENT_RESET);
 }
 
+void drive_control_reset_for_start(foc_t *foc)
+{
+    (void)foc;
+    test_log_event(TEST_EVENT_RESET);
+}
+
 bool drive_mode_step(foc_t *foc)
 {
     test_log_event(TEST_EVENT_RUN_MODE);

@@ -64,3 +64,30 @@ PLATFORM_FAST_CODE void drive_control_reset(foc_t *foc)
     foc->out.duty_b = 0.5f;
     foc->out.duty_c = 0.5f;
 }
+
+PLATFORM_FAST_CODE void drive_control_reset_for_start(foc_t *foc)
+{
+    const float id_target = foc->ref.id;
+    const float iq_target = foc->ref.iq;
+    const float speed_target_r = foc->ref.spd_r;
+    const float speed_target_m = foc->ref.spd_m;
+    const float position_target_m = foc->ref.pos_m;
+    const float torque_target_m = foc->ref.torq_m;
+    const float torque_feedforward = foc->ref.torq_ff;
+    const float mit_kp = foc->ref.kp;
+    const float mit_kd = foc->ref.kd;
+
+    drive_control_reset(foc);
+
+    /* 这些字段是命令入口已经写入的目标；其余被 reset 清掉的字段均为
+     * 上一拍计算结果或控制器历史，启动时必须从已知状态重新建立。 */
+    foc->ref.id = id_target;
+    foc->ref.iq = iq_target;
+    foc->ref.spd_r = speed_target_r;
+    foc->ref.spd_m = speed_target_m;
+    foc->ref.pos_m = position_target_m;
+    foc->ref.torq_m = torque_target_m;
+    foc->ref.torq_ff = torque_feedforward;
+    foc->ref.kp = mit_kp;
+    foc->ref.kd = mit_kd;
+}

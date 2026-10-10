@@ -65,6 +65,11 @@ void drive_control_reset(foc_t *foc)
     (void)foc;
 }
 
+void drive_control_reset_for_start(foc_t *foc)
+{
+    (void)foc;
+}
+
 bool drive_mode_step(foc_t *foc)
 {
     (void)foc;

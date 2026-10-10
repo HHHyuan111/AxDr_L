@@ -60,7 +60,7 @@ int main(void)
 
     drive_control_reset(&motor);
 
-    return expect_true((motor.rate.cur_pid_cnt == 0U) &&
+    if (!expect_true((motor.rate.cur_pid_cnt == 0U) &&
                        (motor.rate.spd_pid_cnt == 0U) &&
                        (motor.rate.pos_pid_cnt == 0U),
                        "复位必须清除三级控制环分频计数。") &&
@@ -90,7 +90,47 @@ int main(void)
                        "复位不能覆盖周期、电机参数和限幅配置。") &&
            expect_true((motor.fb.pos_r == 8.0f) &&
                        (motor.fb.ia == 0.3f),
-                       "复位不能抹掉当前物理位置和电流反馈。")
-        ? 0
-        : 1;
+                       "复位不能抹掉当前物理位置和电流反馈。"))
+    {
+        return 1;
+    }
+
+    motor.rate.cur_pid_cnt = 2U;
+    motor.rate.spd_pid_cnt = 3U;
+    motor.rate.pos_pid_cnt = 4U;
+    motor.ref.id = 0.1f;
+    motor.ref.iq = 0.7f;
+    motor.ref.spd_r = 12.0f;
+    motor.ref.spd_m = 3.0f;
+    motor.ref.pos_m = 4.0f;
+    motor.ref.torq_m = 0.5f;
+    motor.ref.torq_ff = 0.2f;
+    motor.ref.kp = 1.5f;
+    motor.ref.kd = 0.4f;
+    motor.id_pi.i_term = 2.0f;
+    motor.out.vd = 2.0f;
+    motor.out.duty_a = 0.2f;
+
+    drive_control_reset_for_start(&motor);
+
+    return expect_true((motor.rate.cur_pid_cnt == 0U) &&
+                       (motor.rate.spd_pid_cnt == 0U) &&
+                       (motor.rate.pos_pid_cnt == 0U),
+                       "启动复位必须清除三级控制环分频计数。") &&
+           expect_true((motor.ref.id == 0.1f) &&
+                       (motor.ref.iq == 0.7f) &&
+                       (motor.ref.spd_r == 12.0f) &&
+                       (motor.ref.spd_m == 3.0f) &&
+                       (motor.ref.pos_m == 4.0f) &&
+                       (motor.ref.torq_m == 0.5f) &&
+                       (motor.ref.torq_ff == 0.2f) &&
+                       (motor.ref.kp == 1.5f) &&
+                       (motor.ref.kd == 0.4f),
+                       "启动复位必须保留已提交的用户目标。") &&
+           expect_true((motor.id_pi.i_term == 0.0f) &&
+                       (motor.out.vd == 0.0f) &&
+                       (motor.out.duty_a == 0.5f),
+                       "启动复位仍必须清除控制器历史和上一拍调制结果。")
+           ? 0
+           : 1;
 }

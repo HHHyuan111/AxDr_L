@@ -50,6 +50,12 @@ void drive_control_reset(foc_t *motor)
     motor->ref.vq = 0.0f;
 }
 
+void drive_control_reset_for_start(foc_t *motor)
+{
+    motor->ref.vd = 0.0f;
+    motor->ref.vq = 0.0f;
+}
+
 void drive_diag_poll_request(foc_t *motor)
 {
     (void)motor;

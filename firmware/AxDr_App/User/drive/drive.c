@@ -108,7 +108,7 @@ static _RAM_FUNC void drive_start_pwm(foc_t *foc)
     drive_pwm_set_neutral(foc);
     if (drive_pwm_start())
     {
-        drive_control_reset(foc);
+        drive_control_reset_for_start(foc);
         foc->pwm_active = true;
     }
     else
