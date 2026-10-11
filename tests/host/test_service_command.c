@@ -43,6 +43,15 @@ bool drive_fault_clear(foc_t *foc)
 }
 
 static int fail_count;
+/* 用户电流 PI 协议 WIP 新增了该链接依赖。本安全链测试不验证 PI 恢复，
+ * 意外调用必须报失败，不能以空替身冒充真实参数初始化。 */
+void cur_pi_init(foc_t *foc)
+{
+    (void)foc;
+    fprintf(stderr, "安全链测试意外进入未覆盖的电流 PI 恢复路径。\n");
+    fail_count++;
+}
+
 static void expect(const char *name, bool cond)
 {
     if (!cond)

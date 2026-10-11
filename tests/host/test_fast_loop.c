@@ -27,6 +27,7 @@ typedef enum
 #define EVENT_CAPACITY        (24U)
 
 foc_t g_foc;
+ADC_TypeDef axdr_test_adc1;
 
 static fast_event_e events[EVENT_CAPACITY];
 static size_t event_count;
@@ -198,6 +199,9 @@ static bool test_sample_validity_is_forwarded(foc_t *motor)
 
 static bool test_hal_callback_uses_firmware_motor(void)
 {
+    ADC_HandleTypeDef adc = {ADC1};
+    ADC_TypeDef other_adc = {ADC_FLAG_JEOS};
+    ADC_HandleTypeDef other_handle = {&other_adc};
     encoder_valid = true;
     current_valid = true;
     g_foc.fast_seq = 20U;
@@ -206,6 +210,16 @@ static bool test_hal_callback_uses_firmware_motor(void)
     last_pos_box = NULL;
 
     HAL_ADCEx_InjectedConvCpltCallback(NULL);
+    HAL_ADCEx_InjectedConvCpltCallback(&other_handle);
+    axdr_test_adc1.flags = 0U;
+    HAL_ADCEx_InjectedConvCpltCallback(&adc);
+    if (!expect_true(event_count == 0U && g_foc.fast_seq == 20U,
+                     "空句柄、其他 ADC 和未完成序列不能执行控制周期。"))
+    {
+        return false;
+    }
+    axdr_test_adc1.flags = ADC_FLAG_JEOS;
+    HAL_ADCEx_InjectedConvCpltCallback(&adc);
 
     return expect_true(event_count == EVENT_COUNT_PER_CYCLE,
                        "ADC 回调应触发一次完整快速周期。") &&

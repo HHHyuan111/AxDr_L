@@ -9,8 +9,17 @@
 #define __I volatile const
 #endif
 
-/* target_irq.c 的 HAL 回调在 Host 测试中只需要该句柄的不完整类型。 */
-typedef struct ADC_HandleTypeDef ADC_HandleTypeDef;
+/* 回调门槛的最小替身：区分 ADC 实例及注入序列完成标志。 */
+typedef struct {
+    unsigned flags;
+} ADC_TypeDef;
+typedef struct ADC_HandleTypeDef {
+    ADC_TypeDef *Instance;
+} ADC_HandleTypeDef;
+extern ADC_TypeDef axdr_test_adc1;
+#define ADC1 (&axdr_test_adc1)
+#define ADC_FLAG_JEOS (1U << 6)
+#define __HAL_ADC_GET_FLAG(handle, flag) ((handle)->Instance->flags & (flag))
 
 /* NVIC 最小替身：仅满足 target_irq.c 主机编译（优先级表逻辑本身不在宿主验证范围）。 */
 typedef enum

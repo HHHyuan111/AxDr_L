@@ -179,10 +179,10 @@ static int test_foc_core_migration_equivalence(void)
         {0.0f, -0.0f, 0.0f, 6.28318530716f}
     };
     static const foc_voltage_t voltages[] = {
-        {0.4f, -0.2f, 0.04f},
-        {-1.5f, 2.0f, 0.03f},
-        {20.0f, 20.0f, 0.10f},
-        {0.0f, -0.0f, 0.05f}
+        {.vd = 0.4f, .vq = -0.2f, .inv_vbus = 0.04f},
+        {.vd = -1.5f, .vq = 2.0f, .inv_vbus = 0.03f},
+        {.vd = 20.0f, .vq = 20.0f, .inv_vbus = 0.10f},
+        {.vd = 0.0f, .vq = -0.0f, .inv_vbus = 0.05f}
     };
     size_t index;
 
@@ -279,6 +279,60 @@ static int test_deadtime_compensation_is_bounded_and_continuous(void)
         }
     }
 
+    return 1;
+}
+
+static int test_deadtime_configuration_and_polarity(void)
+{
+    const foc_sample_t sample = {3.0f, -1.0f, -2.0f, 0.0f};
+    foc_voltage_t voltage = {
+        .inv_vbus = 1.0f / 24.0f,
+        .deadtime = {
+            .enabled = true,
+            .deadtime_s = 0.5e-6f,
+            .pwm_period_s = 50.0e-6f,
+            .current_blend_a = 0.5f,
+            .polarity = -1.0f,
+            .max_duty_delta = 0.003f,
+        },
+    };
+    foc_frame_t frame;
+    foc_duty_t negative;
+    foc_duty_t positive;
+    foc_duty_t disabled;
+    foc_core_prepare(&sample, &frame);
+    if (!foc_core_modulate(&frame, &voltage, &negative)) return 0;
+    voltage.deadtime.polarity = 1.0f;
+    if (!foc_core_modulate(&frame, &voltage, &positive)) return 0;
+    voltage.deadtime.enabled = false;
+    if (!foc_core_modulate(&frame, &voltage, &disabled)) return 0;
+    if (!expect_close("死区补偿触及限幅", negative.duty_a, 0.497f) ||
+        !expect_close("死区补偿反向极性", positive.duty_a, 0.503f) ||
+        !expect_close("死区补偿关闭保持中性", disabled.duty_a, 0.5f) ||
+        !expect_close("B 相极性反转", negative.duty_b + positive.duty_b, 1.0f) ||
+        !expect_close("C 相极性反转", negative.duty_c + positive.duty_c, 1.0f)) {
+        return 0;
+    }
+    const foc_deadtime_config_t valid = voltage.deadtime;
+    for (int invalid = 0; invalid < 7; ++invalid) {
+        foc_duty_t result;
+        voltage.deadtime = valid;
+        voltage.deadtime.enabled = true;
+        switch (invalid) {
+            case 0: voltage.deadtime.deadtime_s = NAN; break;
+            case 1: voltage.deadtime.pwm_period_s = 0.0f; break;
+            case 2: voltage.deadtime.deadtime_s = voltage.deadtime.pwm_period_s; break;
+            case 3: voltage.deadtime.current_blend_a = 0.0f; break;
+            case 4: voltage.deadtime.polarity = 0.5f; break;
+            case 5: voltage.deadtime.max_duty_delta = -1.0f; break;
+            default: voltage.deadtime.polarity = INFINITY; break;
+        }
+        if (!foc_core_modulate(&frame, &voltage, &result) ||
+            memcmp(&result, &disabled, sizeof(result)) != 0) {
+            fprintf(stderr, "非法补偿配置 %d 未保持关闭路径。\n", invalid);
+            return 0;
+        }
+    }
     return 1;
 }
 
@@ -546,6 +600,9 @@ int main(void)
 
     if (!test_deadtime_compensation_is_bounded_and_continuous()) {
         return 13;
+    }
+    if (!test_deadtime_configuration_and_polarity()) {
+        return 14;
     }
 
     if (!test_pure_transform_interface()) {

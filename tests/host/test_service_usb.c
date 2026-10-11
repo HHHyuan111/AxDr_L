@@ -33,6 +33,14 @@ bool drive_fault_clear(foc_t *foc)
 }
 
 static int fail_count;
+/* 本测试只检查帧同步，不验证用户 WIP 的电流 PI 恢复路径。 */
+void cur_pi_init(foc_t *foc)
+{
+    (void)foc;
+    fprintf(stderr, "USB 帧测试意外进入未覆盖的电流 PI 恢复路径。\n");
+    fail_count++;
+}
+
 static void expect(const char *name, bool cond)
 {
     if (!cond)

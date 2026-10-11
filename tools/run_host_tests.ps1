@@ -539,7 +539,7 @@ Write-Host "Host C11/在线磁链观测器适配测试通过。"
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
-        "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" `
+        "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" "-I$serviceDirEarly" "-I$appDir" `
         $driveDiagTestSource $driveDiagSource $focCoreSource `
         $svmSource $transformSource `
         -o $driveDiagExecutablePath -lm 2>&1 |

@@ -267,6 +267,7 @@ static bool test_startup_direction_mismatch_stops(void)
         TEST_EVENT_PWM_STOP,
         TEST_EVENT_RESET
     };
+    static const test_event_e run_events[] = {TEST_EVENT_RUN_MODE};
     foc_t foc = {
         .req = DRIVE_REQ_RUN,
         .state = DRIVE_STATE_RUN,
@@ -286,10 +287,22 @@ static bool test_startup_direction_mismatch_stops(void)
     test_reset_fakes();
     for (int index = 0; index < 8; index++)
     {
+        test_reset_fakes();
         drive_fast_step(&foc);
         if (foc.state == DRIVE_STATE_FAULT)
         {
+            if (!test_expect(index == 4,
+                             "1 kHz 下连续反向反馈应在第五个样本触发保护。"))
+            {
+                return false;
+            }
             break;
+        }
+        if (!test_expect_events(run_events, 1U) ||
+            !test_expect(foc.pwm_active && foc.fault.all == 0U,
+                         "达到保护持续时间前应保持正常运行且无故障。"))
+        {
+            return false;
         }
     }
 
