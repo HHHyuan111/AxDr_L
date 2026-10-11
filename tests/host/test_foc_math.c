@@ -222,6 +222,66 @@ static int test_foc_core_migration_equivalence(void)
     return 1;
 }
 
+static int test_deadtime_compensation_is_bounded_and_continuous(void)
+{
+    const foc_sample_t sample = {1.0f, -0.5f, -0.5f, 0.0f};
+    const foc_voltage_t base_voltage = {
+        .vd = 0.0f,
+        .vq = 0.0f,
+        .inv_vbus = 0.05f,
+    };
+    const foc_voltage_t compensated_voltage = {
+        .vd = 0.0f,
+        .vq = 0.0f,
+        .inv_vbus = 0.05f,
+        .deadtime = {
+            .enabled = true,
+            .deadtime_s = 0.5e-6f,
+            .pwm_period_s = 50.0e-6f,
+            .current_blend_a = 0.5f,
+            .polarity = -1.0f,
+            .max_duty_delta = 0.015f,
+        },
+    };
+    foc_frame_t frame;
+    foc_duty_t base;
+    foc_duty_t compensated;
+
+    foc_core_prepare(&sample, &frame);
+    if (!foc_core_modulate(&frame, &base_voltage, &base) ||
+        !foc_core_modulate(&frame, &compensated_voltage, &compensated)) {
+        fprintf(stderr, "死区补偿测试的零电压 SVM 不应失败。\n");
+        return 0;
+    }
+
+    if (fabsf(compensated.duty_a - base.duty_a) > 0.015001f ||
+        fabsf(compensated.duty_b - base.duty_b) > 0.015001f ||
+        fabsf(compensated.duty_c - base.duty_c) > 0.015001f ||
+        compensated.duty_a < 0.0f || compensated.duty_a > 1.0f ||
+        compensated.duty_b < 0.0f || compensated.duty_b > 1.0f ||
+        compensated.duty_c < 0.0f || compensated.duty_c > 1.0f) {
+        fprintf(stderr, "死区补偿超出每相限幅。\n");
+        return 0;
+    }
+
+    /* 过零附近应连续，不能用 sign(current) 造成一个整步跳变。 */
+    {
+        foc_sample_t near_zero = {0.001f, -0.0005f, -0.0005f, 0.0f};
+        foc_frame_t near_zero_frame;
+        foc_duty_t near_zero_duty;
+        foc_core_prepare(&near_zero, &near_zero_frame);
+        if (!foc_core_modulate(&near_zero_frame,
+                               &compensated_voltage,
+                               &near_zero_duty) ||
+            fabsf(near_zero_duty.duty_a - 0.5f) > 0.0002f) {
+            fprintf(stderr, "死区补偿过零 blend 不连续。\n");
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 static int test_sin_cos_migration_equivalence(void)
 {
     static const float theta_cases[] = {
@@ -482,6 +542,10 @@ int main(void)
 
     if (!test_foc_core_migration_equivalence()) {
         return 5;
+    }
+
+    if (!test_deadtime_compensation_is_bounded_and_continuous()) {
+        return 13;
     }
 
     if (!test_pure_transform_interface()) {

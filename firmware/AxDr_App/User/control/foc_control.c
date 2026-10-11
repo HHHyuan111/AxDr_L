@@ -86,6 +86,7 @@ PLATFORM_FAST_CODE bool foc_ctrl_step(foc_ctrl_t *ctrl,
         .vd = ctrl->vd,
         .vq = ctrl->vq,
         .inv_vbus = fb->inv_vbus,
+        .deadtime = ctrl->deadtime,
     };
 
     out->vd = ctrl->vd;

@@ -276,6 +276,14 @@ static _RAM_FUNC bool foc_ctrl_run(
         .vq = foc->out.vq,
         .iq_ref = foc->ref.iq_lim,
         .spd_ref = foc->ref.spd_r_lim,
+        .deadtime = {
+            .enabled = (DRIVE_DEADTIME_COMPENSATION_ENABLE != 0),
+            .deadtime_s = foc->board.dead_time * 1.0e-6f,
+            .pwm_period_s = foc->rate.foc_ts,
+            .current_blend_a = DRIVE_DEADTIME_CURRENT_BLEND_A,
+            .polarity = DRIVE_DEADTIME_COMPENSATION_POLARITY,
+            .max_duty_delta = DRIVE_DEADTIME_MAX_DUTY_DELTA,
+        },
     };
     const foc_fb_t fb = {
         .sample = {

@@ -38,9 +38,20 @@ typedef struct
  */
 typedef struct
 {
+    bool enabled;       /* 仅在完成极性/采样验证后开启。 */
+    float deadtime_s;   /* 有效补偿死区，单位 s。 */
+    float pwm_period_s; /* PWM 周期，单位 s。 */
+    float current_blend_a; /* 过零连续化电流尺度，单位 A。 */
+    float polarity;     /* 功率级极性，必须为 +1 或 -1。 */
+    float max_duty_delta; /* 每相最大补偿占空比，单位 pu。 */
+} foc_deadtime_config_t;
+
+typedef struct
+{
     float vd;       /* d 轴电压。 */
     float vq;       /* q 轴电压。 */
     float inv_vbus; /* 现有 SVPWM 使用的母线电压归一化系数。 */
+    foc_deadtime_config_t deadtime;
 } foc_voltage_t;
 
 /**

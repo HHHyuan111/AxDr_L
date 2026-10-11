@@ -18,6 +18,12 @@
 #define DRIVE_VBUS_DIVIDER_LOW_OHM            (1000.0f)
 #define DRIVE_HARDWARE_DEADTIME_US            (0.5f)
 
+/* 死区补偿候选参数。默认关闭，完成功率级极性和实测 A/B 对照后再开启。 */
+#define DRIVE_DEADTIME_COMPENSATION_ENABLE    (0)
+#define DRIVE_DEADTIME_COMPENSATION_POLARITY  (-1.0f)
+#define DRIVE_DEADTIME_CURRENT_BLEND_A        (0.5f)
+#define DRIVE_DEADTIME_MAX_DUTY_DELTA         (0.015f)
+
 /* 驱动保护阈值。 */
 #define DRIVE_UNDER_VOLTAGE_V                 (15.0f)
 #define DRIVE_OVER_VOLTAGE_V                  (60.0f)

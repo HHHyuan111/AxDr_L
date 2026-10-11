@@ -39,6 +39,7 @@ typedef struct
     float vq;
     float iq_ref;
     float spd_ref;
+    foc_deadtime_config_t deadtime;
 } foc_ctrl_t;
 
 /**
