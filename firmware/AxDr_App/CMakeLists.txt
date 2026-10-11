@@ -50,6 +50,7 @@ set(AXDR_USER_SOURCES
     User/service/axdr_safety_runtime.c
     User/service/service_usb.c
     User/service/service_command.c
+    User/service/service_scope.c
     User/service/service_telemetry.c
     User/service/service_param_store.c
     User/adapter/encoder_adapter.c
@@ -148,10 +149,16 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
     # 快速周期函数按设计从 Flash 复制到可写 RAM 执行；STM32G4 没有进程级
-    # 可执行内存权限边界，因此只关闭 GNU ld 针对该嵌入式布局的通用提示。
-    target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
-        "LINKER:--no-warn-rwx-segments"
-    )
+    # 可执行内存权限边界，因此在支持该 GNU ld 选项的工具链上关闭提示。
+    # Arm GNU/旧版 MinGW 链接器没有该选项，不能无条件塞进正式构建。
+    include(CheckLinkerFlag)
+    check_linker_flag(C "-Wl,--no-warn-rwx-segments"
+                      AXDR_LINKER_SUPPORTS_NO_WARN_RWX_SEGMENTS)
+    if(AXDR_LINKER_SUPPORTS_NO_WARN_RWX_SEGMENTS)
+        target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
+            "LINKER:--no-warn-rwx-segments"
+        )
+    endif()
 endif()
 
 add_custom_command(
