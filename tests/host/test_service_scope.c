@@ -22,6 +22,8 @@
 #include "axdr_command_contract.h"
 #include "axdr_command_core.h"
 #include "axdr_scope_contract.h"
+#include "axdr_observation_contract.h"
+#include "service_observation.h"
 #include "common.h"
 #include "diag_runtime.h"
 #include "drive_diag.h"
@@ -54,10 +56,23 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
     forwarded_len = request_payload_length;
     if (opcode == AXDR_OPCODE_GET_PROTOCOL_INFO)
     {
-        /* 最小 protocol_info：capability/mask 全 0，专验 route 补位 */
-        memset(response_payload, 0, sizeof(axdr_protocol_info_payload_t));
+        axdr_protocol_info_payload_t info;
+        memset(&info, 0, sizeof(info));
+        info.capability_flags = AXDR_CAPABILITY_HIGH_RATE_USB_SCOPE |
+                                AXDR_CAPABILITY_SCOPE_SIGNAL_DIRECTORY | 1u;
+        info.supported_opcode_mask = 0xF8000001u;
+        memcpy(response_payload, &info, sizeof(info));
         *response_payload_length =
             (uint16_t)sizeof(axdr_protocol_info_payload_t);
+    }
+    else if (opcode == AXDR_OPCODE_GET_DEVICE_INFO)
+    {
+        axdr_device_info_payload_t info;
+        memset(&info, 0, sizeof(info));
+        info.device_family = 0x12345678u;
+        info.firmware_patch = 6u;
+        memcpy(response_payload, &info, sizeof(info));
+        *response_payload_length = sizeof(info);
     }
     else
     {
@@ -83,13 +98,14 @@ static int nearf(float a, float b, float tolerance)
 
 static uint8_t tx_buf[256];
 static uint16_t tx_len;
-static void tx_stub(const uint8_t *data, uint16_t length)
+static int tx_stub(const uint8_t *data, uint16_t length)
 {
     if (length <= sizeof(tx_buf))
     {
         memcpy(tx_buf, data, length);
         tx_len = length;
     }
+    return 0;
 }
 
 static void send_frame(const uint8_t *payload, uint16_t payload_length,
@@ -195,19 +211,31 @@ int main(void)
     g_foc.motor.Ld = 100.0e-6f;
     g_foc.motor.Lq = 110.0e-6f;
     service_usb_bind_tx(tx_stub);
+    service_observation_init();
 
-    /* 1) 0x01：capability/mask 补位广播（转发后 OR，CRC 已由 core 重算） */
+    /* 1) 新被动能力独立广播，旧主动扫频不能误报成高速观测。 */
     send_frame(NULL, 0u, 1u, AXDR_OPCODE_GET_PROTOCOL_INFO);
     expect("proto reason", reason() == AXDR_REASON_NONE);
     expect("proto forwarded", forwarded_opcode == AXDR_OPCODE_GET_PROTOCOL_INFO);
-    expect("proto cap17/18",
+    expect("proto old scope caps removed",
            (rd_u32(resp_payload(), 12u) &
             (AXDR_CAPABILITY_HIGH_RATE_USB_SCOPE |
-             AXDR_CAPABILITY_SCOPE_SIGNAL_DIRECTORY)) ==
-               (AXDR_CAPABILITY_HIGH_RATE_USB_SCOPE |
-                AXDR_CAPABILITY_SCOPE_SIGNAL_DIRECTORY));
-    expect("proto mask bit27-31",
-           (rd_u32(resp_payload(), 16u) & 0xF8000000u) == 0xF8000000u);
+             AXDR_CAPABILITY_SCOPE_SIGNAL_DIRECTORY)) == 0u);
+    expect("proto passive observation capability",
+           (rd_u32(resp_payload(), 12u) & AXDR_CAPABILITY_PASSIVE_OBSERVATION) != 0u);
+    expect("proto old mask removed",
+           (rd_u32(resp_payload(), 16u) & 0xF8000000u) == 0u);
+    expect("other capabilities preserved", (rd_u32(resp_payload(), 12u) & 1u) == 1u);
+    expect("other opcode bits preserved", (rd_u32(resp_payload(), 16u) & 1u) == 1u);
+    send_frame(NULL, 0u, 1000u, AXDR_OPCODE_GET_DEVICE_INFO);
+    expect("device preserved", rd_u32(resp_payload(), 0u) == 0x12345678u);
+    expect("observation firmware identity", rd_u16(resp_payload(), 8u) == 0u && rd_u16(resp_payload(), 10u) == 7u && rd_u16(resp_payload(), 12u) == 7u && rd_u32(resp_payload(), 20u) == 0x20261013u);
+    memset(dir_req, 0, sizeof(dir_req));
+    dir_req[0] = 16u;
+    dir_req[2] = 2u;
+    send_frame(dir_req, sizeof(dir_req), 1001u, AXDR_OPCODE_OBSERVATION_DIRECTORY);
+    expect("new passive directory routed", reason() == AXDR_REASON_NONE && rd_u16(resp_payload(), 2u) == 17u && rd_u16(resp_payload(), 8u) == 32u);
+    expect("passive query never starts sweep", g_diag.active == false);
 
     /* 2) 0x1B 合法配置：q 轴 20-1000Hz 11 点 0.2A（真门面暂存） */
     memset(&cfg, 0, sizeof(cfg));

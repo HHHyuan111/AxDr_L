@@ -17,6 +17,8 @@
 #include "diag_runtime.h"
 #include "drive_diag.h"
 #include "service_command.h"
+#include "axdr_observation_contract.h"
+#include "service_observation.h"
 
 /* 单会话句柄：无多会话管理，固定值供宿主做请求/应答一致性校验 */
 #define SCOPE_SWEEP_ID 0x53574550u /* "PWSE" 小端 */
@@ -481,6 +483,16 @@ uint8_t service_scope_route(void *context, uint16_t opcode,
 {
     uint8_t reason;
 
+    if ((opcode >= AXDR_OPCODE_OBSERVATION_CONFIGURE) &&
+        (opcode <= AXDR_OPCODE_OBSERVATION_CANCEL))
+    {
+        return service_observation_route(context, opcode, request_payload,
+                                         request_payload_length,
+                                         response_payload,
+                                         response_payload_capacity,
+                                         response_payload_length, ack_state);
+    }
+
     if ((opcode >= AXDR_OPCODE_CONFIGURE_SCOPE_STREAM) &&
         (opcode <= AXDR_OPCODE_GET_SCOPE_SIGNAL_DIRECTORY))
     {
@@ -495,17 +507,30 @@ uint8_t service_scope_route(void *context, uint16_t opcode,
                                       response_payload_capacity,
                                       response_payload_length, ack_state);
 
-    /* GET_PROTOCOL_INFO 应答补扫频 capability/mask：拦截发生在组帧前，
-     * CRC 由 core 按改后 payload 重算。WIP 合入后迁回 service_command.c。 */
+    /* 旧 0x1B～0x1F 仍兼容扫频，但不能广播成被动高速波形。
+     * 新能力独立声明，CRC 由 core 按改后 payload 重算。 */
     if ((opcode == AXDR_OPCODE_GET_PROTOCOL_INFO) &&
         (reason == AXDR_REASON_NONE) &&
         (*response_payload_length >= sizeof(axdr_protocol_info_payload_t)))
     {
         axdr_protocol_info_payload_t info;
         memcpy(&info, response_payload, sizeof(info));
-        info.capability_flags |= AXDR_CAPABILITY_HIGH_RATE_USB_SCOPE |
-                                 AXDR_CAPABILITY_SCOPE_SIGNAL_DIRECTORY;
-        info.supported_opcode_mask |= 0xF8000000u; /* bit27-31 = 0x1B..0x1F */
+        info.capability_flags &= ~(AXDR_CAPABILITY_HIGH_RATE_USB_SCOPE |
+                                   AXDR_CAPABILITY_SCOPE_SIGNAL_DIRECTORY);
+        info.capability_flags |= AXDR_CAPABILITY_PASSIVE_OBSERVATION;
+        info.supported_opcode_mask &= ~0xF8000000u;
+        memcpy(response_payload, &info, sizeof(info));
+    }
+    if ((opcode == AXDR_OPCODE_GET_DEVICE_INFO) &&
+        (reason == AXDR_REASON_NONE) &&
+        (*response_payload_length >= sizeof(axdr_device_info_payload_t)))
+    {
+        axdr_device_info_payload_t info;
+        memcpy(&info, response_payload, sizeof(info));
+        info.firmware_major = 0u;
+        info.firmware_minor = 7u;
+        info.firmware_patch = 7u;
+        info.build_id = 0x20261013u;
         memcpy(response_payload, &info, sizeof(info));
     }
     return reason;

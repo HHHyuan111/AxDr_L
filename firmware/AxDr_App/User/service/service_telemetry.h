@@ -19,7 +19,7 @@
 
 typedef axdr_telemetry_v1_frame_t service_telemetry_frame_t;
 
-/** @brief 发送缝返回值：0=已提交，1=忙（保留重试），其他=错误（丢弃）。 */
+/** @brief 发送缝必须复制数据：0=已复制接收，可复用源缓冲；1=忙，其他=错误。 */
 typedef int (*service_telemetry_tx_fn)(const uint8_t *data, uint16_t length);
 
 /** @brief 复位序列号/计数/队列。 */

@@ -20,6 +20,7 @@ extern ADC_TypeDef axdr_test_adc1;
 #define ADC1 (&axdr_test_adc1)
 #define ADC_FLAG_JEOS (1U << 6)
 #define __HAL_ADC_GET_FLAG(handle, flag) ((handle)->Instance->flags & (flag))
+extern unsigned SystemCoreClock;
 
 /* NVIC 最小替身：仅满足 target_irq.c 主机编译（优先级表逻辑本身不在宿主验证范围）。 */
 typedef enum

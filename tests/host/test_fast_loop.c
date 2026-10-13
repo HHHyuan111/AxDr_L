@@ -10,6 +10,7 @@
 #include "common.h"
 #include "fast_loop.h"
 #include "main.h"
+#include "target_irq_profile.h"
 
 typedef enum
 {
@@ -28,6 +29,13 @@ typedef enum
 
 foc_t g_foc;
 ADC_TypeDef axdr_test_adc1;
+unsigned SystemCoreClock = 160000000u;
+static unsigned observation_calls;
+
+void service_observation_capture(void)
+{
+    ++observation_calls;
+}
 
 static fast_event_e events[EVENT_CAPACITY];
 static size_t event_count;
@@ -213,7 +221,7 @@ static bool test_hal_callback_uses_firmware_motor(void)
     HAL_ADCEx_InjectedConvCpltCallback(&other_handle);
     axdr_test_adc1.flags = 0U;
     HAL_ADCEx_InjectedConvCpltCallback(&adc);
-    if (!expect_true(event_count == 0U && g_foc.fast_seq == 20U,
+    if (!expect_true(event_count == 0U && g_foc.fast_seq == 20U && observation_calls == 0U,
                      "空句柄、其他 ADC 和未完成序列不能执行控制周期。"))
     {
         return false;
@@ -221,7 +229,7 @@ static bool test_hal_callback_uses_firmware_motor(void)
     axdr_test_adc1.flags = ADC_FLAG_JEOS;
     HAL_ADCEx_InjectedConvCpltCallback(&adc);
 
-    return expect_true(event_count == EVENT_COUNT_PER_CYCLE,
+    return expect_true(event_count == EVENT_COUNT_PER_CYCLE && observation_calls == 1U,
                        "ADC 回调应触发一次完整快速周期。") &&
            expect_cycle_events(0U) &&
            expect_true(g_foc.fast_seq == 21U,
@@ -254,6 +262,29 @@ int main(void)
     if (!test_hal_callback_uses_firmware_motor())
     {
         return 4;
+    }
+
+    /* 周期计数自然回绕、超期及间隔异常分别记账，不把间隔异常称为漏采。 */
+    {
+        target_irq_profile_t profile;
+        if (!expect_true(target_irq_profile_begin(0xfffff000u, 0u) == 0u,
+                         "首拍没有已知间隔异常。")) return 5;
+        target_irq_profile_end(0xfffff000u, 0xfffff100u);
+        if (!expect_true(target_irq_profile_begin(0x00000f40u, 1u) == 1u,
+                         "ADC 溢出必须在本拍采集前报告。")) return 5;
+        target_irq_profile_end(0x00000f40u, 0x00002e80u);
+        if (!expect_true(target_irq_profile_begin(0x00004dc0u, 0u) == 1u,
+                         "入口间隔异常必须在本拍采集前报告。")) return 5;
+        target_irq_profile_end(0x00004dc0u, 0x00004ec0u);
+        target_irq_profile_read(&profile);
+        if (!expect_true(profile.count == 3u && profile.last_cycles == 256u &&
+                         profile.max_cycles == 8000u && profile.overruns == 1u &&
+                         profile.gap_count == 1u && profile.max_interval_cycles == 16000u &&
+                         profile.adc_overruns == 1u && profile.core_clock_hz == 160000000u,
+                         "中断计时应正确处理回绕、50微秒超期和75微秒以上间隔。"))
+        {
+            return 5;
+        }
     }
 
     return 0;

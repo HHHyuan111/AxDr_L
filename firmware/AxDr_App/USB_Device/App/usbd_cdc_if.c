@@ -23,6 +23,7 @@
 
 /* USER CODE BEGIN INCLUDE */
 #include "service_usb.h"
+#include "service_usb_tx.h"
 /* USER CODE END INCLUDE */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -155,6 +156,8 @@ static int8_t CDC_Init_FS(void)
   /* Set Application Buffers */
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, 0);
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
+  service_usb_reset_link();
+  service_usb_tx_set_link(1u);
   return (USBD_OK);
   /* USER CODE END 3 */
 }
@@ -166,6 +169,9 @@ static int8_t CDC_Init_FS(void)
 static int8_t CDC_DeInit_FS(void)
 {
   /* USER CODE BEGIN 4 */
+  /* CDC 类驱动已关闭端点，此时才可释放尚未完成的发送槽。 */
+  service_usb_tx_set_link(0u);
+  service_usb_reset_link();
   return (USBD_OK);
   /* USER CODE END 4 */
 }
@@ -290,6 +296,9 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 7 */
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
+  if ((hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED) || (hcdc == NULL)) {
+    return USBD_FAIL;
+  }
   if (hcdc->TxState != 0){
     return USBD_BUSY;
   }
@@ -315,8 +324,7 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
 {
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 13 */
-  UNUSED(Buf);
-  UNUSED(Len);
+  service_usb_tx_complete(Buf, (uint16_t)*Len);
   UNUSED(epnum);
   /* USER CODE END 13 */
   return result;

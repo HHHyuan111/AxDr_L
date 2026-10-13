@@ -590,6 +590,8 @@ $serviceTelemetrySource = Join-Path $serviceDir "service_telemetry.c"
 $serviceCommandTestSource = Join-Path $testDir "test_service_command.c"
 $serviceCommandSource = Join-Path $serviceDir "service_command.c"
 $serviceScopeSource = Join-Path $serviceDir "service_scope.c"
+$serviceObservationSource = Join-Path $serviceDir "service_observation.c"
+$serviceUsbTxSource = Join-Path $serviceDir "service_usb_tx.c"
 $diagnosticCoreDir = Join-Path $repoRoot "firmware/AxDr_App/User/diagnostic/core"
 $diagnosticCoreSources = @(
     "$diagnosticCoreDir/mc_common.c",
@@ -612,7 +614,7 @@ $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" "-I$diagnosticIncludeDir" `
-        $serviceCommandTestSource $serviceUsbSource $serviceCommandSource $serviceScopeSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
+        $serviceCommandTestSource $serviceUsbSource $serviceCommandSource $serviceScopeSource $serviceObservationSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
         $diagnosticCoreSources `
         -o $serviceCommandExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -629,7 +631,7 @@ $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" "-I$diagnosticIncludeDir" `
-        $serviceScopeTestSource $serviceUsbSource $serviceScopeSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
+        $serviceScopeTestSource $serviceUsbSource $serviceScopeSource $serviceObservationSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
         $diagnosticCoreSources `
         -o $serviceScopeExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -680,7 +682,7 @@ $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
         "-I$motorDir" "-I$driveDir" "-I$adapterDir" "-I$bspIncludeDir" "-I$diagnosticIncludeDir" `
-        $serviceUsbTestSource $serviceUsbSource $serviceCommandSource $serviceScopeSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
+        $serviceUsbTestSource $serviceUsbSource $serviceCommandSource $serviceScopeSource $serviceObservationSource $axdrCommandCoreSource $axdrSafetyRuntimeSource $serviceTelemetrySource `
         $diagnosticCoreSources `
         -o $serviceUsbExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -689,6 +691,29 @@ if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; th
 & $serviceUsbExecutablePath
 if ($LASTEXITCODE -ne 0) { throw "service_usb 测试运行失败" }
 Write-Host "Host C11/USB 薄缝与帧同步测试通过。"
+
+foreach ($testName in @('test_service_usb_tx', 'test_usb_cdc_bridge')) {
+    $testSource = Join-Path $testDir "$testName.c"
+    $testExecutable = Join-Path $outputDir "$testName.exe"
+    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+        "-I$serviceDir" $testSource $serviceUsbTxSource -o $testExecutable
+    if ($LASTEXITCODE -ne 0) { throw "$testName 编译失败" }
+    & $testExecutable
+    if ($LASTEXITCODE -ne 0) { throw "$testName 运行失败" }
+    Write-Host "Host C11/$testName 异步发送所有权检查通过。"
+}
+
+$observationExecutable = Join-Path $outputDir 'test_service_observation.exe'
+& $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+    "-I$serviceDir" "-I$focFakeIncludeDir" "-I$commonDir" "-I$configDir" `
+    "-I$controlDir" "-I$algorithmDir" "-I$motorDir" "-I$driveDir" `
+    "-I$adapterDir" "-I$bspIncludeDir" "-I$diagnosticIncludeDir" `
+    (Join-Path $testDir 'test_service_observation.c') $serviceObservationSource `
+    $axdrCommandCoreSource -o $observationExecutable -lm
+if ($LASTEXITCODE -ne 0) { throw '被动观测测试编译失败' }
+& $observationExecutable
+if ($LASTEXITCODE -ne 0) { throw '被动观测测试运行失败' }
+Write-Host 'Host C11/四路采样、短窗冻结与被动观测协议检查通过。'
 
 $serviceCoreTestSource = Join-Path $testDir "test_service_core.c"
 $serviceCoreExecutablePath = Join-Path $outputDir "test_service_core.exe"

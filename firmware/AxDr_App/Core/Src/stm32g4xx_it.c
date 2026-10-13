@@ -22,6 +22,8 @@
 #include "stm32g4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "target_irq_profile.h"
+#include "service_observation.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -269,12 +271,23 @@ void DMA1_Channel4_IRQHandler(void)
 void ADC1_2_IRQHandler(void)
 {
   /* USER CODE BEGIN ADC1_2_IRQn 0 */
-
+  const uint32_t profile_enabled = DWT->CTRL & DWT_CTRL_CYCCNTENA_Msk;
+  const uint32_t start_cycles = DWT->CYCCNT;
+  const uint32_t adc_overrun = (ADC1->ISR | ADC2->ISR) &
+      (ADC_FLAG_OVR | ADC_FLAG_JQOVF);
+  if ((profile_enabled != 0u) &&
+      (target_irq_profile_begin(start_cycles, adc_overrun) != 0u))
+  {
+    service_observation_note_timing_gap();
+  }
   /* USER CODE END ADC1_2_IRQn 0 */
   HAL_ADC_IRQHandler(&hadc1);
   HAL_ADC_IRQHandler(&hadc2);
   /* USER CODE BEGIN ADC1_2_IRQn 1 */
-
+  if (profile_enabled != 0u)
+  {
+    target_irq_profile_end(start_cycles, DWT->CYCCNT);
+  }
   /* USER CODE END ADC1_2_IRQn 1 */
 }
 

@@ -33,12 +33,15 @@
 #include "foc.h"
 #include "drive_diag.h"
 #include "target_adc.h"
+#include "target_irq_profile.h"
 #include "modlue.h"
 #include "lcd.h"
 #include "service_command.h"
 #include "service_param_store.h"
 #include "service_telemetry.h"
 #include "service_usb.h"
+#include "service_usb_tx.h"
+#include "service_observation.h"
 #include "usbd_cdc_if.h"
 #include "axdr_command_contract.h"
 #include <string.h>
@@ -62,6 +65,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+static uint32_t observation_usb_generation;
+static uint32_t observation_stats_tick;
 
 /* USER CODE END PV */
 
@@ -81,43 +86,33 @@ static int usb_cdc_tx_status(const uint8_t *data, uint16_t length)
     return (status == USBD_OK) ? 0 : ((status == USBD_BUSY) ? 1 : 2);
 }
 
-/* 命令响应发送缝：CDC_Transmit_FS 只登记调用方指针、由 USB 中断异步
- * 分包取数，而 service_usb 的响应缓冲是 process_request 的栈帧——函数
- * 返回即失效。>64B 的响应（电机档案 104B/控制限幅 108B）第 2 包起读
- * 到的是复用后的栈垃圾：CRC 必错，宿主静默丢弃后必然 ACK 超时。
- * （≤64B 单包在返回前已整体装入端点 FIFO，故旧版只有长响应出错；
- * 遥测帧的 pending 缓冲是静态的，不受影响。）拷入静态帧再交 CDC。 */
-static uint8_t command_tx_frame[AXDR_COMMAND_MAX_RESPONSE_SIZE];
-/* 命令响应与遥测共用同一个 CDC 单发送槛（hcdc->TxState）。遥测走
- * service_telemetry_poll 高频压发，命令响应若恰好撞上 TxState 忙，
- * CDC_Transmit_FS 直接回 USBD_BUSY——旧版本在此处 (void) 丢弃，
- * 宿主侧必然 ACK 超时（GetLinkDiagnostics 轮询频率高，撞车概率
- * 最大，表现为该命令持续超时；GetControlState 偶发）。
- * 本函数运行在主循环（service_usb_poll），非中断上下文，短暂自旋
- * 等 TxState 让出是安全的：单包 CDC 发送通常几十到几百微秒完成，
- * 不阻塞任何中断，不影响定时器中断里的 FOC 控制环。 */
-#define USB_CDC_TX_BUSY_RETRY_LIMIT 64u
-static void usb_cdc_tx(const uint8_t *data, uint16_t length)
+/* 队列和 CDC 回调共享少量状态，仅屏蔽 USB IRQ，不屏蔽 20 kHz ADC 控制环。 */
+static uint32_t usb_tx_lock(void)
 {
-    uint32_t retry;
+    const uint32_t enabled = NVIC_GetEnableIRQ(USB_LP_IRQn);
+    NVIC_DisableIRQ(USB_LP_IRQn);
+    __DSB();
+    __ISB();
+    return enabled;
+}
 
-    if (length == 0u || length > sizeof(command_tx_frame))
+static void usb_tx_unlock(uint32_t enabled)
+{
+    __DMB();
+    if (enabled != 0u)
     {
-        return;
+        NVIC_EnableIRQ(USB_LP_IRQn);
     }
-    memcpy(command_tx_frame, data, length);
-    for (retry = 0u; retry < USB_CDC_TX_BUSY_RETRY_LIMIT; ++retry)
-    {
-        const int status = usb_cdc_tx_status(command_tx_frame, length);
-        if (status != 1)
-        {
-            /* 0=已登记发送 / 2=其他错误（非忙碌，重试无意义） */
-            return;
-        }
-        /* status==1：USBD_BUSY，上一包（通常是遥测）仍占用 TxState */
-    }
-    /* 重试耗尽仍忙：放弃本次响应，行为退化为旧版（宿主侧重试兜底），
-     * 不在此处死等，避免极端情况下拖慢主循环其他 poll。 */
+}
+
+static int usb_command_tx(const uint8_t *data, uint16_t length)
+{
+    const uint32_t enabled = usb_tx_lock();
+    /* 命令处理可被 USB 复位打断；检查与入队之间不能跨越连接切换。 */
+    const int result = service_usb_response_is_current() != 0u
+        ? service_usb_tx_enqueue_command(data, length) : 2;
+    usb_tx_unlock(enabled);
+    return result;
 }
 /* USER CODE END 0 */
 
@@ -145,6 +140,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+  service_usb_tx_init(usb_cdc_tx_status, usb_tx_lock, usb_tx_unlock);
 
   /* USER CODE END SysInit */
 
@@ -165,6 +161,11 @@ int main(void)
   HAL_TIM_Base_Start(&htim3);
   // HAL_TIM_Base_Start_IT(&htim1);
 
+  /* 调试器可能已开启 DWT。必须先归零时基再开 ADC IRQ，避免把归零
+   * 误记为一次超长采样间隔；此后不再改写周期计数器。 */
+  extern void target_time_init(void);
+  target_time_init();
+
   if (!target_adc_start())
   {
     Error_Handler();
@@ -173,8 +174,6 @@ int main(void)
   /* P2 冻结的中断优先级表与微秒时基（见 15 号规范）；须在全部外设初始化后应用。 */
   extern void target_irq_priority_apply(void);
   target_irq_priority_apply();
-  extern void target_time_init(void);
-  target_time_init();
 
   foc_init(&g_foc);
   /* S5 零位装载：须在 fast_loop_enable 之前——快环一开 START 即可进来。
@@ -188,8 +187,10 @@ int main(void)
   /* S4/S3 service 装配：发送缝绑定 + 遥测复位。CDC 收路径在
    * usbd_cdc_if.c 的 CDC_Receive_FS（USB 中断 → service_usb_rx 环）。 */
   service_telemetry_init();
-  service_usb_bind_tx(usb_cdc_tx);
-  service_telemetry_bind_tx(usb_cdc_tx_status);
+  service_observation_init();
+  service_usb_bind_tx(usb_command_tx);
+  service_telemetry_bind_tx(service_usb_tx_enqueue_data);
+  service_observation_bind_tx(service_usb_tx_enqueue_data);
 
   LCD_Init();
   LCD_Fill(0,0,LCD_W,LCD_H,BLACK);
@@ -206,8 +207,35 @@ int main(void)
      * 辨识档案落盘（on_finish 暂存，逐字段合并）。
      * 均设计为空转廉价；save 时页擦除约 22ms（Bank2 擦写不 stall Bank1 取指）。 */
     service_safety_poll();
+    {
+        const uint32_t generation = service_usb_tx_link_generation();
+        const uint32_t tick = HAL_GetTick();
+        if (generation != observation_usb_generation)
+        {
+            observation_usb_generation = generation;
+            service_observation_reset_link();
+        }
+        if ((uint32_t)(tick - observation_stats_tick) >= 50u)
+        {
+            service_usb_tx_stats_t tx;
+            target_irq_profile_t irq;
+            observation_stats_tick = tick;
+            service_usb_tx_get_stats(&tx);
+            target_irq_profile_read(&irq);
+            service_observation_set_tx_stats(tx.command_completed + tx.data_completed,
+                tx.submit_errors + tx.unexpected_completions +
+                    service_usb_stats()->tx_queue_full + service_usb_stats()->tx_errors,
+                tx.aborted_frames, tx.queue_peak);
+            service_observation_set_timing_stats(irq.last_cycles, irq.max_cycles,
+                irq.overruns, irq.core_clock_hz);
+            service_observation_set_irq_stats(irq.count, irq.gap_count,
+                irq.max_interval_cycles, irq.adc_overruns);
+        }
+    }
     service_usb_poll();
+    service_observation_poll();
     service_telemetry_poll();
+    service_usb_tx_poll();
     service_param_store_poll();
     service_param_store_ident_poll();
     /* USER CODE END WHILE */

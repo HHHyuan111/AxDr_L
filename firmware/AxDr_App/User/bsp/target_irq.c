@@ -8,6 +8,81 @@
 #include "foc.h"
 #include "main.h"
 #include "service_telemetry.h"
+#include "service_observation.h"
+#include "target_irq_profile.h"
+#include "board_config.h"
+
+static volatile target_irq_profile_t irq_profile;
+static volatile uint32_t irq_profile_guard;
+static uint32_t previous_irq_start;
+
+PLATFORM_FAST_CODE uint8_t target_irq_profile_begin(uint32_t start_cycles,
+                                                   uint32_t adc_overrun)
+{
+    const uint32_t period = SystemCoreClock / (uint32_t)DRIVE_FOC_FREQ_HZ;
+    uint8_t timing_gap = adc_overrun != 0u ? 1u : 0u;
+    ++irq_profile_guard;
+    if (irq_profile.count != 0u)
+    {
+        const uint32_t interval = start_cycles - previous_irq_start;
+        if (interval > irq_profile.max_interval_cycles)
+        {
+            irq_profile.max_interval_cycles = interval;
+        }
+        if (interval > period + period / 2u)
+        {
+            ++irq_profile.gap_count;
+            timing_gap = 1u;
+        }
+    }
+    previous_irq_start = start_cycles;
+    irq_profile.adc_overruns += adc_overrun != 0u ? 1u : 0u;
+    irq_profile.core_clock_hz = SystemCoreClock;
+    ++irq_profile.count;
+    ++irq_profile_guard;
+    return timing_gap;
+}
+
+PLATFORM_FAST_CODE void target_irq_profile_end(uint32_t start_cycles,
+                                               uint32_t end_cycles)
+{
+    const uint32_t elapsed = end_cycles - start_cycles;
+    const uint32_t period = SystemCoreClock / (uint32_t)DRIVE_FOC_FREQ_HZ;
+    ++irq_profile_guard;
+    irq_profile.last_cycles = elapsed;
+    if (elapsed > irq_profile.max_cycles)
+    {
+        irq_profile.max_cycles = elapsed;
+    }
+    if (elapsed >= period)
+    {
+        ++irq_profile.overruns;
+    }
+    ++irq_profile_guard;
+}
+
+void target_irq_profile_read(target_irq_profile_t *profile)
+{
+    uint32_t before;
+    uint32_t after;
+    if (profile == NULL)
+    {
+        return;
+    }
+    do
+    {
+        before = irq_profile_guard;
+        profile->count = irq_profile.count;
+        profile->last_cycles = irq_profile.last_cycles;
+        profile->max_cycles = irq_profile.max_cycles;
+        profile->overruns = irq_profile.overruns;
+        profile->gap_count = irq_profile.gap_count;
+        profile->max_interval_cycles = irq_profile.max_interval_cycles;
+        profile->adc_overruns = irq_profile.adc_overruns;
+        profile->core_clock_hz = irq_profile.core_clock_hz;
+        after = irq_profile_guard;
+    } while ((before != after) || ((after & 1u) != 0u));
+}
 
 /*
  * 中断优先级表（冻结，15 号规范）。
@@ -54,4 +129,5 @@ PLATFORM_FAST_CODE void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *ha
     /* 遥测抽取（20kHz 分频组帧，S4）。组装缝：与 fast_loop_step 同为先例——
      * 本文件是快速路径的装配点，service 不反向依赖 bsp。 */
     service_telemetry_capture();
+    service_observation_capture();
 }

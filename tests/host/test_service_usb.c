@@ -53,13 +53,23 @@ static void expect(const char *name, bool cond)
 /* tx 捕获 */
 static uint8_t tx_capture[256];
 static uint16_t tx_capture_len;
-static void tx_stub(const uint8_t *data, uint16_t length)
+static uint8_t refill_frame[64];
+static uint16_t refill_length;
+static uint16_t refills_remaining;
+static int tx_stub(const uint8_t *data, uint16_t length)
 {
     if (length <= sizeof(tx_capture))
     {
         memcpy(tx_capture, data, length);
         tx_capture_len = length;
     }
+    /* 模拟 USB 中断持续追加下一请求；给旧无界实现留有限上限，避免测试挂死。 */
+    if (refills_remaining != 0u)
+    {
+        --refills_remaining;
+        service_usb_rx(refill_frame, refill_length);
+    }
+    return 0;
 }
 
 static void reset_tx(void)
@@ -164,6 +174,47 @@ int main(void)
         service_usb_rx(frame, frame_length);
         service_usb_poll();
         expect("坏长度不卡死", true);
+    }
+
+    /* ---- 场景 7：连接复位后不拼接旧半帧，清理响应重试缓存 ---- */
+    service_usb_reset_link();
+    service_usb_poll();
+    reset_tx();
+    frame_length = make_frame(frame, 6u, AXDR_OPCODE_GET_RUNTIME_STATE);
+    service_usb_rx(frame, 10u);
+    service_usb_poll();
+    service_usb_reset_link();
+    service_usb_poll();
+    service_usb_rx(&frame[10u], (uint16_t)(frame_length - 10u));
+    service_usb_poll();
+    expect("重连不拼接旧半帧", tx_capture_len == 0u);
+    service_usb_rx(frame, frame_length);
+    service_usb_poll();
+    expect("重连后完整帧恢复", tx_capture_len >= AXDR_COMMAND_MIN_RESPONSE_SIZE);
+    expect("接收溢出有计数", service_usb_stats()->rx_dropped_bytes != 0u);
+    expect("连接复位有计数", service_usb_stats()->link_resets == 2u);
+
+    /* ---- 场景 8：生产者持续追加，单轮仍返回；预算边界上的半帧下一轮补完 ---- */
+    {
+        const uint32_t before = service_usb_stats()->rx_frames;
+        uint32_t first_round;
+        refill_length = make_frame(refill_frame, 7u, AXDR_OPCODE_GET_RUNTIME_STATE);
+        refills_remaining = 100u;
+        service_usb_rx(refill_frame, refill_length);
+        service_usb_poll();
+        first_round = service_usb_stats()->rx_frames - before;
+        expect("持续生产仍按单轮预算返回",
+               first_round == SERVICE_USB_RX_POLL_BUDGET / refill_length);
+        expect("返回时生产者仍有待发送数据", refills_remaining != 0u);
+        refills_remaining = 0u;
+        reset_tx();
+        service_usb_poll();
+        expect("预算边界半帧下一轮继续",
+               service_usb_stats()->rx_frames == before + first_round + 1u);
+        expect("后续轮完整响应", tx_capture_len >= AXDR_COMMAND_MIN_RESPONSE_SIZE);
+        reset_tx();
+        service_usb_poll();
+        expect("已消费请求不重复执行", tx_capture_len == 0u);
     }
 
     if (fail_count == 0)

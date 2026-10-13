@@ -63,13 +63,16 @@ static void expect(const char *name, bool cond)
 
 static uint8_t tx_buf[256];
 static uint16_t tx_len;
-static void tx_stub(const uint8_t *data, uint16_t length)
+static int tx_status;
+static int tx_stub(const uint8_t *data, uint16_t length)
 {
+    if (tx_status != 0) { return tx_status; }
     if (length <= sizeof(tx_buf))
     {
         memcpy(tx_buf, data, length);
         tx_len = length;
     }
+    return 0;
 }
 
 static void send_frame(const uint8_t *payload, uint16_t payload_length,
@@ -354,6 +357,16 @@ int main(void)
     expect("req=START", g_foc.req == DRIVE_REQ_START);
 
     /* ---- 15. ControlStop：无条件可用（安全方向），撤运行授权 ---- */
+    {
+        const uint32_t rejected_before = service_usb_stats()->tx_queue_full;
+        tx_status = 1;
+        send_frame(NULL, 0u, 22u, AXDR_OPCODE_CONTROL_STOP);
+        expect("响应队满仍执行 STOP", g_foc.req == DRIVE_REQ_STOP);
+        expect("队满未伪报发送成功", tx_len == 0u);
+        expect("队满响应可观察", service_usb_stats()->tx_queue_full == rejected_before + 1u);
+        tx_status = 0;
+    }
+    /* 相同序号重试从缓存补 ACK，不重新执行控制副作用。 */
     send_frame(NULL, 0u, 22u, AXDR_OPCODE_CONTROL_STOP);
     expect("ControlStop APPLIED", ack() == AXDR_ACK_APPLIED);
     expect("req=STOP", g_foc.req == DRIVE_REQ_STOP);

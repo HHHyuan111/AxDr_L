@@ -28,6 +28,9 @@ static uint16_t parser_length;
 static axdr_command_core_t command_core;
 static service_usb_tx_fn tx_fn;
 static service_usb_stats_t stats;
+static volatile uint32_t link_epoch;
+static uint32_t parsed_epoch;
+static uint32_t response_epoch;
 
 static uint8_t rx_pop(uint8_t *value)
 {
@@ -84,6 +87,7 @@ static uint16_t find_request_magic(void)
 static void process_request(uint16_t request_length)
 {
     uint8_t response[AXDR_COMMAND_MAX_RESPONSE_SIZE];
+    response_epoch = parsed_epoch;
     const uint16_t response_length = axdr_command_core_process(
         &command_core, parser_buffer, request_length,
         service_scope_route, NULL,
@@ -99,9 +103,12 @@ static void process_request(uint16_t request_length)
         }
         if (tx_fn != 0)
         {
-            tx_fn(response, response_length);
-            stats.tx_frames++;
+            const int result = tx_fn(response, response_length);
+            if (result == 0) { ++stats.tx_frames; }
+            else if (result == 1) { ++stats.tx_queue_full; }
+            else { ++stats.tx_errors; }
         }
+        else { ++stats.tx_errors; }
     }
 }
 
@@ -160,6 +167,7 @@ void service_usb_rx(const uint8_t *data, uint16_t length)
         const uint16_t next = (uint16_t)((rx_head + 1u) & SVC_RX_RING_MASK);
         if (next == rx_tail)
         {
+            stats.rx_dropped_bytes += (uint32_t)(length - i);
             break; /* 环满丢弃（上位机重发机制兜底） */
         }
         rx_ring[rx_head] = data[i];
@@ -173,11 +181,47 @@ void service_usb_bind_tx(service_usb_tx_fn tx)
     tx_fn = tx;
 }
 
+void service_usb_reset_link(void)
+{
+    ++link_epoch;
+}
+
+uint8_t service_usb_response_is_current(void)
+{
+    return response_epoch == link_epoch ? 1u : 0u;
+}
+
+static uint8_t apply_link_reset(void)
+{
+    const uint32_t current_epoch = link_epoch;
+    if (parsed_epoch == current_epoch)
+    {
+        return 0u;
+    }
+    /* 重连前的半帧和响应缓存不能进入新会话。新连接最早一包允许由宿主重试。 */
+    rx_tail = rx_head;
+    parser_length = 0u;
+    axdr_command_core_init(&command_core);
+    parsed_epoch = current_epoch;
+    ++stats.link_resets;
+    return 1u;
+}
+
 void service_usb_poll(void)
 {
     uint8_t byte;
-    while (rx_pop(&byte) != 0u)
+    uint16_t consumed = 0u;
+    if (apply_link_reset() != 0u)
     {
+        return;
+    }
+    while ((consumed < SERVICE_USB_RX_POLL_BUDGET) && (rx_pop(&byte) != 0u))
+    {
+        ++consumed;
+        if (apply_link_reset() != 0u)
+        {
+            return;
+        }
         if (parser_length < sizeof(parser_buffer))
         {
             parser_buffer[parser_length++] = byte;

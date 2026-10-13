@@ -10,14 +10,21 @@
 
 #include <stdint.h>
 
+#define SERVICE_USB_RX_POLL_BUDGET 256u
+
 /** @brief 注入一段收到的字节（来自 CDC_Receive / 主机测试）。可分任意大小到达。 */
 void service_usb_rx(const uint8_t *data, uint16_t length);
 
-/** @brief 发送缝：协议层需要发响应/遥测时回调（固件=CDC_Transmit；测试=捕获数组）。 */
-typedef void (*service_usb_tx_fn)(const uint8_t *data, uint16_t length);
+/** @brief 发送缝：0=已复制入队，1=队满，其他=失败；不能保存本函数栈缓冲指针。 */
+typedef int (*service_usb_tx_fn)(const uint8_t *data, uint16_t length);
 void service_usb_bind_tx(service_usb_tx_fn tx);
 
-/** @brief 主循环轮询：搬运 rx 队列 → 帧同步 → command_core 分发 → 响应经 tx 缝发出。 */
+/** @brief USB 重建连接时丢弃旧接收半帧和重试缓存；中断只登记，主循环清理。 */
+void service_usb_reset_link(void);
+/** @brief 装配层在 USB 锁内检查，防止命令执行期间重连后补发旧连接的响应。 */
+uint8_t service_usb_response_is_current(void);
+
+/** @brief 每轮最多消费 256 字节，半帧保留；持续接收不能挤占 Safety 和发送轮询。 */
 void service_usb_poll(void);
 
 /** @brief 诊断计数（GetLinkDiagnostics 用）。 */
@@ -29,6 +36,10 @@ typedef struct
     uint32_t bad_crc_count;
     uint32_t rejected_count;
     uint32_t tx_frames;
+    uint32_t tx_queue_full;
+    uint32_t tx_errors;
+    uint32_t rx_dropped_bytes;
+    uint32_t link_resets;
 } service_usb_stats_t;
 const service_usb_stats_t *service_usb_stats(void);
 

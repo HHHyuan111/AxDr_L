@@ -49,6 +49,8 @@ set(AXDR_USER_SOURCES
     User/service/axdr_command_core.c
     User/service/axdr_safety_runtime.c
     User/service/service_usb.c
+    User/service/service_usb_tx.c
+    User/service/service_observation.c
     User/service/service_command.c
     User/service/service_scope.c
     User/service/service_telemetry.c
