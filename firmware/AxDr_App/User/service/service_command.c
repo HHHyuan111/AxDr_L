@@ -89,6 +89,17 @@ static uint8_t last_stop_reason = AXDR_CONTROL_STOP_NONE;
  * 关断后落地恢复，防止"故障清了但功率级还开着"的假恢复。 */
 static uint8_t fault_recovery_pending;
 
+/* 电流环运行时 PI 覆盖状态（RAM-only：复位/掉电回到 cur_pi_init 的
+ * 档案默认值，不写 EEPROM——与 SpeedPi 契约里 ram_only 字段同语义）。
+ * 边界取当前沉沙档案基准（Ls*ibw≈0.415、Rs*ibw≈420.5）的保守倍程，
+ * 既给手动微调留空间，又挡掉会让电流环明显失稳的量级错误。 */
+#define SVC_CURRENT_PI_KP_MINIMUM 0.05f
+#define SVC_CURRENT_PI_KP_MAXIMUM 2.0f
+#define SVC_CURRENT_PI_KI_MINIMUM 20.0f
+#define SVC_CURRENT_PI_KI_MAXIMUM 2000.0f
+static uint8_t current_pi_override_active;
+static uint32_t current_pi_generation;
+
 /* F2 档案 payload：只构造一次，CRC 注册与应答同源 */
 static axdr_motor_profile_payload_t profile_payload;
 static uint8_t profile_built;
@@ -286,7 +297,8 @@ static uint8_t provide_protocol_info(uint8_t *resp, uint16_t cap,
                          AXDR_CAPABILITY_ENCODER_ALIGNMENT |
                          AXDR_CAPABILITY_MOTOR_PROFILE |
                          AXDR_CAPABILITY_MOTOR_PROFILE_CONFIRMATION |
-                         AXDR_CAPABILITY_LINK_DIAGNOSTICS;
+                         AXDR_CAPABILITY_LINK_DIAGNOSTICS |
+                         AXDR_CAPABILITY_CURRENT_PI_RUNTIME_TUNING;
     p.supported_opcode_mask = SVC_SUPPORTED_MASK;
     p.parameter_count = 0u;
     return payload_out(&p, sizeof(p), resp, cap, len);
@@ -399,6 +411,32 @@ static uint8_t provide_link_diagnostics(uint8_t *resp, uint16_t cap,
     p.bad_crc_count = s->bad_crc_count;
     p.resync_count = s->resync_count;
     p.parser_reject_count = s->rejected_count;
+    return payload_out(&p, sizeof(p), resp, cap, len);
+}
+
+/* 电流环 PI 状态快照：current_kp/ki 取 g_foc.id_pi（d/q 共用一组，
+ * 见 cur_pi_init），default_kp/ki 用当前档案参数现算，与是否已被
+ * SetCurrentPi 覆盖无关——Restore 后两者应相等。 */
+static uint8_t provide_current_pi_state(uint8_t *resp, uint16_t cap,
+                                        uint16_t *len)
+{
+    axdr_current_pi_state_payload_t p;
+    const float default_kp = g_foc.motor.Ls * g_foc.motor.ibw;
+    const float default_ki = g_foc.motor.Rs * g_foc.motor.ibw;
+    memset(&p, 0, sizeof(p));
+    p.schema_version = AXDR_CURRENT_PI_SCHEMA_VERSION;
+    p.payload_size = sizeof(p);
+    p.generation = current_pi_generation;
+    p.current_kp = g_foc.id_pi.kp;
+    p.current_ki = g_foc.id_pi.ki;
+    p.default_kp = default_kp;
+    p.default_ki = default_ki;
+    p.minimum_kp = SVC_CURRENT_PI_KP_MINIMUM;
+    p.maximum_kp = SVC_CURRENT_PI_KP_MAXIMUM;
+    p.minimum_ki = SVC_CURRENT_PI_KI_MINIMUM;
+    p.maximum_ki = SVC_CURRENT_PI_KI_MAXIMUM;
+    p.override_active = current_pi_override_active;
+    p.ram_only = 1u;
     return payload_out(&p, sizeof(p), resp, cap, len);
 }
 
@@ -851,6 +889,85 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
                                          response_payload_capacity,
                                          response_payload_length);
         }
+
+        /* ---- 电流环运行时 PI（空载门禁，不走运动租约） ----
+         * 与 SET_SPEED/SET_CURRENT 不同：本组不驱动电机、不调用
+         * authorize_motion，只改变 g_foc.id_pi/iq_pi 的 kp/ki 系数。
+         * 门禁改为"必须 STOP 且无故障"——运行中拒绝，防止在闭环
+         * 控制中实时切换增益引发突变/震荡。 */
+        case AXDR_OPCODE_GET_CURRENT_PI:
+            if (request_payload_length != 0u)
+            {
+                return AXDR_REASON_INVALID_PAYLOAD;
+            }
+            *ack_state = AXDR_ACK_ACCEPTED;
+            return provide_current_pi_state(response_payload,
+                                            response_payload_capacity,
+                                            response_payload_length);
+
+        case AXDR_OPCODE_SET_CURRENT_PI:
+        {
+            const axdr_current_pi_set_request_t *req = payload_in(
+                request_payload, request_payload_length, sizeof(*req));
+            if (req == NULL)
+            {
+                return AXDR_REASON_INVALID_PAYLOAD;
+            }
+            if (req->schema_version != AXDR_CURRENT_PI_SCHEMA_VERSION ||
+                req->payload_size != sizeof(*req))
+            {
+                return AXDR_REASON_INVALID_PAYLOAD;
+            }
+            if (!isfinite(req->kp) || !isfinite(req->ki) ||
+                (req->kp < SVC_CURRENT_PI_KP_MINIMUM) ||
+                (req->kp > SVC_CURRENT_PI_KP_MAXIMUM) ||
+                (req->ki < SVC_CURRENT_PI_KI_MINIMUM) ||
+                (req->ki > SVC_CURRENT_PI_KI_MAXIMUM))
+            {
+                return AXDR_REASON_OUT_OF_RANGE;
+            }
+            if (g_foc.state != DRIVE_STATE_STOP)
+            {
+                return AXDR_REASON_INVALID_STATE;
+            }
+            if (g_foc.fault.all != 0u)
+            {
+                return AXDR_REASON_FAULT_ACTIVE;
+            }
+            g_foc.id_pi.kp = req->kp;
+            g_foc.id_pi.ki = req->ki;
+            g_foc.iq_pi.kp = req->kp;
+            g_foc.iq_pi.ki = req->ki;
+            current_pi_override_active = 1u;
+            current_pi_generation++;
+            *ack_state = AXDR_ACK_APPLIED;
+            return provide_current_pi_state(response_payload,
+                                            response_payload_capacity,
+                                            response_payload_length);
+        }
+
+        case AXDR_OPCODE_RESTORE_CURRENT_PI:
+            if (request_payload_length != 0u)
+            {
+                return AXDR_REASON_INVALID_PAYLOAD;
+            }
+            if (g_foc.state != DRIVE_STATE_STOP)
+            {
+                return AXDR_REASON_INVALID_STATE;
+            }
+            if (g_foc.fault.all != 0u)
+            {
+                return AXDR_REASON_FAULT_ACTIVE;
+            }
+            /* 复用固件自带公式重算默认值，与上电初始化路径一致，
+             * 不在此处手写第二份 Ls*ibw/Rs*ibw 常量。 */
+            cur_pi_init(&g_foc);
+            current_pi_override_active = 0u;
+            current_pi_generation++;
+            *ack_state = AXDR_ACK_APPLIED;
+            return provide_current_pi_state(response_payload,
+                                            response_payload_capacity,
+                                            response_payload_length);
 
         default:
             return AXDR_REASON_UNKNOWN_OPCODE;

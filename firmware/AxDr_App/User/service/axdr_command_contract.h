@@ -52,6 +52,9 @@
 #define AXDR_CAPABILITY_IF_CONTROL            (1u << 20)
 #define AXDR_CAPABILITY_VDEAD_ACTIVE_TEST     (1u << 21)
 #define AXDR_CAPABILITY_SPEED_PI_RUNTIME_TUNING (1u << 22)
+/* bit 23 由 Qt 侧遗留的 CapabilitySpeedOnly 占用（AxDrCommandCodec.h），
+ * 固件契约与 Qt 协议常量必须同值，故电流环用 24，不用 23。 */
+#define AXDR_CAPABILITY_CURRENT_PI_RUNTIME_TUNING (1u << 24)
 
 typedef enum
 {
@@ -95,7 +98,10 @@ typedef enum
     AXDR_OPCODE_SET_VDEAD_COMPENSATION = 0x0024u,
     AXDR_OPCODE_GET_SPEED_PI = 0x0025u,
     AXDR_OPCODE_SET_SPEED_PI = 0x0026u,
-    AXDR_OPCODE_RESTORE_SPEED_PI = 0x0027u
+    AXDR_OPCODE_RESTORE_SPEED_PI = 0x0027u,
+    AXDR_OPCODE_GET_CURRENT_PI = 0x0028u,
+    AXDR_OPCODE_SET_CURRENT_PI = 0x0029u,
+    AXDR_OPCODE_RESTORE_CURRENT_PI = 0x002Au
 } axdr_command_opcode_t;
 
 #define AXDR_SPEED_PI_SCHEMA_VERSION 1u
@@ -125,6 +131,39 @@ typedef struct __attribute__((packed))
     uint8_t ram_only;
     uint16_t reserved;
 } axdr_speed_pi_state_payload_t;
+
+/* 电流环运行时 PI（d/q 共用一组增益，与 cur_pi_init 现状一致：
+ * foc->id_pi.kp/ki 和 foc->iq_pi.kp/ki 由同一公式 Ls*ibw / Rs*ibw 得到，
+ * 本协议不引入 d/q 分轴整定这个固件尚未验证的新自由度）。
+ * 写入门禁：仅 DRIVE_STATE_STOP（空载/未使能）且 g_foc.fault.all==0
+ * 时接受，运行中拒绝（AXDR_REASON_INVALID_STATE），参见 service_command.c。 */
+#define AXDR_CURRENT_PI_SCHEMA_VERSION 1u
+
+typedef struct __attribute__((packed))
+{
+    uint16_t schema_version;
+    uint16_t payload_size;
+    float kp;
+    float ki;
+} axdr_current_pi_set_request_t;
+
+typedef struct __attribute__((packed))
+{
+    uint16_t schema_version;
+    uint16_t payload_size;
+    uint32_t generation;
+    float current_kp;
+    float current_ki;
+    float default_kp;
+    float default_ki;
+    float minimum_kp;
+    float maximum_kp;
+    float minimum_ki;
+    float maximum_ki;
+    uint8_t override_active;
+    uint8_t ram_only;
+    uint16_t reserved;
+} axdr_current_pi_state_payload_t;
 
 #define AXDR_VDEAD_CONTROL_SCHEMA_VERSION 1u
 #define AXDR_VDEAD_ESTIMATE_ABS_MIN_V 0.005f

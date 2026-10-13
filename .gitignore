@@ -27,3 +27,6 @@ tests/csv/
 firmware/AxDr_App/MDK-ARM/build_log.txt
 # 参考工程（suanfa 等 P8 资产来源，只读不进仓）
 /reference/
+
+# 本机验收证据、录波和冻结镜像；中文结论保存在文档/开发记录
+/artifacts/
