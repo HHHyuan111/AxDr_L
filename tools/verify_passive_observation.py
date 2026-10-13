@@ -8,7 +8,7 @@ STOP、无故障后，才能配置被动采集。独立 SWD/供电/Flash 读回�
 from __future__ import annotations
 
 import argparse
-from collections import Counter
+from collections import Counter, deque
 import csv
 from datetime import datetime, timezone
 import io
@@ -143,11 +143,14 @@ class Client:
         self.sequence = secrets.randbits(31) + 1
         self.responses: list[dict] = []
         self.stream_handler: Callable[[bytes], None] | None = None
-        self.ack_log: list[dict] = []
-        self.telemetry_log: list[dict] = []
+        self.ack_log: deque = deque(maxlen=2048)
+        self.telemetry_log: deque = deque(maxlen=2048)
+        self.ack_count = self.telemetry_count = 0
+        self.ack_max_ms = 0.0
         self.observation_permitted = False
+        self.identity: dict | None = None
         self.last_slow_sequence: int | None = None
-        self.receive_errors: list[str] = []
+        self.receive_errors: deque = deque(maxlen=32)
 
     def pump(self, cleanup=False) -> None:
         data = self.port.read(max(1, min(getattr(self.port, "in_waiting", 0), 4096)))
@@ -171,6 +174,7 @@ class Client:
                     self.last_slow_sequence = sequence
                     self.telemetry_log.append({"sequence": sequence, "tick_ms": tick, "request": frame[16],
                                                "state": frame[17], "faults": faults, "vbus_V": vbus if math.isfinite(vbus) else None})
+                    self.telemetry_count += 1
                     require(sequence_ok, "慢遥测序号缺口")
                     require(frame[16] == frame[17] == 0 and faults == 0, "观测期间检测到运行请求/非STOP/故障；停止验收")
             except VerificationError as error:
@@ -191,6 +195,7 @@ class Client:
         started = self.clock()
         record = {"sequence": self.sequence, "opcode": opcode, "cleanup": cleanup, "status": "pending"}
         self.ack_log.append(record)
+        self.ack_count += 1
         require(self.port.write(frame) == len(frame), "串口写入不完整")
         while self.clock() - started < self.timeout:
             self.pump(cleanup=cleanup)
@@ -199,6 +204,7 @@ class Client:
                     continue
                 self.responses.pop(index)
                 elapsed = (self.clock() - started) * 1000.0
+                self.ack_max_ms = max(self.ack_max_ms, elapsed)
                 record.update(latency_ms=elapsed, ack=response["ack"], reason=response["reason"], status="received")
                 require(response["opcode"] == opcode, "ACK opcode 不一致")
                 require(response["reason"] == 0 and response["ack"] in (1, 3), f"命令 0x{opcode:02X} 被拒绝，reason={response['reason']}")
@@ -242,6 +248,7 @@ def identity_gate(client: Client) -> dict:
     product = device[24:40].split(b"\0", 1)[0].decode("ascii", errors="replace")
     caps = struct.unpack_from("<I", protocol, 12)[0]
     result = {"firmware": version, "build_id": build, "product": product, "capabilities": caps}
+    client.identity = result
     require(version == (0, 7, 7) and build == 0x20261013 and product == "AxDrService", "当前不是配套普通版 0.7.7 / 0x20261013，拒绝启动观测")
     require(caps & (1 << 25) != 0, "固件未声明被动观测能力")
     require(caps & ((1 << 17) | (1 << 18)) == 0, "旧 Scope 能力仍错误广播，拒绝混用主动扫频")
@@ -287,36 +294,61 @@ def baseline(client: Client, output: Path, seconds: float) -> dict:
     return result
 
 
-def inspect_stream(frames: list[dict], stream_id: int | None, minimum_samples: int) -> dict:
-    expected_sequence = 1
-    expected_tick = None
-    nan_count = 0
-    errors = []
-    counts: Counter = Counter()
-    for index, frame in enumerate(frames):
-        for key, invalid in (("stream_id", frame["stream_id"] != stream_id),
+class StreamSummary:
+    """逐包检查并只保留统计；原始帧和样点由调用方直接写入证据文件。"""
+
+    def __init__(self, stream_id=None):
+        self.stream_id = stream_id
+        self.expected_sequence = 1
+        self.expected_tick = None
+        self.first_tick = None
+        self.last_tick = None
+        self.nan_count = self.packets = self.samples = 0
+        self.errors: list[str] = []
+        self.counts: Counter = Counter()
+
+    def add(self, frame: dict) -> None:
+        if self.stream_id is None:
+            self.stream_id = frame["stream_id"]
+        if self.first_tick is None:
+            self.first_tick = frame["first_tick"]
+        for key, invalid in (("stream_id", frame["stream_id"] != self.stream_id),
                              ("channels_or_period", tuple(frame["channel_ids"]) != CHANNELS or frame["period"] != 20),
-                             ("sequence", frame["sequence"] != expected_sequence),
-                             ("tick", expected_tick is not None and frame["first_tick"] != expected_tick),
+                             ("sequence", frame["sequence"] != self.expected_sequence),
+                             ("tick", self.expected_tick is not None and frame["first_tick"] != self.expected_tick),
                              ("flags", frame["flags"] != 0), ("drops", frame["drops"] != 0)):
             if invalid:
-                counts[key] += 1
-                errors.append(f"packet[{index}] {key} 异常")
-        expected_sequence = (frame["sequence"] + 1) & MASK
-        expected_tick = (frame["first_tick"] + frame["period"] * frame["sample_count"]) & MASK
-        nan_count += sum(not math.isfinite(value) for row in frame["samples"] for value in row)
-    count = sum(frame["sample_count"] for frame in frames)
-    if nan_count:
-        errors.append(f"真实采样通道出现 {nan_count} 个非有限值")
-    if not frames:
-        errors.append("未收到高速帧")
-    if count < minimum_samples:
-        errors.append(f"样本不足：{count} < {minimum_samples}")
-    return {"packets": len(frames), "samples": count, "nonfinite_values": nan_count,
-            "first_control_tick": frames[0]["first_tick"] if frames else None,
-            "last_control_tick": (expected_tick - frames[-1]["period"]) & MASK if frames else None,
-            "nominal_rate_hz": 1000, "anomaly_counts": dict(counts), "errors": errors,
-            "note": "tick 连续性与实际中断间隔计数分别检查；序号/时间异常按相邻实际帧统计"}
+                self.counts[key] += 1
+                if len(self.errors) < 16:
+                    self.errors.append(f"packet[{self.packets}] {key} 异常")
+        self.expected_sequence = (frame["sequence"] + 1) & MASK
+        self.expected_tick = (frame["first_tick"] + frame["period"] * frame["sample_count"]) & MASK
+        self.last_tick = (self.expected_tick - frame["period"]) & MASK
+        self.nan_count += sum(not math.isfinite(value) for row in frame["samples"] for value in row)
+        self.samples += frame["sample_count"]
+        self.packets += 1
+
+    def result(self, stream_id, minimum_samples: int) -> dict:
+        errors = list(self.errors)
+        if self.packets and self.stream_id != stream_id:
+            errors.append("接收流 ID 与配置应答不一致")
+        if self.nan_count:
+            errors.append(f"真实采样通道出现 {self.nan_count} 个非有限值")
+        if not self.packets:
+            errors.append("未收到高速帧")
+        if self.samples < minimum_samples:
+            errors.append(f"样本不足：{self.samples} < {minimum_samples}")
+        return {"packets": self.packets, "samples": self.samples, "nonfinite_values": self.nan_count,
+                "first_control_tick": self.first_tick, "last_control_tick": self.last_tick,
+                "nominal_rate_hz": 1000, "anomaly_counts": dict(self.counts), "errors": errors,
+                "note": "逐包检查，不保留历史帧；错误详情最多16条，异常总数不截断。"}
+
+
+def inspect_stream(frames: list[dict], stream_id: int | None, minimum_samples: int) -> dict:
+    summary = StreamSummary(stream_id)
+    for frame in frames:
+        summary.add(frame)
+    return summary.result(stream_id, minimum_samples)
 
 
 def validate_stream(frames: list[dict], stream_id: int, minimum_samples: int) -> dict:
@@ -327,7 +359,7 @@ def validate_stream(frames: list[dict], stream_id: int, minimum_samples: int) ->
 
 def stream_test(client: Client, output: Path, seconds: float) -> dict:
     before = decode_diagnostics(client.command(0x35))
-    frames: list[dict] = []
+    summary = StreamSummary()
     sid = None
     result = {"hypothesis": "四路 1 kHz 原始流无缺帧，并保持命令和控制中断服务", "duration_s": seconds, "before": before}
     with (output / "stream.axsf.bin").open("wb") as raw, (output / "stream.csv").open("w", newline="", encoding="utf-8") as file:
@@ -340,7 +372,7 @@ def stream_test(client: Client, output: Path, seconds: float) -> dict:
             nonlocal first_tick, total_samples
             raw.write(data)
             frame = decode_stream(data)
-            frames.append(frame)
+            summary.add(frame)
             if first_tick is None:
                 first_tick = frame["first_tick"]
             for index, row in enumerate(frame["samples"]):
@@ -348,6 +380,7 @@ def stream_test(client: Client, output: Path, seconds: float) -> dict:
                 writer.writerow(("passive_stream", frame["stream_id"], frame["sequence"], tick,
                                  ((tick - first_tick) & MASK) / 20000, *row, frame["flags"], frame["drops"]))
                 total_samples += 1
+            require(not summary.errors and summary.nan_count == 0, "高速流出现缺口、无效值或协议异常")
 
         client.stream_handler = receive
         try:
@@ -355,18 +388,24 @@ def stream_test(client: Client, output: Path, seconds: float) -> dict:
             require(len(accepted) == 28, "高速配置响应尺寸异常")
             sid, rate, count, per_packet = struct.unpack_from("<IHBB", accepted)
             require(sid != 0 and (rate, count, per_packet) == (1000, 4, 5), "固件未接受四路 1 kHz")
+            require(summary.stream_id in (None, sid), "配置应答前收到其他流")
+            summary.stream_id = sid
             until = client.clock() + seconds
             next_status = client.clock() + 1.0
             while client.clock() < until:
                 client.pump()
                 if client.clock() >= next_status:
                     stopped_state(client)
+                    current = decode_diagnostics(client.command(0x35))
+                    diagnostic_delta(before, current)
+                    write_json(output / "progress.json", {"remaining_s": max(0, until - client.clock()),
+                               "waveform": summary.result(sid, 0), "diagnostics": current})
                     next_status = client.clock() + 1.0
             client.command(0x30, configure_payload(False))
             client.wait(0.05)
             after = decode_diagnostics(client.command(0x35))
             result["after"] = after
-            result["waveform"] = inspect_stream(frames, sid, int(seconds * 1000 * 0.95))
+            result["waveform"] = summary.result(sid, int(seconds * 1000 * 0.95))
             require(not result["waveform"]["errors"], "；".join(result["waveform"]["errors"]))
             result["delta"] = diagnostic_delta(before, after)
             require(after["stream_id"] == 0, "停止指令后高速流未关闭")
@@ -378,7 +417,7 @@ def stream_test(client: Client, output: Path, seconds: float) -> dict:
         finally:
             client.stream_handler = None
             result["received_samples"] = total_samples
-            result["waveform"] = inspect_stream(frames, sid, int(seconds * 1000 * 0.95))
+            result["waveform"] = summary.result(sid, int(seconds * 1000 * 0.95))
             write_json(output / "stream.json", result)
 
 
@@ -469,6 +508,7 @@ def run_board(args) -> int:
                 report["status"] = "FAILED"
                 report["error"] = str(error)
             finally:
+                report["identity"] = client.identity
                 report["cleanup_errors"] = cleanup(client)
                 if report["cleanup_errors"]:
                     report["status"] = "FAILED"
@@ -481,12 +521,15 @@ def run_board(args) -> int:
                         report["status"] = "FAILED"
                         report["final_check_error"] = str(error)
                 report["parser"] = dict(client.parser.stats)
-                report["receive_errors"] = client.receive_errors
+                report["receive_errors"] = list(client.receive_errors)
                 if client.receive_errors:
                     report["status"] = "FAILED"
                 report["uncompleted_rx_bytes"] = len(client.parser.buffer)
-                write_json(output / "ack-latency.json", client.ack_log)
-                write_json(output / "slow-state.json", client.telemetry_log)
+                report["log_retention"] = {"tail_limit": 2048, "command_count": client.ack_count,
+                    "ack_max_ms": client.ack_max_ms, "slow_frame_count": client.telemetry_count,
+                    "note": "JSON仅保留最近2048项；全部原始帧在rx.bin/tx.bin，全部高速样点在stream.csv。"}
+                write_json(output / "ack-latency.json", list(client.ack_log))
+                write_json(output / "slow-state.json", list(client.telemetry_log))
     except Exception as error:
         report["status"] = "FAILED"
         report["open_or_io_error"] = str(error)
@@ -612,6 +655,43 @@ def selftest() -> int:
     check(summary["nonfinite_values"] == 20 and summary["anomaly_counts"] == {"sequence": 1, "tick": 1, "flags": 1, "drops": 1},
           "所有异常同时计入统计")
 
+    online = StreamSummary(7)
+    for value in frames:
+        online.add(value)
+    check(online.result(7, 10) == inspect_stream(frames, 7, 10), "逐包与批量统计一致")
+    check(online.result(8, 10)["errors"], "配置ACK与提前到达的流ID不一致时拒绝")
+    for _ in range(1000):
+        online.add(invalid)
+    check(len(online.errors) == 16 and online.counts["flags"] == 1000 and online.nan_count == 20000,
+          "错误详情有界且总数不丢失")
+
+    class ForeignPort(FakePort):
+        def write(self, data):
+            result = super().write(data)
+            if struct.unpack_from("<H", data, 12)[0] == 2:
+                frame = bytearray(self.received)
+                frame[44:60] = b"AxDr Duotuo".ljust(16, b"\0")
+                self.received = bytearray(crc_frame(bytes(frame[:-4])))
+            return result
+
+    clock = Clock()
+    port = ForeignPort(clock)
+    client = Client(port, io.BytesIO(), io.BytesIO(), clock=clock)
+    try:
+        identity_gate(client)
+        raise AssertionError("同版本号不同产品未被拒绝")
+    except VerificationError:
+        check(client.identity["product"] == "AxDr Duotuo" and port.opcodes == [1, 2]
+              and not client.observation_permitted and cleanup(client) == [], "错板保留实际身份且不发观测或清理指令")
+
+    clock = Clock()
+    port = FakePort(clock)
+    client = Client(port, io.BytesIO(), io.BytesIO(), clock=clock)
+    for _ in range(3000):
+        client.command(1)
+    check(len(client.ack_log) == 2048 and client.ack_count == 3000 and client.ack_max_ms > 0,
+          "长时间应答记录有界且保留总数和最大延迟")
+
     class StagePort(FakePort):
         def __init__(self, clock, corrupt_chunk=False, invalid_sample=False):
             super().__init__(clock)
@@ -720,7 +800,7 @@ def main() -> int:
     if not args.run or args.self_test:
         return selftest()
     require(args.output is not None, "板端运行必须指定新的证据目录 --output")
-    require(0.5 <= args.baseline_seconds <= 10 and 1 <= args.stream_seconds <= 30, "测量时长超出受控范围")
+    require(0.5 <= args.baseline_seconds <= 10 and 1 <= args.stream_seconds <= 1800, "测量时长超出受控范围（实时最长1800秒）")
     require(10 <= args.ack_limit_ms <= 500, "ACK 门限超出 10～500 ms")
     return run_board(args)
 
