@@ -466,7 +466,7 @@ struct foc
     /* ABZ 上电自动对齐状态（Drive 层 START 期间执行，对齐完成置 enc_aligned；
      * RAM 语义：复位/掉电清零，STOP/START 不重复对齐）。 */
     bool enc_aligned;
-    uint32_t align_ticks;   /* 对齐计时（先保持后取平均） */
+    uint32_t align_ticks;   /* 对齐计时（渐变+扫场+保持+采样） */
     float align_sin_sum;    /* 对齐期 fb.theta_e 圆均值累积 */
     float align_cos_sum;
 

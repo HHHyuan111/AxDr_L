@@ -830,6 +830,9 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             g_foc.mode.debug = curr_cl;
             g_foc.ref.id = req->id_target_A;
             g_foc.ref.iq = req->iq_target_A;
+            /* 清残留速度目标：方向守卫拿 target×feedback 判反向，旧速度
+             * 目标会让手掰转子的电流模式测试被误杀（静默停机无报错）。 */
+            g_foc.ref.spd_r = 0.0f;
             if (g_foc.state != DRIVE_STATE_RUN)
             {
                 g_foc.req = DRIVE_REQ_START;
@@ -862,21 +865,26 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
                 return AXDR_REASON_OUT_OF_RANGE;
             }
             /* 对齐授权+租约：不套 authorize_motion 的请求域校验——宿主
-             * 租约合同上限 1s，短于内置对齐 1.5s（会被腰斩）；对齐是
-             * 单发命令无续租，租约由固件按时序定死 2s（对齐 1.5s +
-             * 宿主 500ms 轮询余量）。到期 revoke → 强制 STOP 双保险。 */
+             * 租约合同上限 1s，短于内置对齐时长（会被腰斩）；对齐是
+             * 单发命令无续租，租约由固件按时序定死 4s（预定位序列
+             * 3.2s + 宿主 500ms 轮询拍 + 余量；租约必须覆盖对齐全
+             * 时序——2026-10-18 实测租约短于序列会腰斩终窗，
+             * alignment_valid 置不上，宿主 30s 轮询超时报"对齐失败"）。
+             * 到期 revoke → 强制 STOP 双保险。 */
             reason = axdr_safety_runtime_authorize_run(
                 &safety, now_ms(), req->session_id);
             if (reason != AXDR_REASON_NONE)
             {
                 return reason;
             }
-            command_deadline_ms = now_ms() + 2000u;
+            command_deadline_ms = now_ms() + 4000u;
             command_active = 1u;
             if (g_foc.enc_aligned == 0u)
             {
-                /* 触发内置对齐：零速速度模式 START → STARTING 对齐
-                 * （1.2s 保持 + 0.3s 采样）→ 完成自动晋升 RUN（零速）。 */
+                /* 触发内置对齐：START → STARTING 预定位（1s 电流渐变
+                 * + 1.5s 整圈扫场 + 0.7s 保持，末 0.3s 定零）→ 完成
+                 * 关 PWM 回 STOP（对齐≠运行授权），宿主轮询
+                 * alignment_valid 后自行失能。 */
                 g_foc.mode.sys = debug_mode;
                 g_foc.mode.debug = spd_curr_cl;
                 g_foc.ref.iq = CHENSHA_ALIGN_CURRENT_A;

@@ -1,9 +1,15 @@
 /**
  * @file test_drive_align.c
- * @brief ABZ 上电自动对齐验证：状态流转、固定角电流注入、e_off 圆均值数学、
- *        对齐后保持 STOP、二次启动不重复对齐、绝对编码器跳过对齐。
+ * @brief ABZ 上电自动对齐验证（参考预定位+整圈扫场）：状态流转、电流
+ *        渐变+扫场注入、e_off 圆均值定零（=参考清 TIM3 计数器的等价
+ *        实现）、对齐后保持 STOP、二次启动不重复对齐、绝对编码器跳过
+ *        对齐、样本分散拒绝、重对齐增量语义、卡死转子参考语义。
  *
- * 用小 fs（10Hz）把 1.5s 对齐压缩为 15 拍：settle=12 拍，平均=3 拍。
+ * 用小 fs（10Hz）把 3.2s 对齐压缩为 32 拍：渐变=[0,10)、扫场=[10,25)、
+ * 保持=[25,32)、采样=[29,32)、第 33 拍收尾（n=32 时判收）。
+ * 注：扫场=本台架联轴静摩擦下保证转子到场 0（静场拉不动，2026-10-18
+ * 三轮实测位置全平）；参考无到位验收，场景 8 文档化卡死转子以停位
+ * 定零的参考同款语义。
  */
 
 #include <math.h>
@@ -72,7 +78,9 @@ void drive_control_reset_for_start(foc_t *foc)
 
 bool drive_mode_step(foc_t *foc)
 {
-    (void)foc;
+    /* 真实模式步进会生成并提交有效 PWM 命令；桩同步置 valid，
+     * 否则 RUN 晋升断言会被 fast_step 的无效命令守卫误伤。 */
+    foc->pwm_cmd.valid = true;
     return true;
 }
 
@@ -114,7 +122,7 @@ static foc_t make_align_motor(void)
     foc.state = DRIVE_STATE_STOP;
     foc.motor.phase_order = PHASE_ORDER_ABC;
     foc.motor.align_current_a = 2.0f;
-    foc.rate.foc_fs = 10.0f; /* settle=12 拍 / avg=3 拍 */
+    foc.rate.foc_fs = 10.0f; /* 渐变=10 拍 / 扫场=15 拍 / 保持=7 拍 / 第 33 拍收尾 */
     foc.enc.primary = ENCODER_TYPE_ABZ;
     foc.prot_cfg.invalid_position_samples = 100U;
     return foc;
@@ -122,10 +130,9 @@ static foc_t make_align_motor(void)
 
 int main(void)
 {
-    /* 场景 1：START → STARTING，对齐期间固定角 0 注入档案电流 */
+    /* 场景 1：START → STARTING，首拍电流=0（渐变起点），场角 0 */
     foc_t m = make_align_motor();
     m.fb.theta_e = 1.0f;
-    m.fb.id = 2.0f;
     m.fb.pos_valid = true;
     m.fb.i_valid = true;
     m.fb.vbus_valid = true;
@@ -133,26 +140,56 @@ int main(void)
     m.req = DRIVE_REQ_START;
     drive_fast_step(&m);
     expect("对齐首拍进入 STARTING", m.state == DRIVE_STATE_STARTING);
-    expect("注入电流=档案对齐电流", last_align_id == 2.0f);
-    expect("注入角度恒 0（开环）", last_align_theta == 0.0f);
+    expect("首拍电流=渐变起点 0", last_align_id == 0.0f);
+    expect("首拍场角 0", last_align_theta == 0.0f);
     expect("iq 给定 0", last_align_iq == 0.0f);
 
-    /* 场景 2：平均期 fb.theta_e=1.0 → e_off = 2pi-1.0，完成后回到 STOP。
-     * 时序：settle=12 + avg=3 → 第 15 拍计数满，第 16 拍收尾（含首拍共 16 次调用）。 */
-    for (int i = 0; i < 15; i++)
+    /* 场景 2：渐变段静场转子不动（停 1.0），扫场段被移动场拖到 0，
+     * 保持段稳在 0 → 采样窗均值 0 → e_off=0，完成后关 PWM 回 STOP
+     * （对齐≠运行授权）。渐变中点电流=半幅；扫场中点场角=2pi*7/15。 */
+    for (int i = 0; i < 45; i++)
     {
-        m.fb.theta_e = 1.0f;
-        m.fb.id = 2.0f; /* 对齐电流已建立（判据②） */
+        const float n = (float)m.align_ticks;
+
+        if (n < 10.0f)
+        {
+            m.fb.theta_e = 1.0f;
+        }
+        else if (n < 25.0f)
+        {
+            m.fb.theta_e = 1.0f * (25.0f - n) / 15.0f;
+        }
+        else
+        {
+            m.fb.theta_e = 0.0f;
+        }
         m.fb.pos_valid = true;
         m.fb.i_valid = true;
         m.fb.vbus_valid = true;
         m.fb.vbus = 24.0f;
         drive_fast_step(&m);
+        if (n == 5.0f)
+        {
+            expect("渐变中点电流=半幅", last_align_id == 1.0f);
+        }
+        if (n == 17.0f)
+        {
+            expect("扫场中点电流=全幅", last_align_id == 2.0f);
+            expect("扫场中点场角=2pi*7/15",
+                   fabsf(last_align_theta - 6.28318530718f * 7.0f / 15.0f) <
+                       1e-4f);
+        }
+        if (m.enc_aligned)
+        {
+            break;
+        }
     }
-    expect("15 拍后对齐完成", m.enc_aligned);
+    expect("33 拍后对齐完成", m.enc_aligned);
     expect("对齐完成保持 STOP", m.req == DRIVE_REQ_STOP);
     expect("对齐完成关闭 PWM", !m.pwm_active && pwm_stop_calls > 0);
-    expect("e_off=2pi-1.0", fabsf(m.motor.e_off - (6.28318530718f - 1.0f)) < 1e-4f);
+    expect("e_off=0（吸合停位=零位）", m.motor.e_off == 0.0f);
+    expect("末拍电流=档案全幅", last_align_id == 2.0f);
+    expect("末拍场角收尾回 0", last_align_theta == 0.0f);
 
     /* 场景 3：已对齐 → STOP 后再 START 直接晋升，不再注入对齐电流 */
     m.req = DRIVE_REQ_STOP;
@@ -182,46 +219,32 @@ int main(void)
     drive_fast_step(&m2);
     expect("STOP 清对齐进度", m2.align_ticks == 0U);
 
-    /* 场景 6：角度未收敛（样本 0/π 交替 → R̄≈0）→ 拒绝对齐，置 enc_err */
+    /* 场景 6：角度未收敛（样本 0/π 交替 → 圆均值矢量长 1/3 < 0.9）
+     * → 拒绝对齐，置 enc_err（转子在转/编码器异常的诚实报错） */
     {
         foc_t m3 = make_align_motor();
         m3.fb.pos_valid = true;
         m3.fb.i_valid = true;
         m3.fb.vbus_valid = true;
         m3.fb.vbus = 24.0f;
-        m3.fb.id = 2.0f;
         m3.req = DRIVE_REQ_START;
-        for (int i = 0; i < 16; i++)
+        for (int i = 0; i < 45; i++)
         {
-            m3.fb.theta_e = (i % 2 == 0) ? 0.0f : 3.14159265f;
+            m3.fb.theta_e = (m3.align_ticks % 2U == 0U) ? 0.0f : 3.14159265f;
             drive_fast_step(&m3);
+            if (m3.fault.all != 0U)
+            {
+                break;
+            }
         }
         expect("角度未收敛拒绝对齐", !m3.enc_aligned);
         expect("置编码器故障", m3.fault.bit.enc_err == 1U);
         expect("不晋升 RUN", m3.req == DRIVE_REQ_STOP || m3.req == DRIVE_REQ_START);
     }
 
-    /* 场景 7：电流未建立（fb.id=0.5 < 0.8x2）→ 拒绝对齐 */
-    {
-        foc_t m4 = make_align_motor();
-        m4.fb.pos_valid = true;
-        m4.fb.i_valid = true;
-        m4.fb.vbus_valid = true;
-        m4.fb.vbus = 24.0f;
-        m4.fb.id = 0.5f;
-        m4.req = DRIVE_REQ_START;
-        for (int i = 0; i < 16; i++)
-        {
-            m4.fb.theta_e = 1.0f;
-            drive_fast_step(&m4);
-        }
-        expect("电流未建立拒绝对齐", !m4.enc_aligned);
-        expect("同样置编码器故障", m4.fault.bit.enc_err == 1U);
-    }
-
-    /* 场景 8：重对齐（现行 e_off=0.478 非零）→ 增量收敛而非绝对替换。
-     * 旧代码产 e_off=2pi-1.0（多扣旧值 0.478，真机 RS_NO_SAMPLE 根因）；
-     * 增量语义产 wrap(0.478-1.0)=2pi-0.522，使锁定位 fb 归零。 */
+    /* 场景 7：重对齐（现行 e_off=0.478 非零）→ 增量收敛而非绝对替换。
+     * 绝对替换产 e_off=2pi-0.5（多扣旧值 0.478，真机 RS_NO_SAMPLE 根因）；
+     * 增量语义产 wrap(0.478-0.5)=2pi-0.022，使锁定位 fb 归零。 */
     {
         foc_t m5 = make_align_motor();
         m5.motor.e_off = 0.478f;
@@ -229,16 +252,56 @@ int main(void)
         m5.fb.i_valid = true;
         m5.fb.vbus_valid = true;
         m5.fb.vbus = 24.0f;
-        m5.fb.id = 2.0f;
         m5.req = DRIVE_REQ_START;
-        for (int i = 0; i < 16; i++)
+        for (int i = 0; i < 45; i++)
         {
-            m5.fb.theta_e = 1.0f;
+            const float n = (float)m5.align_ticks;
+
+            if (n < 10.0f)
+            {
+                m5.fb.theta_e = 1.0f;
+            }
+            else if (n < 25.0f)
+            {
+                m5.fb.theta_e = 0.5f + 0.5f * (25.0f - n) / 15.0f;
+            }
+            else
+            {
+                m5.fb.theta_e = 0.5f;
+            }
             drive_fast_step(&m5);
+            if (m5.enc_aligned)
+            {
+                break;
+            }
         }
         expect("重对齐完成", m5.enc_aligned);
-        expect("e_off=增量收敛 2pi-0.522",
-               fabsf(m5.motor.e_off - (6.28318530718f - 0.522f)) < 1e-4f);
+        expect("e_off=增量收敛 2pi-0.022",
+               fabsf(m5.motor.e_off - (6.28318530718f - 0.022f)) < 1e-4f);
+    }
+
+    /* 场景 8：卡死转子（θ_e 恒 1.5，静场拉不动）→ 参考同款语义：
+     * 无到位验收，以停位定零"成功"（e_off=2pi-1.5）。参考实现
+     * （清计数器）行为一致——参考靠 5A 渐变保证拉入，不靠验收。 */
+    {
+        foc_t m6 = make_align_motor();
+        m6.fb.theta_e = 1.5f;
+        m6.fb.pos_valid = true;
+        m6.fb.i_valid = true;
+        m6.fb.vbus_valid = true;
+        m6.fb.vbus = 24.0f;
+        m6.req = DRIVE_REQ_START;
+        for (int i = 0; i < 45; i++)
+        {
+            drive_fast_step(&m6);
+            if (m6.enc_aligned)
+            {
+                break;
+            }
+        }
+        expect("卡死转子按参考语义定零成功", m6.enc_aligned);
+        expect("e_off=2pi-1.5（停位即零位）",
+               fabsf(m6.motor.e_off - (6.28318530718f - 1.5f)) < 1e-4f);
     }
 
     if (fail_count == 0)

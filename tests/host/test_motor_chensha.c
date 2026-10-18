@@ -71,7 +71,7 @@ int main(void)
     expect_close("div_pn", g_foc.motor.div_pn, 0.2f, 1e-9f);
     expect_close("Kt=1.5*pn*flux", g_foc.motor.Kt,
                  1.5f * 5.0f * flux_expected, 1e-9f);
-    expect_bits("ibw=4000", g_foc.motor.ibw, 4000.0f);
+    expect_bits("ibw=500(降噪,厂商对照)", g_foc.motor.ibw, 500.0f);
 
     /* ---- 台架限幅（B 库 target_config 沉沙段） ---- */
     expect_close("iq_max=8A", g_foc.ref.iq_max, 8.0f, 1e-6f);
@@ -105,10 +105,10 @@ int main(void)
     /* ---- 电流环公式核对（Kp=Ls*ibw / Ki=Rs*ibw，B 库同式） ---- */
     expect_close("cur Kp=Ls*ibw",
                  g_foc.motor.Ls * g_foc.motor.ibw,
-                 0.0001037615f * 4000.0f, 1e-12f);
+                 0.0001037615f * 500.0f, 1e-12f);
     expect_close("cur Ki=Rs*ibw",
                  g_foc.motor.Rs * g_foc.motor.ibw,
-                 0.105125f * 4000.0f, 1e-12f);
+                 0.105125f * 500.0f, 1e-12f);
 
     if (fail_count == 0)
     {

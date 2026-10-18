@@ -19,7 +19,7 @@
 
 /* 配置一致性：与 B 库沉沙定版值逐项锁定。 */
 _Static_assert(ENCODER_SELECTED_TYPE == ENCODER_TYPE_ABZ, "primary must be ABZ");
-_Static_assert(ABZ_DIRECTION == -1, "ABZ direction is -1 (B-lib dual-point aligned)");
+_Static_assert(ABZ_DIRECTION == -1, "ABZ direction -1（扫场对齐曲线铁证：场 +1 电圈编码器读 −1.233，2026-10-18）");
 _Static_assert(ABZ_COUNTS_PER_REV == 10000U, "2500 lpi x4 = 10000");
 _Static_assert(ABZ_RESOLUTION_BITS == 14U, "14-bit guard (B-lib pit 3)");
 

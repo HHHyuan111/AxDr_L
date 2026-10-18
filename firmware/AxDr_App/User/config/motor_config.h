@@ -102,8 +102,12 @@
 #define CHENSHA_ROTOR_OFFSET_RAD              (0.0240995f)
 #define CHENSHA_MECHANICAL_OFFSET_RAD         (0.0f)
 
-/* 三环整定：电流环 Kp=L*ibw / Ki=R*ibw（B 库注明 4000 为整定用值，非实测带宽）。 */
-#define CHENSHA_CURRENT_BW_RAD_S              (4000.0f)
+/* 三环整定：电流环 Kp=L*ibw / Ki=R*ibw。
+ * 2026-10-18 降 4000→500：电流环带宽 636→80Hz。测量噪声（2.2LSB 宽带，无 RC 抗混叠）
+ * 高于环宽的部分被 Kp 全额直通成电压噪声——人耳敏感的 1~5kHz 恰全在直通带，
+ * 即电机可听电流噪声根因。厂商同板固件 ibw=500 跑多台电机安静（foc_drv.c:107/166），
+ * 为同硬件验证过的安静工作点。速度环固化值不受影响（motor_profile_control_load 晚绑定覆盖）。 */
+#define CHENSHA_CURRENT_BW_RAD_S              (500.0f)
 /* 速度环：联轴工况实测固化值（覆盖机械模型公式整定），kfp=给定权重 0.5。 */
 #define CHENSHA_SPEED_KP_A_PER_RAD_S          (0.332909408f)
 #define CHENSHA_SPEED_KI_A_PER_RAD            (10.45865749f)
@@ -116,9 +120,9 @@
 /* 台架限幅（B 库 target_config 沉沙段）。 */
 #define CHENSHA_COMMAND_CURRENT_LIMIT_A       (8.0f)    /* 指令电流 */
 #define CHENSHA_ALIGN_CURRENT_LIMIT_A        (5.0f)    /* 对齐电流 */
-/* 自动对齐使用电流：空载 2A 起步（B 库联轴工况 3A 失败/4A 通过，本台空载足够；
- * 上限受上面 LIMIT 宏约束语义：若 2A 吸不合，按 B 库路径升 3~4A）。 */
-#define CHENSHA_ALIGN_CURRENT_A               (2.0f)
+/* 自动对齐使用电流：照抄参考预定位 CALIB_TARGET_ID=5A（渐变 1s+保持 1s）。
+ * B 库联轴工况实测 3A 失败/4A 通过，本台 2026-10-18 用 5A。 */
+#define CHENSHA_ALIGN_CURRENT_A               (5.0f)
 #define CHENSHA_ACCEL_LIMIT_RAD_S2           (1200.0f)
 
 /* 保护阈值（B 库沉沙定版，0.1s 延时滤波由 prot_cfg_init 统一配置）。 */

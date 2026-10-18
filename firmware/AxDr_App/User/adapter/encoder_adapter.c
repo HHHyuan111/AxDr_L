@@ -102,7 +102,7 @@ _RAM_FUNC void encoder_update_angle(encoder_data_t *enc)
 /**
  * @brief 从 TIM3 读取一拍 ABZ 原始计数。
  *
- * @param[in,out] enc 编码器对象；方向在源头应用（dir=-1 与 ABC 相序配套）。
+ * @param[in,out] enc 编码器对象；方向在源头应用（ABZ_DIRECTION，扫场对齐曲线实测 -1）。
  * @return TIM3 计数始终有效，恒返回 true；每拍都是新数据。
  * @note   增量式无绝对零点：上电 e_off=0，先对齐（Drive 层门控）再进闭环。
  */

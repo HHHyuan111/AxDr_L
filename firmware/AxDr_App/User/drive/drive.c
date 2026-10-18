@@ -190,6 +190,9 @@ static _RAM_FUNC void drive_start_pwm(foc_t *foc)
     }
 }
 
+/* 对齐状态清理定义在对齐代码块内，此处先行声明供停机路径调用。 */
+static _RAM_FUNC void drive_align_reset(foc_t *foc);
+
 /**
  * @brief 关闭三相 PWM，并清空控制器历史状态。
  *
@@ -208,6 +211,11 @@ static _RAM_FUNC void drive_stop_pwm(foc_t *foc)
     const bool stopped = drive_pwm_stop();
 
     drive_control_reset(foc);
+    if (!foc->enc_aligned)
+    {
+        drive_align_reset(foc); /* PWM 关断即对齐中止：进度作废，
+                                 * 故障停机路径同样生效，下次 START 重来 */
+    }
     if (stopped)
     {
         foc->pwm_active = false;
@@ -226,27 +234,26 @@ static _RAM_FUNC void drive_stop_pwm(foc_t *foc)
  * @param[in] req 本周期入口锁存的请求。
  */
 /*
- * ABZ 上电自动对齐（B 库门控哲学落地）：START 期间以固定电角度 0 注入
- * 档案对齐电流（foc_cur_step 的角度参数与编码器无关）——转子被吸到
- * "真实电角度=0"位置；后段对 fb.theta_e 做圆均值，e_off += -均值 (mod 2pi)。
- * 完成：置 enc_aligned 并回到 STOP（对齐只建立零位，不隐式启动运行）。
- * 上位机必须在看到 alignment_valid 后再次明确请求使能；这样不会把对齐前
- * 已缓存的速度/电流目标直接带入功率输出。时长 = 保持 1.2s + 取平均
- * 0.3s（B 库契约 >=300ms）。
+ * ABZ 上电自动对齐（参考预定位+整圈扫场）：电流幅值 1s 线性渐变
+ * 0→档案值（参考 CALIB_RISE_CNT），随后场角扫一整圈收尾到 0，
+ * 全电流保持，末 0.3s 对 fb.theta_e 做圆均值定零。
+ * 扫场注：本台架联轴静摩擦 ~3A 等效，转子停位离场 0 仅 ~34° 电角
+ * （sin 小），纯静场（参考做法）拉力上限不足以破摩擦——多轮真机
+ * 对齐期位置曲线全平（2026-10-18 三轮实测）。场扫一整圈必经过
+ * 转子正交位（拉力=满幅），转子被移动场拖到场 0 落位，参考
+ * "吸合停位=零位"的前提才成立。定零=参考 __HAL_TIM_SET_COUNTER
+ * (htim3,0) 的等价实现：e_off -= 均值 (mod 2pi)（不清计数器，
+ * 位置链无差分突变）。
+ * 完成：置 enc_aligned 并回 STOP（对齐是校准不是运行授权，上位机
+ * 轮询 alignment_valid 后自行失能，再显式使能进模式）。
+ * 唯一拒绝条件 R̄ < 0.9（在转/编码器异常样本分散，同 0x12 诊断档；
+ * 静止转子恒通过）——参考无到位验收，不设。
  */
-#define DRIVE_ALIGN_SETTLE_S   (1.2f)
-#define DRIVE_ALIGN_AVG_S      (0.3f)
-/*
- * 对齐验收双判据（26 号手册 §2，理论依据见 25/26 号）：
- * ① 角度收敛：圆均值矢量长度 R̄ >= 0.99（循环统计学 s=sqrt(-2 ln R̄)，
- *    0.99 对应角标准差约 8.1° 电角——转子锁定则样本集中于单点，R̄→1；
- *    转子被卡/仍在转/编码器异常则样本分散，R̄→0）；
- * ② 电流建立：|fb.id| >= 0.8x 指令（场给了电流没到位=采样或功率链问题，
- *    0.8 为工程容差，参照 B 库"对齐最小有效电流"概念）。
- * 任一不过 → 置 enc_err 故障拒绝对齐结果（错误零点闭环比不运行危险，
- *    P6 讲解决策 D1）。 */
-#define DRIVE_ALIGN_MIN_RESULT_LEN  (0.99f)
-#define DRIVE_ALIGN_CURRENT_RATIO   (0.8f)
+#define DRIVE_ALIGN_RISE_S         (1.0f)  /* 电流线性渐变（参考 CALIB_RISE_CNT） */
+#define DRIVE_ALIGN_SWEEP_S        (1.5f)  /* 场扫一整圈 0→2pi 收尾到 0 */
+#define DRIVE_ALIGN_HOLD_S         (0.7f)  /* 全电流保持（含采样窗） */
+#define DRIVE_ALIGN_AVG_S          (0.3f)  /* 末段定零采样窗（抗编码器噪声） */
+#define DRIVE_ALIGN_MIN_RESULT_LEN (0.9f)  /* 同 DIAG_ALIGN_MIN_RESULTANT_RATIO */
 
 static _RAM_FUNC void drive_align_reset(foc_t *foc)
 {
@@ -255,51 +262,78 @@ static _RAM_FUNC void drive_align_reset(foc_t *foc)
     foc->align_cos_sum = 0.0f;
 }
 
+static _RAM_FUNC void drive_align_reject(foc_t *foc)
+{
+    /* 验收不过：置编码器故障（fault 汇聚路径同拍停机拒绝 RUN），
+     * 清对齐进度——清故障后重新 START 可重试。 */
+    foc->fault.bit.enc_err = 1U;
+    drive_align_reset(foc);
+}
+
 static _RAM_FUNC void drive_align_tick(foc_t *foc)
 {
-    const uint32_t settle_ticks =
-        (uint32_t)(DRIVE_ALIGN_SETTLE_S * foc->rate.foc_fs);
+    const uint32_t rise_ticks =
+        (uint32_t)(DRIVE_ALIGN_RISE_S * foc->rate.foc_fs);
+    const uint32_t sweep_ticks =
+        (uint32_t)(DRIVE_ALIGN_SWEEP_S * foc->rate.foc_fs);
+    const uint32_t hold_ticks =
+        (uint32_t)(DRIVE_ALIGN_HOLD_S * foc->rate.foc_fs);
     const uint32_t avg_ticks =
         (uint32_t)(DRIVE_ALIGN_AVG_S * foc->rate.foc_fs);
-    float s;
-    float c;
+    const uint32_t sweep_end = rise_ticks + sweep_ticks;
+    const uint32_t total_ticks = sweep_end + hold_ticks;
+    const uint32_t avg_start = total_ticks - avg_ticks;
+    const uint32_t n = foc->align_ticks;
 
-    /* 固定角 0 的 id 场：角度参数恒 0（开环），与编码器反馈无关 */
-    if (foc_cur_step(foc, foc->motor.align_current_a, 0.0f, 0.0f))
     {
-        (void)drive_pwm_commit(foc);
+        /* 参考预定位：电流线性渐变+保持；渐变后场扫一整圈收尾到 0，
+         * 移动场拖转子到场 0 落位（纯静场在本台架拉不动，见块注释） */
+        float id_cmd = foc->motor.align_current_a;
+        float field = 0.0f;
+
+        if (n < rise_ticks)
+        {
+            id_cmd *= (float)n / (float)rise_ticks;
+        }
+        else if (n < sweep_end)
+        {
+            field = M_2PI * (float)(n - rise_ticks) / (float)sweep_ticks;
+        }
+        if (foc_cur_step(foc, id_cmd, 0.0f, field))
+        {
+            (void)drive_pwm_commit(foc);
+        }
     }
 
-    if (foc->align_ticks < settle_ticks + avg_ticks)
+    if (n < total_ticks)
     {
-        foc->align_ticks++;
-        if (foc->align_ticks > settle_ticks)
+        if (n >= avg_start)
         {
-            /* 保持期后取平均：theta_e 圆均值（规避 0/2pi 边界线性均值失效） */
+            /* θ_e 圆均值累积（规避 0/2pi 边界线性均值失效） */
+            float s;
+            float c;
+
             fast_sincos(foc->fb.theta_e, &s, &c);
             foc->align_sin_sum += s;
             foc->align_cos_sum += c;
         }
+        foc->align_ticks++;
         return;
     }
 
     {
         const float result_len =
             sqrtf(foc->align_sin_sum * foc->align_sin_sum +
-                  foc->align_cos_sum * foc->align_cos_sum) / (float)avg_ticks;
-        const bool angle_converged = (result_len >= DRIVE_ALIGN_MIN_RESULT_LEN);
-        const bool current_established =
-            (fabsf(foc->fb.id) >=
-             DRIVE_ALIGN_CURRENT_RATIO * foc->motor.align_current_a);
+                  foc->align_cos_sum * foc->align_cos_sum) /
+            (float)avg_ticks;
+        const float mean = atan2f(foc->align_sin_sum, foc->align_cos_sum);
 
-        if (angle_converged && current_established)
+        if (result_len >= DRIVE_ALIGN_MIN_RESULT_LEN)
         {
-            /* 增量更新：圆均值由 fb.theta_e（已含现行 e_off）算出，新零点
-             * = 旧零点 − 均值。绝对替换在重对齐（现行 e_off≠0，如 flash
-             * 装载残留）时多扣旧值，产生 e_off_old 大小的常量角误差
-             * （真机实测形态 δ=e_off_old，锁轴电流被拉开到 q 轴）。 */
-            float e_off = foc->motor.e_off
-                          + atan2f(-foc->align_sin_sum, foc->align_cos_sum);
+            /* 定零=参考清 TIM3 计数器的等价实现：吸合停位即零位，
+             * e_off −= 均值 (mod 2pi)。增量语义：均值由 fb.theta_e
+             * （已含现行 e_off）算出，重对齐/flash 装载残留不叠加。 */
+            float e_off = foc->motor.e_off - mean;
             if (e_off >= 6.28318530718f)
             {
                 e_off -= 6.28318530718f;
@@ -319,10 +353,7 @@ static _RAM_FUNC void drive_align_tick(foc_t *foc)
         }
         else
         {
-            /* 验收不过：置编码器故障（fault 汇聚路径同拍停机拒绝 RUN），
-             * 清对齐进度——清故障后重新 START 可重试。 */
-            foc->fault.bit.enc_err = 1U;
-            drive_align_reset(foc);
+            drive_align_reject(foc);
         }
     }
 }
@@ -332,11 +363,7 @@ static _RAM_FUNC void drive_exec_action(foc_t *foc, drive_req_e req)
     switch (req)
     {
         case DRIVE_REQ_STOP:
-            drive_stop_pwm(foc);
-            if (!foc->enc_aligned)
-            {
-                drive_align_reset(foc); /* 中断对齐则进度作废，下次重来 */
-            }
+            drive_stop_pwm(foc); /* 内部含未完成对齐的进度作废 */
             break;
 
         case DRIVE_REQ_START:
