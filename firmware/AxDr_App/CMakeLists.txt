@@ -60,6 +60,7 @@ set(AXDR_USER_SOURCES
     User/adapter/position_adapter.c
     User/adapter/speed_adapter.c
     User/app/control_cycle.c
+    User/app/current_offset.c
     User/app/cycle_record.c
     User/app/fast_loop.c
     User/app/debug_snapshot.c
@@ -106,6 +107,7 @@ set(AXDR_USER_SOURCES
     User/moldue/display.c
     User/moldue/lcd.c
     User/motor/foc_drv.c
+    User/motor/foc_mapping.c
     User/motor/motor_modes.c
 )
 

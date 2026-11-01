@@ -390,6 +390,11 @@
               <FilePath>..\User\app\control_cycle.c</FilePath>
             </File>
             <File>
+              <FileName>current_offset.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\app\current_offset.c</FilePath>
+            </File>
+            <File>
               <FileName>cycle_record.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\app\cycle_record.c</FilePath>
@@ -983,6 +988,11 @@
               <FileName>foc_drv.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\motor\foc_drv.c</FilePath>
+            </File>
+            <File>
+              <FileName>foc_mapping.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\motor\foc_mapping.c</FilePath>
             </File>
             <File>
               <FileName>motor_modes.c</FileName>

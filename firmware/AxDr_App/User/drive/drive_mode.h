@@ -29,7 +29,7 @@ bool drive_mode_is_supported(const foc_t *foc);
 bool drive_mode_prepare(foc_t *foc);
 
 /**
- * @brief 生成当前控制模式的给定和角度，不执行控制器或 PWM。
+ * @brief 生成当前控制模式的给定和角度（只填 foc_plan_t）。
  *
  * @param[in,out] foc 电机控制对象。
  * @pre foc 指向快速周期独占写入的有效对象，Drive 已确认当前允许运行。

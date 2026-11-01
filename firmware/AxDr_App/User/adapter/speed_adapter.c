@@ -35,13 +35,13 @@ void speed_est_step(speed_est_t *est, float pos_rad, float fs_hz,
         const uint32_t past = (est->index + SPEED_HISTORY_DEPTH - window) % SPEED_HISTORY_DEPTH;
         float diff = pos_rad - est->hist[past];
         /* 沿用单圈角的解卷绕；窗口内转角须小于 pi。 */
-        if (diff > MATH_PI)
+        if (diff > 0.5f * M_2PI)
         {
-            diff -= MATH_2PI;
+            diff -= M_2PI;
         }
-        else if (diff < -MATH_PI)
+        else if (diff < -0.5f * M_2PI)
         {
-            diff += MATH_2PI;
+            diff += M_2PI;
         }
         est->speed = diff * fs_hz / (float)window;
     }

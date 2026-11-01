@@ -1,9 +1,9 @@
 /**
  * @file control_cycle.c
- * @brief FOC 七步主流程。硬件运行与离线输入共用同一条执行路径。
+ * @brief FOC 七步主流程。硬件运行与离线输入共用同一条执行路径。主链位置：第 1~7 步本体。
  *
  * 输入可来自真实采样或离线回放；Drive 会执行启停并提交 PWM。
- * 离线测试需要替代硬件输出接口，不能把本函数当作纯数学计算。
+ * 离线测试需要替代硬件输出接口。
  */
 
 #include "control_cycle.h"
@@ -11,6 +11,7 @@
 
 #include "common.h"
 #include "board_adapter.h"
+#include "encoder_adapter.h"
 #include "position_adapter.h"
 #include "compiler.h"
 #include "drive.h"
@@ -34,10 +35,10 @@ PLATFORM_FAST_CODE void control_cycle_step(foc_t *foc,
     /* 2. 检查保护：电流、电压、编码器有效性和启动方向。 */
     drive_check_protection(foc);
 
-    /* 3. 更新运行状态：空闲、启动、对齐、运行、诊断或故障。 */
+    /* 3. 更新运行状态：停止、启动、对齐、运行、诊断或故障。 */
     drive_update_state(foc);
 
-    /* 4. 处理特殊状态并生成给定：确定本拍用哪个角度、哪个控制器。 */
+    /* 4. 处理状态并生成给定：确定本拍控制角度和控制器参考。 */
     drive_handle_state(foc, &cycle);
 
     if (cycle.ready && foc->fault.all == 0U)
@@ -52,7 +53,7 @@ PLATFORM_FAST_CODE void control_cycle_step(foc_t *foc,
     /* 7. 输出 PWM：校验后提交；STOP、故障、无效计算在这里关断。 */
     drive_output(foc, &cycle);
 
-    /* 观测放在控制之后；当前磁链观测不接管控制角度。 */
+    /* 观测放在控制之后，只旁路估算。 */
     obs_step(foc);
 
     if (output != NULL)

@@ -185,6 +185,7 @@ static bool test_explicit_motor_cycle(foc_t *motor)
     event_count = 0U;
     last_motor = NULL;
     last_pos_box = NULL;
+    observation_calls = 0U;
 
     feedback_before = motor->fb;
     fast_loop_step(motor);
@@ -197,7 +198,9 @@ static bool test_explicit_motor_cycle(foc_t *motor)
         !expect_true(last_motor == motor,
                      "各步骤必须使用调用者传入的同一个电机对象。") ||
         !expect_true(last_pos_box == &motor->enc,
-                     "编码器采样必须写入当前电机对象的位置成员。"))
+                     "编码器采样必须写入当前电机对象的位置成员。") ||
+        !expect_true(observation_calls == 1U,
+                     "每拍快环应调用一次观测抽取。"))
     {
         return false;
     }
@@ -220,7 +223,9 @@ static bool test_explicit_motor_cycle(foc_t *motor)
                        "两次快速周期应各执行一遍完整步骤。") &&
            expect_cycle_events(EVENT_COUNT_PER_CYCLE) &&
            expect_true(motor->fast_seq == 9U,
-                       "第二次快速周期应继续增加周期编号。");
+                       "第二次快速周期应继续增加周期编号。") &&
+           expect_true(observation_calls == 2U,
+                       "两次快环应各调用一次观测抽取。");
 }
 
 static bool test_sample_validity_is_forwarded(foc_t *motor)
@@ -281,6 +286,7 @@ static bool test_hal_callback_uses_firmware_motor(void)
     event_count = 0U;
     last_motor = NULL;
     last_pos_box = NULL;
+    observation_calls = 0U;
 
     HAL_ADCEx_InjectedConvCpltCallback(NULL);
     HAL_ADCEx_InjectedConvCpltCallback(&other_handle);

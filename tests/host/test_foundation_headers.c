@@ -14,11 +14,11 @@
 int main(void)
 {
     /* 与标准库无宏冲突：这里能取地址调用标准 sinf 即为共存证明 */
-    volatile float s = sinf(MATH_PI_2);
+    volatile float s = sinf(0.5f * M_2PI);
     (void)s;
 
     /* MATH 常量为 float 字面量 */
-    _Static_assert(_Generic(MATH_PI, float: 1, default: 0) == 1, "MATH_PI must be float");
+    _Static_assert(_Generic(M_2PI, float: 1, default: 0) == 1, "M_2PI must be float");
 
     /* ret_e：OK 必须为 0 */
     _Static_assert(RET_OK == 0, "RET_OK must be 0");

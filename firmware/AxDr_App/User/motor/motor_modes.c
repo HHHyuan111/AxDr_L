@@ -1,6 +1,6 @@
 /**
  * @file motor_modes.c
- * @brief 控制模式给定生成：轨迹、单位换算和控制角度。此文件不输出 PWM。
+ * @brief 控制模式给定生成：轨迹、单位换算和控制角度。主链位置：第 4 步内。
  */
 
 #include "common.h"

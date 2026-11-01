@@ -1,8 +1,8 @@
 /**
  * @file fast_loop.c
- * @brief ADC 中断中的电机控制入口，每 50 us 执行一次（20 kHz）。
+ * @brief ADC 中断中的电机控制入口，每 50 us 执行一次（20 kHz）。主链位置：主链前（放行、周期编号）与主链后（快照、周期记录、遥测与观测抽取）。
  *
- * 执行顺序：调用 FOC 主流程 → 保存观测结果。
+ * 执行顺序：调用 FOC 主流程 → 保存观测结果 → 遥测与观测抽取。
  * 电流单位 A，电压单位 V，机械角和电角度单位 rad。
  * 启停、保护和 PWM 提交由 FOC 主流程内的 Drive 处理。
  */
@@ -14,6 +14,8 @@
 #include "common.h"
 #include "cycle_record.h"
 #include "debug_snapshot.h"
+#include "service_observation.h"
+#include "service_telemetry.h"
 
 /* 初始化完成前禁止执行控制；主程序只置位一次，中断只读。 */
 static volatile bool fast_loop_enabled = false;
@@ -40,4 +42,8 @@ _RAM_FUNC void fast_loop_step(foc_t *foc)
     /* 保存控制后的结果。周期记录仅在人工启用时保留最近 32 拍。 */
     debug_snapshot_publish(foc);
     cycle_record_publish(foc);
+
+    /* 遥测与观测抽取在主链之后（20 kHz 分频组帧）。 */
+    service_telemetry_capture();
+    service_observation_capture();
 }

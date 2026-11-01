@@ -1,3 +1,8 @@
+/**
+ * @file mc_decoupling.c
+ * @brief 电流环解耦计算核。状态：已编译未调用（P8 预留，勿删）。
+ */
+
 #include "mc_decoupling.h"
 
 #include <math.h>

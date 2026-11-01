@@ -31,6 +31,7 @@
 /* USER CODE BEGIN Includes */
 #include "fast_loop.h"
 #include "foc.h"
+#include "current_offset.h"
 #include "drive_diag.h"
 #include "target_adc.h"
 #include "target_time.h"
@@ -225,6 +226,7 @@ static void app_motor_init(void)
 
     /* 恢复参数时快环仍被禁止；ABZ 上电后仍需重新对齐。 */
     foc_init(&g_foc);
+    cur_offset_init(&g_foc);
     service_param_store_boot();
     drive_diag_ident_load();
     fast_loop_enable();

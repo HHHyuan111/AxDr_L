@@ -20,17 +20,13 @@
 #include "drive_protection.h"
 #include "encoder_type.h"
 #include "foc.h"
+#include "math_const.h"
 #include "phase_order.h"
 #include "speed_est.h"
 
 #define _RAM_FUNC PLATFORM_FAST_CODE
 #define _RAM_DATA PLATFORM_FAST_DATA
 
-/* 正式代码和旧算法对照测试共用的数学常量。 */
-#define M_2PI         (6.28318530716f)
-#define div_M_2PI     (0.159154943092391467f)
-#define SQRT3_BY_2    (0.86602540378f)
-#define ONE_BY_SQRT3  (0.57735026919f)
 #define SQ(x)         ((x) * (x))
 
 #define wrap_pm_pi(angle)                       \
@@ -413,7 +409,7 @@ typedef union
     uint32_t all;
 } foc_fault_t;
 
-typedef struct
+typedef struct encoder_data
 {
     int dir;
     int32_t raw;
@@ -428,7 +424,7 @@ typedef struct
 } encoder_data_t;
 
 /** @brief 编码器配置、各器件状态和当前主编码器结果。 */
-typedef struct
+typedef struct encoder_state
 {
     position_source_t source;
     position_observer_t observer;
@@ -495,7 +491,6 @@ struct foc
 };
 
 void ctrl_fb_update(foc_t *foc, float vbus);
-void cur_offset_init(foc_t *foc);
 void cur_pi_init(foc_t *foc);
 void spd_pi_init(foc_t *foc);
 
@@ -509,16 +504,5 @@ bool pp_step(foc_t *foc, foc_plan_t *cmd);
 bool cst_step(foc_t *foc, foc_plan_t *cmd);
 bool csv_step(foc_t *foc, foc_plan_t *cmd);
 bool csp_step(foc_t *foc, foc_plan_t *cmd);
-
-void encoder_init(encoder_state_t *enc);
-bool read_mt6816_raw(encoder_data_t *enc);
-bool read_abz_raw(encoder_data_t *enc);
-bool read_ma732_raw(encoder_data_t *enc);
-void encoder_update_angle(encoder_data_t *enc);
-bool encoder_sample(encoder_state_t *enc);
-
-/* 仅由 tests/legacy 的数值对照实现使用。 */
-float sin_f32(float x);
-float cos_f32(float x);
 
 #endif /* FOC_COMMON_H */

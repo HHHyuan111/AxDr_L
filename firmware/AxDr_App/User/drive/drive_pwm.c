@@ -1,6 +1,6 @@
 /**
  * @file drive_pwm.c
- * @brief Drive 层三相 PWM 执行适配。
+ * @brief Drive 层三相 PWM 执行适配。主链位置：第 7 步内。
  *
  * 数据流：逻辑 A/B/C 相占空比 -> 相序映射 -> Target 物理通道。
  */
@@ -84,7 +84,7 @@ _RAM_FUNC bool drive_pwm_commit(foc_t *foc)
             break;
 
         default:
-            /* 无法确定物理相序时立即撤销功率输出，不能继续沿用上一拍占空比。 */
+            /* 相序非法时立即撤销功率输出。 */
             if (target_pwm_stop_phase_outputs())
             {
                 foc->pwm_active = false;

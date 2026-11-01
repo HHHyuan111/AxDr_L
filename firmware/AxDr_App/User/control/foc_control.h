@@ -96,7 +96,7 @@ typedef struct
  * @return 三相占空比均有效时返回 true；模式非法或占空比无效时返回 false。
  * @pre 四个参数均为有效且互不重叠的对象；ctrl 中使用到的 PI 指针有效。
  *
- * 本函数不访问 HAL、Target 或全局电机对象，不分配内存，也不阻塞。
+ * 纯算法，可在主机上单独测试。
  */
 bool foc_ctrl_step(foc_ctrl_t *ctrl,
                    const foc_fb_t *fb,

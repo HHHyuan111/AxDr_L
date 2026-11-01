@@ -1,6 +1,6 @@
 /**
  * @file foc_control.c
- * @brief 与硬件无关的 FOC 电压、电流、速度和位置控制实现。
+ * @brief 与硬件无关的 FOC 电压、电流、速度和位置控制实现。主链位置：第 6 步内。
  */
 
 #include "foc_control.h"

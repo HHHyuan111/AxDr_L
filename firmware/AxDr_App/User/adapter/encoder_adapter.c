@@ -1,7 +1,9 @@
 /**
  * @file encoder_adapter.c
- * @brief 正式单 MA732/MT6816 位置反馈所需的编码器适配。
+ * @brief 编码器初始化、原始读取与角度换算。主链位置：第 1 步内（经 encoder_sample）。
  */
+
+#include "encoder_adapter.h"
 
 #include "common.h"
 
@@ -9,6 +11,35 @@
 #include "encoder_config.h"
 #include "target_encoder.h"
 #include "target_qenc.h"
+
+/**
+ * @brief 按当前正式配置读取本周期编码器原始值。
+ *
+ * @param[in,out] enc 位置反馈配置和编码器数据对象。
+ * @return MA732、MT6816 或 ABZ 读取成功返回 true，其他配置返回 false。
+ */
+_RAM_FUNC bool encoder_sample(encoder_state_t *enc)
+{
+    if (enc->source != POSITION_SOURCE_ENCODER)
+    {
+        return false;
+    }
+
+    switch (enc->primary)
+    {
+        case ENCODER_TYPE_MA732:
+            return read_ma732_raw(&enc->ma732);
+
+        case ENCODER_TYPE_MT6816:
+            return read_mt6816_raw(&enc->mt6816);
+
+        case ENCODER_TYPE_ABZ:
+            return read_abz_raw(&enc->abz);
+
+        default:
+            return false;
+    }
+}
 
 /**
  * @brief 初始化正式使用的 MA732 和 MT6816 参数。

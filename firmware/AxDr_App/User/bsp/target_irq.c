@@ -1,14 +1,12 @@
 /**
  * @file target_irq.c
- * @brief STM32G474 控制周期中断到应用快速周期的连接点 + 中断优先级表。
+ * @brief STM32G474 控制周期中断到应用快速周期的连接点 + 中断优先级表。主链位置：中断入口（清标志 → 快环分发）。
  */
 
 #include "compiler.h"
 #include "fast_loop.h"
 #include "foc.h"
 #include "main.h"
-#include "service_telemetry.h"
-#include "service_observation.h"
 #include "target_irq_profile.h"
 #include "board_config.h"
 
@@ -125,9 +123,6 @@ PLATFORM_FAST_CODE void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *ha
         return;
     }
 
+    /* 快环分发；遥测与观测抽取在 fast_loop_step 内。 */
     fast_loop_step(&g_foc);
-    /* 遥测抽取（20kHz 分频组帧，S4）。组装缝：与 fast_loop_step 同为先例——
-     * 本文件是快速路径的装配点，service 不反向依赖 bsp。 */
-    service_telemetry_capture();
-    service_observation_capture();
 }

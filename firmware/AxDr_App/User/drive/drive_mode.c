@@ -1,6 +1,6 @@
 /**
  * @file drive_mode.c
- * @brief Drive 正式控制模式判定和分派。
+ * @brief Drive 正式控制模式判定和分派。主链位置：第 4 步内。
  */
 
 #include "drive_mode.h"

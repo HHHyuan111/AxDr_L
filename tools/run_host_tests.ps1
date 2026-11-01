@@ -840,7 +840,7 @@ Write-Host "Host C11/上位机基准验收工具编译与 selftest 回环测试�
 
 # 七步主流程：真实 Drive/控制数学，替代硬件输出；不连接板端。
 $sequenceSources = @(
-    'app/control_cycle.c', 'adapter/speed_adapter.c', 'motor/foc_drv.c', 'motor/motor_modes.c',
+    'app/control_cycle.c', 'adapter/speed_adapter.c', 'motor/foc_drv.c', 'motor/foc_mapping.c', 'motor/motor_modes.c',
     'drive/drive.c', 'drive/drive_mode.c', 'drive/drive_pwm.c', 'drive/drive_protection.c', 'drive/drive_reset.c',
     'control/foc_control.c', 'control/foc_core.c', 'control/control_cascade.c', 'control/control_mit.c',
     'algorithm/control_pid.c', 'algorithm/control_filter.c', 'algorithm/control_limit.c',

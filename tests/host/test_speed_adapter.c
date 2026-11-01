@@ -41,7 +41,7 @@ int main(void)
     speed_est_step(&a, 6.2820f, 20000.0f, UINT32_MAX-1U, true);
     speed_est_step(&a, 0.0005f, 20000.0f, UINT32_MAX, true);
     speed_est_step(&a, 0.0015f, 20000.0f, 0U, true);
-    near(speed_est_get(&a),(0.0015f-6.2820f+MATH_2PI)*10000.0f);
+    near(speed_est_get(&a),(0.0015f-6.2820f+M_2PI)*10000.0f);
     const float before = speed_est_get(&a);
     speed_est_step(&a, NAN, 20000.0f, 1U, true);
     near(speed_est_get(&a), before);

@@ -1,3 +1,8 @@
+/**
+ * @file mc_bias_bandwidth.c
+ * @brief 电流环带宽拟合核。状态：已编译未调用（P8 预留，勿删）。
+ */
+
 #include "mc_bias_bandwidth.h"
 
 #include <math.h>

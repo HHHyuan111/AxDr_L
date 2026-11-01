@@ -1,3 +1,8 @@
+/**
+ * @file mc_deadtime_comp.c
+ * @brief 死区压降补偿核。状态：已编译未调用（P8 预留，勿删）。
+ */
+
 #include "mc_deadtime_comp.h"
 
 #include <math.h>

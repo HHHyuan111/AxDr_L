@@ -12,6 +12,7 @@
 #include <stdio.h>
 
 #include "common.h"
+#include "encoder_adapter.h"
 #include "encoder_config.h"
 #include "math_const.h"
 #include "position_adapter.h"
@@ -84,14 +85,14 @@ int main(void)
 
     /* 场景 1：编码器参数与换算（encoder_init 的 ABZ 分支）。 */
     encoder_init(&g_foc.enc);
-    fail += expect_f("factor", abz->factor, MATH_2PI / 10000.0f, 1e-9f);
+    fail += expect_f("factor", abz->factor, M_2PI / 10000.0f, 1e-9f);
     fail += expect_i("dir", abz->dir, ABZ_DIRECTION);
 
     /* 场景 2：读数 + 方向应用：TIM3=2500（正转 1/4 圈），dir=-1 → 角度 3π/2。 */
     qenc_stub_count = 2500;
     (void)read_abz_raw(abz);
     encoder_update_angle(abz);
-    fail += expect_f("pos dir applied", abz->pos, 1.5f * MATH_PI, 1e-4f);
+    fail += expect_f("pos dir applied", abz->pos, 0.75f * M_2PI, 1e-4f);
 
     /* 场景 3：position_update 全链（pn=5, e_off=r_off=0, Gr=1）。
      * raw 9990 → 5 跨越计数回绕：单圈角从 ~6.22 跳回 ~0.003，rev 应 +1，
@@ -99,7 +100,7 @@ int main(void)
     g_foc.enc.source = POSITION_SOURCE_ENCODER;
     g_foc.enc.primary = ENCODER_TYPE_ABZ;
     g_foc.motor.pn = 5.0f;
-    g_foc.motor.pnd_2pi = 5.0f / MATH_2PI;
+    g_foc.motor.pnd_2pi = 5.0f / M_2PI;
     g_foc.motor.e_off = 0.0f;
     g_foc.motor.r_off = 0.0f;
     g_foc.motor.div_Gr = 1.0f;
@@ -119,13 +120,13 @@ int main(void)
     fail += expect_i("rev decrement on reverse wrap", (long)g_foc.fb.rev, (long)(rev_before - 1));
     fail += expect_f("pos continuity",
                      sample.pos_r - pos_r_before,
-                     -15.0f * MATH_2PI / 10000.0f,
+                     -15.0f * M_2PI / 10000.0f,
                      1e-3f);
 
     /* 场景 4：电角度换算：单圈角 θ，电角度 = θ×pn mod 2π。 */
     fail += expect_f("theta_e scaled",
                      sample.theta_e,
-                     fmodf(g_foc.fb.enc_pos_r * 5.0f, MATH_2PI),
+                     fmodf(g_foc.fb.enc_pos_r * 5.0f, M_2PI),
                      1e-4f);
 
     fail += expect_f("fb theta waits for control", g_foc.fb.theta_e, 0.0f, 0.0f);
@@ -133,7 +134,7 @@ int main(void)
     fail += expect_f("fb pos_m waits for control", g_foc.fb.pos_m, 0.0f, 0.0f);
     fail += expect_i("no fresh sample", position_update(&g_foc, &sample), false);
     fail += expect_f("stale sample retained", sample.pos_r,
-                     pos_r_before - 15.0f * MATH_2PI / 10000.0f, 1e-3f);
+                     pos_r_before - 15.0f * M_2PI / 10000.0f, 1e-3f);
 
     /* 场景 5：影子测速。窗口 2、fs 20000、每拍 +0.001 rad → Δ2拍=0.002，
      * 速度 = 0.002 × 20000 / 2 = 20 rad/s。 */
@@ -153,7 +154,7 @@ int main(void)
     speed_est_step(&g_foc.speed, 0.0015f, 20000.0f, 2U, true); /* 此拍与 6.2820 差 2 拍窗：Δ=0.0015-6.2820+2π=+0.00299 */
     /* 窗口 2：第 3 拍对比第 1 拍 */
     fail += expect_f("speed wrap", speed_est_get(&g_foc.speed),
-                     (0.0015f - 6.2820f + MATH_2PI) * 20000.0f / 2.0f, 1e-2f);
+                     (0.0015f - 6.2820f + M_2PI) * 20000.0f / 2.0f, 1e-2f);
 
     if (fail == 0)
     {
