@@ -103,4 +103,9 @@ bool foc_ctrl_step(foc_ctrl_t *ctrl,
                    const foc_ref_t *ref,
                    foc_out_t *out);
 
+/** 使用本拍已准备的坐标变换结果，不重复做 Clarke/Park。 */
+bool foc_ctrl_execute(foc_ctrl_t *ctrl, const foc_fb_t *fb,
+                      const foc_ref_t *ref, const foc_frame_t *frame,
+                      foc_out_t *out);
+
 #endif /* FOC_CONTROL_H */

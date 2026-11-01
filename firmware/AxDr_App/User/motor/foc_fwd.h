@@ -8,4 +8,7 @@
 
 typedef struct foc foc_t;
 
+/* 单周期计算给定的内部定义见 foc_run.h。 */
+typedef struct foc_plan foc_plan_t;
+
 #endif /* FOC_FWD_H */

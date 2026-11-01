@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "foc_fwd.h"
 #include "phase_order.h"
 #include "target_adc.h"
 
@@ -57,5 +58,14 @@ bool board_phase_map(phase_order_t order,
 bool board_adc_convert(const board_adc_cfg_t *cfg,
                        const target_adc_raw_t *raw,
                        board_sample_t *sample);
+
+/**
+ * @brief 读取已完成的 ADC 结果，换算本拍电流和母线电压。
+ *
+ * 成功时保存 foc->adc.raw 并返回 sample，不写入 foc->fb。
+ * 相序无效时返回 false，保留原始计数和 sample 原值。
+ * foc 与 sample 必须指向有效且互不重叠的对象。
+ */
+bool foc_adc_sample(foc_t *foc, board_sample_t *sample);
 
 #endif /* BOARD_ADAPTER_H */

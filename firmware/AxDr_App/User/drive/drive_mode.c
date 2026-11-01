@@ -6,9 +6,10 @@
 #include "drive_mode.h"
 
 #include "common.h"
+#include "foc_run.h"
 #include "drive_command.h"
 #include "drive_diag.h"
-#include "drive_pwm.h"
+
 
 bool drive_mode_is_supported(const foc_t *foc)
 {
@@ -60,7 +61,7 @@ bool drive_mode_prepare(foc_t *foc)
     return true;
 }
 
-_RAM_FUNC bool drive_mode_step(foc_t *foc)
+_RAM_FUNC bool drive_mode_step(foc_t *foc, foc_plan_t *cmd)
 {
     if (!drive_mode_prepare(foc))
     {
@@ -73,95 +74,92 @@ _RAM_FUNC bool drive_mode_step(foc_t *foc)
             switch (foc->mode.release)
             {
                 case mit_mode:
-                    mit_step(foc);
-                    return true;
+                    return mit_step(foc, cmd);
 
                 case vel_mode:
-                    pv_step(foc);
-                    return true;
+                    return pv_step(foc, cmd);
 
                 case pos_mode:
-                    pp_step(foc);
-                    return true;
+                    return pp_step(foc, cmd);
 
                 case cst_mode:
-                    cst_step(foc);
-                    return true;
+                    return cst_step(foc, cmd);
 
                 case csv_mode:
-                    csv_step(foc);
-                    return true;
+                    return csv_step(foc, cmd);
 
                 case csp_mode:
-                    csp_step(foc);
-                    return true;
+                    return csp_step(foc, cmd);
 
                 default:
                     return false;
             }
 
         case halt_mode:
-            quick_stop_step(foc);
-            return true;
+            return quick_stop_step(foc, cmd);
 
         case debug_mode:
             switch (foc->mode.debug)
             {
                 case drag_vf:
-                    open_volt_step(foc);
-                    return true;
+                    return open_volt_step(foc, cmd);
 
                 case volt_op:
-                    if (!foc_volt_step(foc,
-                                  foc->ref.vd,
-                                  foc->ref.vq,
-                                  foc->fb.theta_e))
-                    {
-                        return false;
-                    }
-                    return drive_pwm_commit(foc);
-
-                case drag_if:
-                    open_cur_step(foc);
+                    *cmd = (foc_plan_t){
+                        .ref = {
+                            .mode = FOC_CTRL_MODE_VOLT,
+                            .vd = foc->ref.vd,
+                            .vq = foc->ref.vq,
+                        },
+                        .theta = foc->fb.theta_e,
+                    };
                     return true;
 
+                case drag_if:
+                    return open_cur_step(foc, cmd);
+
                 case curr_cl:
-                    if (!foc_cur_step(foc,
-                                  foc->ref.id,
-                                  foc->ref.iq,
-                                  foc->fb.theta_e))
-                    {
-                        return false;
-                    }
-                    return drive_pwm_commit(foc);
+                    *cmd = (foc_plan_t){
+                        .ref = {
+                            .mode = FOC_CTRL_MODE_CUR,
+                            .id_ref = foc->ref.id,
+                            .iq_ref = foc->ref.iq,
+                        },
+                        .theta = foc->fb.theta_e,
+                    };
+                    return true;
 
                 case spd_curr_cl:
-                    if (!foc_spd_step(foc,
-                                 foc->ref.spd_r,
-                                 foc->ref.iq,
-                                 foc->fb.theta_e))
-                    {
-                        return false;
-                    }
-                    return drive_pwm_commit(foc);
+                    *cmd = (foc_plan_t){
+                        .ref = {
+                            .mode = FOC_CTRL_MODE_SPD,
+                            .spd_ref = foc->ref.spd_r,
+                            .cur_lim = foc->ref.iq,
+                            .id_ref = foc->ref.id,
+                        },
+                        .theta = foc->fb.theta_e,
+                    };
+                    return true;
 
                 case pos_spd_curr_cl:
-                    if (!foc_pos_step(foc,
-                                 foc->ref.pos_r,
-                                 foc->ref.spd_r,
-                                 foc->ref.iq,
-                                 foc->fb.theta_e))
-                    {
-                        return false;
-                    }
-                    return drive_pwm_commit(foc);
+                    *cmd = (foc_plan_t){
+                        .ref = {
+                            .mode = FOC_CTRL_MODE_POS,
+                            .pos_ref = foc->ref.pos_r,
+                            .spd_lim = foc->ref.spd_r,
+                            .cur_lim = foc->ref.iq,
+                            .id_ref = foc->ref.id,
+                        },
+                        .theta = foc->fb.theta_e,
+                    };
+                    return true;
 
                 default:
                     return false;
             }
 
         case calibrat_mode:
-            return drive_diag_step(foc);
+            return drive_diag_step(foc, cmd);
 
         default:
             return false;

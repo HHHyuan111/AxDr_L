@@ -25,7 +25,7 @@ import zlib
 
 MASK = 0xFFFFFFFF
 READ_ONLY = frozenset((0x01, 0x02, 0x03, 0x08, 0x0C))
-OBSERVATION = frozenset(range(0x30, 0x37))
+OBSERVATION = frozenset(range(0x30, 0x38))
 ALLOWED = READ_ONLY | OBSERVATION
 CHANNELS = (1, 2, 3, 8)  # 停机也更新的 Ia/Ib/Ic/Vbus，不能用陈旧 dq 做验收。
 CSV_NAMES = ("ia_A", "ib_A", "ic_A", "vbus_V")
@@ -66,12 +66,12 @@ class FrameParser:
         frames = []
         while len(self.buffer) >= 8:
             magic = bytes(self.buffer[:4])
-            if magic not in (b"AXCA", b"AXDR", b"AXSF"):
+            if magic not in (b"AXCA", b"AXDR", b"AXSF", b"AXSB"):
                 del self.buffer[0]
                 self.stats["resync_bytes"] += 1
                 continue
             version, length = struct.unpack_from("<HH", self.buffer, 4)
-            valid_length = (magic == b"AXCA" and 24 <= length <= 160) or (magic == b"AXDR" and length == 160) or (magic == b"AXSF" and length == 212)
+            valid_length = (magic == b"AXCA" and 24 <= length <= 160) or (magic == b"AXDR" and length == 160) or (magic == b"AXSF" and length == 212) or (magic == b"AXSB" and length == 564)
             if version != 1 or not valid_length:
                 del self.buffer[0]
                 self.stats["bad_header"] += 1
@@ -163,7 +163,7 @@ class Client:
             try:
                 if frame[:4] == b"AXCA":
                     self.responses.append(decode_ack(frame))
-                elif frame[:4] == b"AXSF":
+                elif frame[:4] in (b"AXSF", b"AXSB"):
                     if self.stream_handler:
                         self.stream_handler(frame)
                 else:
@@ -223,15 +223,19 @@ def stopped_state(client: Client, cleanup=False) -> dict:
     runtime = client.command(0x03, cleanup=cleanup)
     safety = client.command(0x08, cleanup=cleanup)
     control = client.command(0x0C, cleanup=cleanup)
-    require(len(runtime) == 36 and len(safety) == len(control) == 40, "状态响应尺寸异常")
+    # 0.7.7 首故障字段追加到旧 36B 尾部；兼容两种明确契约，不接受任意长度。
+    require(len(runtime) in (36, 44) and len(safety) == len(control) == 40, "状态响应尺寸异常")
     fault = struct.unpack_from("<I", runtime, 16)[0]
+    first_fault = struct.unpack_from("<I", runtime, 36)[0] if len(runtime) == 44 else None
     session, sfault = struct.unpack_from("<I", safety, 12)[0], struct.unpack_from("<I", safety, 24)[0]
     control_session = struct.unpack_from("<I", control, 4)[0]
     targets = struct.unpack_from("<4f", control, 24)
     result = {"runtime_request": runtime[4], "runtime_state": runtime[5], "runtime_faults": fault,
               "safety_session": session, "safety_faults": sfault, "safety_state": safety[36],
               "interlocks": safety[38], "run_authorized": safety[39], "control_session": control_session,
-              "control_mode": control[20], "control_active": control[21], "targets": targets}
+              "control_mode": control[20], "control_active": control[21], "targets": targets,
+              "runtime_payload_bytes": len(runtime), "first_fault_bits": first_fault}
+    require(first_fault in (None, 0), "首故障仍锁存；保留现场，不自动清故障")
     require(runtime[4] == runtime[5] == fault == sfault == session == control_session == safety[36] == safety[39] == control[20] == control[21] == 0,
             "状态门未通过：必须 STOP、失能、无会话、无授权、无故障")
     require((safety[38] & 1) != 0, "Safety 未确认三相输出关闭")

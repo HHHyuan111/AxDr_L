@@ -14,6 +14,9 @@
 
 #include "common.h"
 #include "drive.h"
+#include "drive_cycle_test.h"
+#include "foc_run.h"
+#include "service_drive_state.h"
 
 #if !defined(__STDC_VERSION__) || (__STDC_VERSION__ < 201112L)
 #error "需要支持 C11 的电脑端编译器"
@@ -129,7 +132,7 @@ static bool test_expect_events(const test_event_e *expected, size_t expected_cou
 
 bool drive_pwm_commit(foc_t *foc)
 {
-    (void)foc;
+    foc->pwm_cmd.valid = true;
     return true;
 }
 
@@ -163,8 +166,9 @@ void drive_control_reset_for_start(foc_t *foc)
     test_log_event(TEST_EVENT_RESET);
 }
 
-bool drive_mode_step(foc_t *foc)
+bool drive_mode_step(foc_t *foc, foc_plan_t *cmd)
 {
+    *cmd = (foc_plan_t){.ref = {.mode = FOC_CTRL_MODE_CUR}};
     test_log_event(TEST_EVENT_RUN_MODE);
 
     if (test_mode_writes_pwm)
@@ -199,7 +203,7 @@ static bool test_power_on_stays_stopped(void)
     };
 
     test_reset_fakes();
-    drive_fast_step(&foc);
+    run_drive_cycle(&foc);
 
     return test_expect(test_event_count == 0U,
                        "上电 STOP 周期不应调用 PWM 接口。") &&
@@ -229,7 +233,7 @@ static bool test_start_then_run(void)
 
     foc.req = DRIVE_REQ_START;
     test_reset_fakes();
-    drive_fast_step(&foc);
+    run_drive_cycle(&foc);
 
     if (!test_expect_events(start_events,
                             sizeof(start_events) / sizeof(start_events[0])) ||
@@ -244,7 +248,7 @@ static bool test_start_then_run(void)
     }
 
     test_reset_fakes();
-    drive_fast_step(&foc);
+    run_drive_cycle(&foc);
 
     if (!test_expect_events(run_events,
                             sizeof(run_events) / sizeof(run_events[0])) ||
@@ -255,7 +259,7 @@ static bool test_start_then_run(void)
     }
 
     test_reset_fakes();
-    drive_fast_step(&foc);
+    run_drive_cycle(&foc);
 
     return test_expect_events(run_events,
                               sizeof(run_events) / sizeof(run_events[0]));
@@ -288,7 +292,7 @@ static bool test_startup_direction_mismatch_stops(void)
     for (int index = 0; index < 8; index++)
     {
         test_reset_fakes();
-        drive_fast_step(&foc);
+        run_drive_cycle(&foc);
         if (foc.state == DRIVE_STATE_FAULT)
         {
             if (!test_expect(index == 4,
@@ -329,7 +333,7 @@ static bool test_stop_runs_once(void)
     };
 
     test_reset_fakes();
-    drive_fast_step(&foc);
+    run_drive_cycle(&foc);
 
     if (!test_expect_events(stop_events,
                             sizeof(stop_events) / sizeof(stop_events[0])) ||
@@ -342,7 +346,7 @@ static bool test_stop_runs_once(void)
     }
 
     test_reset_fakes();
-    drive_fast_step(&foc);
+    run_drive_cycle(&foc);
 
     return test_expect(test_event_count == 0U,
                        "持续 STOP 时不应重复停止 PWM。") &&
@@ -359,7 +363,7 @@ static bool test_unsupported_mode_never_starts_pwm(void)
 
     test_reset_fakes();
     test_mode_supported = false;
-    drive_fast_step(&foc);
+    run_drive_cycle(&foc);
 
     return test_expect(test_event_count == 0U,
                        "未验证模式不能产生任何功率级启动动作。") &&
@@ -379,8 +383,6 @@ static bool test_pwm_action_failure_is_reported(void)
     };
     static const test_event_e stop_failure_events[] = {
         TEST_EVENT_PWM_STOP,
-        TEST_EVENT_RESET,
-        TEST_EVENT_PWM_STOP,
         TEST_EVENT_RESET
     };
     foc_t start_pm = {.req = DRIVE_REQ_START};
@@ -392,7 +394,7 @@ static bool test_pwm_action_failure_is_reported(void)
 
     test_reset_fakes();
     test_pwm_start_result = false;
-    drive_fast_step(&start_pm);
+    run_drive_cycle(&start_pm);
     if (!test_expect_events(
             start_failure_events,
             sizeof(start_failure_events) / sizeof(start_failure_events[0])) ||
@@ -408,7 +410,7 @@ static bool test_pwm_action_failure_is_reported(void)
 
     test_reset_fakes();
     test_pwm_stop_result = false;
-    drive_fast_step(&stop_pm);
+    run_drive_cycle(&stop_pm);
 
     return test_expect_events(
                stop_failure_events,
@@ -436,7 +438,7 @@ static bool test_fault_stops_same_cycle(void)
 
     test_reset_fakes();
     test_mode_sets_fault = true;
-    drive_fast_step(&foc);
+    run_drive_cycle(&foc);
 
     return test_expect_events(fault_events,
                               sizeof(fault_events) / sizeof(fault_events[0])) &&
@@ -467,7 +469,7 @@ static bool test_existing_fault_blocks_start_and_run(void)
     };
 
     test_reset_fakes();
-    drive_fast_step(&start_pm);
+    run_drive_cycle(&start_pm);
 
     if (!test_expect(test_event_count == 0U,
                      "已有故障时不能执行 START 的任何功率动作。") ||
@@ -482,7 +484,7 @@ static bool test_existing_fault_blocks_start_and_run(void)
     }
 
     test_reset_fakes();
-    drive_fast_step(&run_pm);
+    run_drive_cycle(&run_pm);
 
     return test_expect_events(
                fault_run_events,
@@ -511,7 +513,7 @@ static bool test_invalid_mode_or_missing_pwm_stops(void)
 
     test_reset_fakes();
     test_mode_valid = false;
-    drive_fast_step(&invalid_mode_pm);
+    run_drive_cycle(&invalid_mode_pm);
 
     if (!test_expect_events(stop_events,
                             sizeof(stop_events) / sizeof(stop_events[0])) ||
@@ -527,7 +529,7 @@ static bool test_invalid_mode_or_missing_pwm_stops(void)
 
     test_reset_fakes();
     test_mode_writes_pwm = false;
-    drive_fast_step(&missing_pwm_pm);
+    run_drive_cycle(&missing_pwm_pm);
 
     return test_expect_events(stop_events,
                               sizeof(stop_events) / sizeof(stop_events[0])) &&
@@ -576,7 +578,7 @@ static bool test_protection_blocks_power_actions(void)
     };
 
     test_reset_fakes();
-    drive_fast_step(&under_voltage_pm);
+    run_drive_cycle(&under_voltage_pm);
 
     if (!test_expect(test_event_count == 0U,
                      "母线欠压时不能执行 START 动作。") ||
@@ -589,7 +591,7 @@ static bool test_protection_blocks_power_actions(void)
     }
 
     test_reset_fakes();
-    drive_fast_step(&over_current_pm);
+    run_drive_cycle(&over_current_pm);
 
     return test_expect_events(stop_events,
                               sizeof(stop_events) / sizeof(stop_events[0])) &&
@@ -627,7 +629,7 @@ static bool test_invalid_feedback_blocks_start(void)
     };
 
     test_reset_fakes();
-    drive_fast_step(&invalid_current_pm);
+    run_drive_cycle(&invalid_current_pm);
     if (!test_expect(test_event_count == 0U,
                      "电流反馈非法时不能执行 START。") ||
         !test_expect(invalid_current_pm.fault.bit.ioff_err == 1U,
@@ -637,7 +639,7 @@ static bool test_invalid_feedback_blocks_start(void)
     }
 
     test_reset_fakes();
-    drive_fast_step(&invalid_position_pm);
+    run_drive_cycle(&invalid_position_pm);
 
     return test_expect(test_event_count == 0U,
                        "位置反馈非法时不能执行 START。") &&
@@ -662,7 +664,7 @@ static bool test_stop_request_during_mode_is_preserved(void)
 
     test_reset_fakes();
     test_mode_requests_stop = true;
-    drive_fast_step(&foc);
+    run_drive_cycle(&foc);
 
     if (!test_expect_events(run_events,
                             sizeof(run_events) / sizeof(run_events[0])) ||
@@ -675,7 +677,7 @@ static bool test_stop_request_during_mode_is_preserved(void)
     }
 
     test_reset_fakes();
-    drive_fast_step(&foc);
+    run_drive_cycle(&foc);
 
     return test_expect_events(stop_events,
                               sizeof(stop_events) / sizeof(stop_events[0])) &&
@@ -701,7 +703,7 @@ static bool test_invalid_requests_do_not_run(void)
     };
 
     test_reset_fakes();
-    drive_fast_step(&inactive_pm);
+    run_drive_cycle(&inactive_pm);
 
     if (!test_expect(test_event_count == 0U,
                      "PWM 未启动时，RUN 请求不能执行控制模式。") ||
@@ -714,7 +716,7 @@ static bool test_invalid_requests_do_not_run(void)
     }
 
     test_reset_fakes();
-    drive_fast_step(&invalid_pm);
+    run_drive_cycle(&invalid_pm);
 
     return test_expect_events(stop_events,
                               sizeof(stop_events) / sizeof(stop_events[0])) &&
@@ -770,8 +772,170 @@ static bool test_fault_clear_requires_stopped_pwm(void)
                        "故障清除后 Drive 必须回到 STOP。");
 }
 
+/* 首故障定格：0→非 0 后的下一拍入口锁存、多故障不覆盖首因、清除后
+ * 重新记录。锁存点在周期入口（单一捕获点覆盖保护/对齐/模式全部
+ * 来源），故同拍中段新置的位滞后一拍定格。fast_seq 递增在快环调度
+ * 层，这里手动模拟。 */
+static bool test_first_fault_latch(void)
+{
+    foc_t foc = {
+        .fast_seq = 100U,
+        .req = DRIVE_REQ_START,
+        .fb = {
+            .i_valid = true,
+            .vbus_valid = true,
+            .pos_valid = true,
+            .vbus = 12.0f
+        },
+        .prot_cfg = {
+            .under_voltage_v = 15.0f,
+            .under_voltage_samples = 1U
+        }
+    };
+
+    /* 第一拍：欠压（bit1）在本拍中段置位，定格发生在下一拍入口。 */
+    test_reset_fakes();
+    run_drive_cycle(&foc);
+    if (!test_expect(foc.fault.bit.un_volt == 1U,
+                     "欠压首拍应锁存故障位。") ||
+        !test_expect(foc.first_fault_bits == 0U,
+                     "同拍置位的故障尚未到定格点。"))
+    {
+        return false;
+    }
+
+    /* 第二拍：入口定格欠压位图与本拍序号。 */
+    foc.fast_seq = 101U;
+    test_reset_fakes();
+    run_drive_cycle(&foc);
+    if (!test_expect(foc.first_fault_bits == 0x02U,
+                     "首故障位图应定格为欠压位。") ||
+        !test_expect(foc.first_fault_seq == 101U,
+                     "首故障应记录定格拍序号。"))
+    {
+        return false;
+    }
+
+    /* 第三拍：叠加过流（bit0），首因不得被覆盖。 */
+    foc.fast_seq = 102U;
+    foc.fb.vbus = 24.0f;
+    foc.fb.ia = 81.0f;
+    foc.prot_cfg.over_current_a = 80.0f;
+    foc.prot_cfg.over_current_samples = 1U;
+    test_reset_fakes();
+    run_drive_cycle(&foc);
+    if (!test_expect(foc.fault.all == 0x03U,
+                     "叠加拍应含过流位。") ||
+        !test_expect(foc.first_fault_bits == 0x02U,
+                     "多故障同亮时首故障位图不得被覆盖。") ||
+        !test_expect(foc.first_fault_seq == 101U,
+                     "多故障同亮时首故障序号不得被覆盖。"))
+    {
+        return false;
+    }
+
+    /* 后续故障拍：定格值保持不变。 */
+    foc.fast_seq = 103U;
+    test_reset_fakes();
+    run_drive_cycle(&foc);
+    if (!test_expect(foc.first_fault_bits == 0x02U &&
+                     foc.first_fault_seq == 101U,
+                     "持续故障拍不应改写首故障定格。"))
+    {
+        return false;
+    }
+
+    /* 清除：PWM 已关断（FAULT 停机路径），drive_fault_clear 一并清零。 */
+    if (!test_expect(!foc.pwm_active,
+                     "故障停机后 PWM 应已关断。") ||
+        !test_expect(drive_fault_clear(&foc),
+                     "PWM 关断后应允许清除故障。") ||
+        !test_expect(foc.fault.all == 0U &&
+                     foc.first_fault_bits == 0U &&
+                     foc.first_fault_seq == 0U,
+                     "清除后故障位与首故障定格应一并归零。"))
+    {
+        return false;
+    }
+
+    /* 清除后新故障（PWM 启动失败 bit9）重新成为首因，同样滞后一拍。
+     * 先撤掉过流条件，避免保护路径抢先置位。 */
+    foc.fast_seq = 200U;
+    foc.fb.ia = 0.0f;
+    foc.req = DRIVE_REQ_START;
+    test_reset_fakes();
+    test_pwm_start_result = false;
+    run_drive_cycle(&foc);
+    if (!test_expect(foc.fault.bit.pwm_err == 1U,
+                     "PWM 启动失败应锁存执行故障。") ||
+        !test_expect(foc.first_fault_bits == 0U,
+                     "新故障同样在下一拍入口定格。"))
+    {
+        return false;
+    }
+
+    foc.fast_seq = 201U;
+    test_reset_fakes();
+    run_drive_cycle(&foc);
+    return test_expect(foc.first_fault_bits == 0x200U,
+                       "清除后的新故障应重新定格为首故障。") &&
+           test_expect(foc.first_fault_seq == 201U,
+                       "新首故障应记录定格拍序号。");
+}
+
+static bool test_persistent_state_boundaries(void)
+{
+    foc_t f = {.req = DRIVE_REQ_START};
+    test_reset_fakes();
+    run_drive_cycle(&f);
+    test_reset_fakes();
+    run_drive_cycle(&f);
+    f.req = DRIVE_REQ_START;
+    test_reset_fakes();
+    run_drive_cycle(&f);
+    if (!test_expect(f.state == DRIVE_STATE_RUN && test_event_count == 1U &&
+                     test_events[0] == TEST_EVENT_RUN_MODE,
+                     "运行中重复 START 不能清 PI、重启 PWM 或跳过控制。")) return false;
+
+    f = (foc_t){.req = DRIVE_REQ_RUN, .pwm_active = true};
+    test_reset_fakes();
+    run_drive_cycle(&f);
+    if (!test_expect(f.state == DRIVE_STATE_STOP && !f.pwm_active,
+                     "STOP 不能靠 RUN 请求绕过启动检查。")) return false;
+
+    f = (foc_t){.state = DRIVE_STATE_FAULT, .req = DRIVE_REQ_START};
+    test_reset_fakes();
+    run_drive_cycle(&f);
+    if (!test_expect(f.state == DRIVE_STATE_FAULT && !f.pwm_active,
+                     "只清故障位不能绕过显式故障确认。")) return false;
+
+    f = (foc_t){.state = DRIVE_STATE_RUN, .pwm_active = true};
+    test_reset_fakes(); test_pwm_stop_result = false;
+    run_drive_cycle(&f);
+    if (!test_expect(test_event_count == 2U && f.state == DRIVE_STATE_FAULT && f.pwm_active,
+                     "关断失败本拍保留 FAULT 和活动状态。")) return false;
+    test_reset_fakes();
+    run_drive_cycle(&f);
+    if (!test_expect(test_event_count == 2U && !f.pwm_active && f.state == DRIVE_STATE_FAULT,
+                     "下一拍重试关断，但不能自动清故障。")) return false;
+
+    f = (foc_t){.req = DRIVE_REQ_START, .mode.sys = calibrat_mode};
+    test_reset_fakes(); run_drive_cycle(&f);
+    test_reset_fakes(); run_drive_cycle(&f);
+    if (!test_expect(f.state == DRIVE_STATE_DIAG, "诊断有独立持久状态。")) return false;
+    f.mode.sys = debug_mode;
+    test_reset_fakes(); run_drive_cycle(&f);
+    return test_expect(f.state == DRIVE_STATE_STOP && !f.pwm_active,
+                       "诊断不能直接切换为普通运行。") &&
+           test_expect(service_drive_state(DRIVE_STATE_ALIGN) == 1U &&
+                       service_drive_state(DRIVE_STATE_DIAG) == 2U &&
+                       service_drive_state(DRIVE_STATE_FAULT) == 3U,
+                       "新增内部状态不能改变旧协议状态码。");
+}
+
 int main(void)
 {
+    if (!test_persistent_state_boundaries()) return 16;
     if (!test_power_on_stays_stopped())
     {
         return 1;
@@ -842,5 +1006,19 @@ int main(void)
         return 14;
     }
 
+    if (!test_first_fault_latch())
+    {
+        return 15;
+    }
+
     return 0;
 }
+
+
+void foc_update_current(foc_t *foc, float theta, foc_frame_t *frame)
+{ (void)foc; *frame = (foc_frame_t){.theta = theta}; }
+
+bool drive_diag_check_output(foc_t *foc, const foc_plan_t *cmd)
+{ (void)foc; (void)cmd; return true; }
+bool foc_execute(foc_t *foc, const foc_plan_t *cmd, const foc_frame_t *frame)
+{ (void)foc; (void)cmd; (void)frame; return test_mode_writes_pwm; }

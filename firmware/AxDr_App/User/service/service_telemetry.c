@@ -32,6 +32,7 @@
 
 #include "axdr_command_core.h"
 #include "common.h"
+#include "service_drive_state.h"
 
 _Static_assert(sizeof(float) == 4u, "AxDr telemetry requires 32-bit IEEE-754 float");
 _Static_assert(sizeof(service_telemetry_frame_t) == AXDR_TELEMETRY_V1_FRAME_SIZE,
@@ -128,7 +129,7 @@ static void fill_frame(volatile service_telemetry_frame_t *frame,
     frame->tick_ms = g_foc.fast_seq / 20u;
 
     frame->ctrl_bit = (uint8_t)g_foc.req;
-    frame->state_bit = (uint8_t)g_foc.state;
+    frame->state_bit = service_drive_state(g_foc.state);
     frame->sys_mode = (uint8_t)g_foc.mode.sys;
     frame->debug_mode = (uint8_t)g_foc.mode.debug;
     frame->release_mode = (uint8_t)g_foc.mode.release;

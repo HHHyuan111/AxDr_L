@@ -21,7 +21,12 @@ static uint16_t response_length;
 static uint8_t ack;
 static int tx_result;
 static uint32_t tx_calls;
+static uint16_t tx_length;
 static axdr_scope_stream_frame_v1_t tx_frame;
+static axdr_scope_stream_frame_v1_t tx_frame2; /* 攒批第二帧（单帧发送时清零） */
+static axdr_scope_stream_frame_v1_t tx_frames[4];
+static axdr_observation_block_t tx_block;
+static FILE *stream_fixture;
 static foc_t before_sample;
 
 static void expect(const char *name, bool condition)
@@ -37,8 +42,30 @@ static void expect(const char *name, bool condition)
 static int transmit_copy(const uint8_t *data, uint16_t length)
 {
     ++tx_calls;
-    expect("frame length", length == sizeof(tx_frame));
+    tx_length = length;
+    if (length == sizeof(tx_block))
+    {
+        memcpy(&tx_block, data, length);
+        expect("block magic", tx_block.magic == AXDR_OBSERVATION_BLOCK_MAGIC);
+        if (stream_fixture != NULL && tx_result == 0)
+            expect("block fixture write", fwrite(data, 1u, length, stream_fixture) == length);
+        return tx_result;
+    }
+    expect("frame length", length >= sizeof(tx_frame) &&
+           length <= sizeof(tx_frames) && length % sizeof(tx_frame) == 0u);
+    memset(tx_frames, 0, sizeof(tx_frames));
+    memcpy(tx_frames, data, length);
+    if (stream_fixture != NULL && tx_result == 0)
+        expect("20k fixture write", fwrite(data, 1u, length, stream_fixture) == length);
     memcpy(&tx_frame, data, sizeof(tx_frame));
+    if (length >= 2u * sizeof(tx_frame))
+    {
+        memcpy(&tx_frame2, data + sizeof(tx_frame), sizeof(tx_frame2));
+    }
+    else
+    {
+        memset(&tx_frame2, 0, sizeof(tx_frame2));
+    }
     return tx_result;
 }
 
@@ -74,7 +101,9 @@ static void reset(void)
     service_observation_bind_tx(transmit_copy);
     tx_result = 0;
     tx_calls = 0u;
+    tx_length = 0u;
     memset(&tx_frame, 0, sizeof(tx_frame));
+    memset(&tx_frame2, 0, sizeof(tx_frame2));
 }
 
 static axdr_scope_stream_config_request_t stream_request(uint16_t rate)
@@ -151,7 +180,7 @@ static void test_stream(void)
     expect("stream CRC", tx_frame.crc32 == axdr_command_crc32((const uint8_t *)&tx_frame, 208u));
     expect("duplicate tick ignored", diagnostics().produced_samples == 5u);
 
-    /* BUSY 保留最老包；ISR 环满后丢新包，不能撕裂正在主循环读取的槽。 */
+    /* BUSY 保留最老包；环容量 32 下 12 包积压零丢弃（8 包时代会满环丢样）。 */
     for (tick = 182u; tick <= 281u; ++tick) step(tick, (float)tick);
     tx_result = 1;
     service_observation_poll();
@@ -160,20 +189,26 @@ static void test_stream(void)
     service_observation_poll();
     expect("BUSY payload preserved", memcmp(saved.values, tx_frame.values, sizeof(saved.values)) == 0 && tx_frame.packet_sequence == 2u);
     diag = diagnostics();
-    expect("queue bounded", diag.queued_packets == 8u);
-    expect("full queue exact loss", diag.produced_samples == 65u && diag.dropped_samples == 20u);
+    expect("backlog within ring capacity", diag.queued_packets == 12u);
+    expect("deep ring avoids loss", diag.produced_samples == 65u && diag.dropped_samples == 0u);
     tx_result = 0;
-    for (packet = 2u; packet <= 9u; ++packet)
+    packet = 2u;
+    while (diagnostics().queued_packets != 0u)
     {
         service_observation_poll();
         expect("queued packets preserve order", tx_frame.packet_sequence == packet);
+        if (tx_length == 2u * sizeof(tx_frame))
+        {
+            expect("batch second frame follows", tx_frame2.packet_sequence == packet + 1u);
+        }
+        packet += tx_length / (uint16_t)sizeof(tx_frame);
     }
-    expect("queue drains", diagnostics().queued_packets == 0u);
+    expect("backlog fully covered", packet == 14u);
     for (tick = 1382u; tick <= 1481u; ++tick) step(tick, (float)tick);
     tx_result = -1;
     service_observation_poll();
-    expect("gap visible after backlog", tx_frame.packet_sequence == 14u && (tx_frame.flags & 1u) != 0u);
-    expect("TX error drops exact sample count", diagnostics().dropped_samples == 25u);
+    expect("no loss no discontinuity flag", tx_frame.packet_sequence == 14u && (tx_frame.flags & 1u) == 0u);
+    expect("TX error drops exact sample count", diagnostics().dropped_samples == 5u);
 
     /* 重配期间旧包不能混入新会话。 */
     tx_result = 0;
@@ -235,6 +270,7 @@ static void test_stream(void)
     service_observation_poll();
     expect("neutral-start has no FOC cache", isnan(tx_frame.values[0]) && isnan(tx_frame.values[1]) && isnan(tx_frame.values[2]));
     expect("duty reports actual neutral commit", tx_frame.values[3] == 0.5f);
+    g_foc.state = DRIVE_STATE_ALIGN;
     g_foc.align_ticks = 1u;
     for (tick = 182u; tick <= 281u; ++tick) step(tick, 0.5f);
     service_observation_poll();
@@ -247,6 +283,116 @@ static void test_stream(void)
     }
     service_observation_poll();
     expect("stale output sequence rejected", isnan(tx_frame.values[0]) && isnan(tx_frame.values[3]));
+}
+
+static void test_stream_high_rate(void)
+{
+    axdr_scope_stream_config_request_t config = stream_request(5000u);
+    axdr_observation_diagnostics_t diag;
+    uint32_t tick;
+    reset();
+    expect("5000 Hz accepted", request(AXDR_OPCODE_OBSERVATION_CONFIGURE, &config, sizeof(config)) == 0u);
+
+    /* 5 kHz 填满 32 包环：ISR 满环丢新包，BUSY 期间攒住最老一对帧。 */
+    tx_result = 1;
+    for (tick = 1u; tick <= 660u; ++tick) step(tick, (float)tick);
+    service_observation_poll();
+    expect("busy holds oldest pair", tx_length == 2u * sizeof(tx_frame) &&
+                                       tx_frame.packet_sequence == 1u &&
+                                       tx_frame2.packet_sequence == 2u);
+    diag = diagnostics();
+    expect("ring bounded at 32", diag.queued_packets == 32u);
+    expect("overflow exact loss", diag.produced_samples == 165u && diag.dropped_samples == 5u);
+
+    tx_result = 0;
+    service_observation_poll();
+    expect("batch sends two frames", tx_length == 2u * sizeof(tx_frame) &&
+                                       tx_frame.packet_sequence == 1u &&
+                                       tx_frame2.packet_sequence == 2u);
+    expect("both CRCs valid",
+           tx_frame.crc32 == axdr_command_crc32((const uint8_t *)&tx_frame, 208u) &&
+               tx_frame2.crc32 == axdr_command_crc32((const uint8_t *)&tx_frame2, 208u));
+    while (diagnostics().queued_packets != 0u) service_observation_poll();
+    expect("full ring drained in pairs", diagnostics().queued_packets == 0u &&
+                                            tx_frame2.packet_sequence == 32u);
+
+    /* 满环丢弃后的下一包带断续标志；发送失败按批内样本数记账。 */
+    tx_result = -1;
+    for (tick = 661u; tick <= 680u; ++tick) step(tick, (float)tick);
+    service_observation_poll();
+    expect("overflow marks discontinuity", tx_frame.packet_sequence == 34u &&
+                                              (tx_frame.flags & 1u) != 0u);
+    expect("tx failure drops exact samples", diagnostics().dropped_samples == 10u);
+}
+
+static void test_stream_20k(void)
+{
+    axdr_scope_stream_config_request_t config = stream_request(20000u);
+    uint32_t tick;
+    uint32_t packets = 0u;
+    config.channel_ids[3] = 8u;
+    reset();
+    g_foc.fb.vbus = 24.0f;
+    expect("20k accepted", request(AXDR_OPCODE_OBSERVATION_CONFIGURE, &config, sizeof(config)) == 0u);
+    for (tick = 0u; tick < 20000u; ++tick)
+    {
+        step(UINT32_MAX - 999u + tick, (float)tick + 0.125f);
+        if ((tick + 1u) % 20u == 0u)
+        {
+            unsigned i;
+            service_observation_poll();
+            expect("four frames per 20 ticks", tx_length == sizeof(tx_frames));
+            for (i = 0; i < 4u; ++i)
+            {
+                const axdr_scope_stream_frame_v1_t *frame = &tx_frames[i];
+                expect("20k ordered continuous packets", frame->packet_sequence == packets + 1u &&
+                       frame->first_control_tick == UINT32_MAX - 999u + packets * 5u &&
+                       frame->sample_period_ticks == 1u && frame->flags == 0u && frame->dropped_samples == 0u);
+                expect("20k CRC", frame->crc32 == axdr_command_crc32((const uint8_t *)frame, 208u));
+                ++packets;
+            }
+        }
+    }
+    expect("one second complete", packets == 4000u && diagnostics().produced_samples == 20000u &&
+           diagnostics().queued_packets == 0u && diagnostics().dropped_samples == 0u);
+}
+
+static void test_stream_20k_boundaries(void)
+{
+    axdr_scope_stream_config_request_t config = stream_request(20000u);
+    uint32_t tick;
+    axdr_scope_stream_frame_v1_t held[4];
+    reset();
+    expect("20k busy configure", request(AXDR_OPCODE_OBSERVATION_CONFIGURE, &config, sizeof(config)) == 0u);
+    for (tick = 1u; tick <= 20u; ++tick) step(tick, (float)tick);
+    tx_result = 1;
+    service_observation_poll();
+    memcpy(held, tx_frames, sizeof(held));
+    for (tick = 21u; tick <= 200u; ++tick) step(tick, (float)tick);
+    expect("20k bounded overflow", diagnostics().queued_packets == 32u && diagnostics().dropped_samples == 40u);
+    service_observation_poll();
+    expect("busy batch unchanged", memcmp(held, tx_frames, sizeof(held)) == 0);
+    tx_result = -1;
+    service_observation_poll();
+    expect("four failed frames counted", diagnostics().dropped_samples == 60u);
+    tx_result = 1;
+    service_observation_poll();
+    expect("cancel busy batch", request(AXDR_OPCODE_OBSERVATION_CANCEL, NULL, 0u) == 0u);
+    step(201u, 0.0f);
+    tick = tx_calls;
+    service_observation_poll();
+    expect("cancel discards pending batch", tx_calls == tick);
+    config = stream_request(1000u);
+    expect("20k to old stream", request(AXDR_OPCODE_OBSERVATION_CONFIGURE, &config, sizeof(config)) == 0u);
+    for (tick = 202u; tick <= 282u; ++tick) step(tick, 0.5f);
+    tx_result = 0;
+    /* poll 每次只丢一个旧流槽；按真实主循环逐次推进，不假定一次清空。 */
+    tick = tx_calls;
+    for (unsigned poll = 0u; poll < 33u && diagnostics().queued_packets != 0u; ++poll)
+        service_observation_poll();
+    expect("old backlog never transmitted", tx_calls == tick + 1u && diagnostics().queued_packets == 0u);
+    expect("new stream not mixed", tx_length == sizeof(tx_frame) && tx_frame.stream_id == 2u &&
+           tx_frame.packet_sequence == 1u && tx_frame.sample_period_ticks == 20u);
 }
 
 static void test_capture(void)
@@ -348,6 +494,108 @@ static void test_capture(void)
     expect("before capture window gap is fresh origin", state().state == AXDR_SCOPE_CAPTURE_TRIGGERED && state().captured_samples == 1u);
 }
 
+static void test_block_stream(void)
+{
+    axdr_scope_stream_config_request_t config = stream_request(20000u);
+    axdr_scope_stream_config_payload_t accepted;
+    uint32_t i, j;
+    reset();
+    g_foc.fb.vbus = 24.0f;
+    config.channel_ids[3] = 8u;
+    expect("block configure", request(AXDR_OPCODE_OBSERVATION_BLOCK_CONFIGURE, &config, sizeof(config)) == 0u);
+    memcpy(&accepted, response, sizeof(accepted));
+    expect("block ACK", accepted.samples_per_packet == 32u && accepted.channel_count == 4u);
+    for (i = 0u; i < 20000u; ++i)
+    {
+        step(UINT32_MAX - 999u + i, (float)i + 0.125f);
+        if ((i % 32u) != 31u) continue;
+        service_observation_poll();
+        expect("block CRC", tx_block.crc32 == axdr_command_crc32((uint8_t *)&tx_block, 560u));
+        expect("block header", tx_length == 564u && tx_block.version == 1u && tx_block.frame_size == 564u &&
+            tx_block.sample_count == 32u && tx_block.channel_count == 4u && tx_block.sample_period_ticks == 1u &&
+            tx_block.control_rate_hz == 20000u && tx_block.packet_sequence == i / 32u + 1u &&
+            tx_block.stream_id == accepted.stream_id && tx_block.flags == 0u && tx_block.dropped_samples == 0u);
+        expect("block tick", tx_block.first_control_tick == UINT32_MAX - 999u + i - 31u);
+        for (j = 0u; j < 32u; ++j)
+        {
+            const float v = (float)(i - 31u + j) + 0.125f;
+            expect("block exact values", tx_block.values[j*4u] == v && tx_block.values[j*4u+1u] == -v-0.25f &&
+                tx_block.values[j*4u+2u] == 0.25f && tx_block.values[j*4u+3u] == 24.0f);
+        }
+    }
+    expect("625 blocks complete", tx_calls == 625u && diagnostics().produced_samples == 20000u &&
+        diagnostics().dropped_samples == 0u && diagnostics().queued_packets == 0u);
+}
+
+static void test_block_boundaries(void)
+{
+    axdr_scope_stream_config_request_t config = stream_request(20000u);
+    axdr_observation_block_t first;
+    uint32_t i, calls;
+    reset();
+    config.sample_rate_hz = 5000u;
+    expect("block reject other rate", request(AXDR_OPCODE_OBSERVATION_BLOCK_CONFIGURE, &config, sizeof(config)) == AXDR_REASON_INVALID_PAYLOAD);
+    config.sample_rate_hz = 20000u; config.channel_count = 3u; config.channel_ids[3] = 0u;
+    expect("block reject three channels", request(AXDR_OPCODE_OBSERVATION_BLOCK_CONFIGURE, &config, sizeof(config)) == AXDR_REASON_INVALID_PAYLOAD);
+    config = stream_request(20000u);
+    expect("block start", request(AXDR_OPCODE_OBSERVATION_BLOCK_CONFIGURE, &config, sizeof(config)) == 0u);
+    for (i=1u; i<=32u; ++i) step(i, (float)i);
+    tx_result = 1;
+    service_observation_poll(); first = tx_block;
+    for (i=33u; i<=160u; ++i) step(i, (float)i);
+    expect("block bounded overflow", diagnostics().queued_packets == 4u && diagnostics().dropped_samples == 32u);
+    service_observation_poll();
+    expect("busy immutable bytes", memcmp(&first, &tx_block, sizeof(first)) == 0);
+    tx_result = 0;
+    service_observation_poll(); service_observation_poll();
+    expect("overflow exposed", tx_block.dropped_samples == 32u && tx_block.packet_sequence == 2u);
+    tx_result = 2; service_observation_poll();
+    expect("TX failure counts 32", diagnostics().dropped_samples == 64u);
+    tx_result = 0;
+    calls = tx_calls;
+    expect("cancel queued", request(AXDR_OPCODE_OBSERVATION_CANCEL, NULL, 0u) == 0u);
+    service_observation_poll(); step(161u, 0.0f);
+    expect("cancel no stale send", tx_calls == calls && diagnostics().stream_id == 0u);
+
+    reset();
+    expect("block for gap", request(AXDR_OPCODE_OBSERVATION_BLOCK_CONFIGURE, &config, sizeof(config)) == 0u);
+    step(1u, 1.0f); step(2u, 2.0f);
+    for (i=5u; i<=36u; ++i) step(i, (float)i);
+    service_observation_poll();
+    expect("partial discarded and missing counted", tx_block.first_control_tick == 5u && tx_block.flags == 1u && tx_block.dropped_samples == 4u);
+    service_observation_note_timing_gap();
+    for (i=37u; i<=68u; ++i) step(i, (float)i);
+    service_observation_poll();
+    expect("physical gap flag", (tx_block.flags & 1u) != 0u);
+    g_foc.fb.i_valid = false;
+    for (i=69u; i<=100u; ++i) step(i, (float)i);
+    service_observation_poll();
+    expect("invalid feedback preserved", (tx_block.flags & 2u) != 0u && isnan(tx_block.values[0]));
+
+    reset();
+    expect("block before switch", request(AXDR_OPCODE_OBSERVATION_BLOCK_CONFIGURE, &config, sizeof(config)) == 0u);
+    for (i=1u; i<=32u; ++i) step(i, 1.0f);
+    tx_result = 1; service_observation_poll(); calls = tx_calls;
+    expect("switch to legacy", request(AXDR_OPCODE_OBSERVATION_CONFIGURE, &config, sizeof(config)) == 0u);
+    tx_result = 0; service_observation_poll();
+    expect("no stale block after switch", tx_calls == calls);
+    for (i=33u; i<=37u; ++i) step(i, 1.0f);
+    service_observation_poll();
+    expect("legacy preserved after block", tx_length == 212u && tx_frame.stream_id == 2u && tx_frame.packet_sequence == 1u);
+    for (i=38u; i<=42u; ++i) step(i, 1.0f);
+    expect("switch to block", request(AXDR_OPCODE_OBSERVATION_BLOCK_CONFIGURE, &config, sizeof(config)) == 0u);
+    calls = tx_calls; service_observation_poll();
+    expect("no stale legacy after switch", tx_calls == calls);
+    for (i=43u; i<=74u; ++i) step(i, 1.0f);
+    service_observation_poll();
+    expect("fresh block after switch", tx_length == 564u && tx_block.stream_id == 3u && tx_block.packet_sequence == 1u);
+    for (i=75u; i<=106u; ++i) step(i, 1.0f);
+    tx_result=1; service_observation_poll(); calls=tx_calls;
+    service_observation_reset_link(); tx_result=0;
+    service_observation_poll(); step(107u, 1.0f); service_observation_poll();
+    expect("disconnect drops pending block", calls == tx_calls && diagnostics().queued_packets == 0u && diagnostics().stream_id == 0u);
+}
+
 static void test_requests(void)
 {
     axdr_scope_stream_config_request_t stream = stream_request(1000u);
@@ -358,9 +606,9 @@ static void test_requests(void)
     uint16_t length;
     uint32_t i;
     reset();
-    expect("unknown opcode", request(0x37u, NULL, 0u) == AXDR_REASON_UNKNOWN_OPCODE);
+    expect("unknown opcode", request(0x38u, NULL, 0u) == AXDR_REASON_UNKNOWN_OPCODE);
     expect("bad config length", request(AXDR_OPCODE_OBSERVATION_CONFIGURE, &stream, sizeof(stream) - 1u) == AXDR_REASON_INVALID_PAYLOAD);
-    stream.sample_rate_hz = 2000u;
+    stream.sample_rate_hz = 1500u;
     expect("unqualified rate rejected", request(AXDR_OPCODE_OBSERVATION_CONFIGURE, &stream, sizeof(stream)) == AXDR_REASON_INVALID_PAYLOAD);
     stream.sample_rate_hz = 1000u;
     stream.channel_count = 5u;
@@ -383,6 +631,16 @@ static void test_requests(void)
     stream.enabled = 0u;
     expect("disable", request(AXDR_OPCODE_OBSERVATION_CONFIGURE, &stream, sizeof(stream)) == 0u);
     step(2u, 0.0f);
+    stream.enabled = 1u;
+    stream.sample_rate_hz = 2000u;
+    expect("2000 Hz accepted", request(AXDR_OPCODE_OBSERVATION_CONFIGURE, &stream, sizeof(stream)) == 0u);
+    step(3u, 0.0f);
+    stream.sample_rate_hz = 5000u;
+    expect("5000 Hz accepted", request(AXDR_OPCODE_OBSERVATION_CONFIGURE, &stream, sizeof(stream)) == 0u);
+    step(4u, 0.0f);
+    stream.enabled = 0u;
+    expect("high rate disable", request(AXDR_OPCODE_OBSERVATION_CONFIGURE, &stream, sizeof(stream)) == 0u);
+    step(5u, 0.0f);
     capture.pretrigger_percent = 50u;
     expect("unsupported pretrigger", request(AXDR_OPCODE_OBSERVATION_CAPTURE, &capture, sizeof(capture)) == AXDR_REASON_INVALID_PAYLOAD);
     capture.pretrigger_percent = 0u;
@@ -475,12 +733,44 @@ static void fixtures(const char *directory)
     service_observation_set_tx_stats(7u, 2u, 1u, 3u);
     service_observation_set_irq_stats(1024u, 0u, 8001u, 0u);
     save_command_fixture(directory, "diagnostics.axca.bin", AXDR_OPCODE_OBSERVATION_DIAGNOSTICS, NULL, 0u);
+    {
+        char path[1024];
+        const int n = snprintf(path, sizeof(path), "%s/stream-20k.axsf.bin", directory);
+        expect("20k fixture path", n > 0 && (size_t)n < sizeof(path));
+        stream_fixture = fopen(path, "wb");
+        expect("20k fixture open", stream_fixture != NULL);
+        if (stream_fixture != NULL)
+        {
+            test_stream_20k();
+            expect("20k fixture close", fclose(stream_fixture) == 0);
+            stream_fixture = NULL;
+        }
+    }
+    {
+        char path[1024];
+        const int n = snprintf(path, sizeof(path), "%s/stream-compact.axsb.bin", directory);
+        expect("block fixture path", n > 0 && (size_t)n < sizeof(path));
+        stream_fixture = fopen(path, "wb");
+        expect("block fixture open", stream_fixture != NULL);
+        if (stream_fixture != NULL)
+        {
+            test_block_stream();
+            expect("block fixture close", fclose(stream_fixture) == 0);
+            stream_fixture = NULL;
+        }
+    }
+
 }
 
 int main(int argc, char **argv)
 {
     service_observation_capture(); /* 启动 ADC 早于服务初始化时必须无动作。 */
     test_stream();
+    test_stream_high_rate();
+    test_stream_20k();
+    test_stream_20k_boundaries();
+    test_block_stream();
+    test_block_boundaries();
     test_capture();
     test_requests();
     if (argc > 1) fixtures(argv[1]);

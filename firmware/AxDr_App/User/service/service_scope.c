@@ -484,7 +484,7 @@ uint8_t service_scope_route(void *context, uint16_t opcode,
     uint8_t reason;
 
     if ((opcode >= AXDR_OPCODE_OBSERVATION_CONFIGURE) &&
-        (opcode <= AXDR_OPCODE_OBSERVATION_CANCEL))
+        (opcode <= AXDR_OPCODE_OBSERVATION_BLOCK_CONFIGURE))
     {
         return service_observation_route(context, opcode, request_payload,
                                          request_payload_length,
@@ -517,7 +517,9 @@ uint8_t service_scope_route(void *context, uint16_t opcode,
         memcpy(&info, response_payload, sizeof(info));
         info.capability_flags &= ~(AXDR_CAPABILITY_HIGH_RATE_USB_SCOPE |
                                    AXDR_CAPABILITY_SCOPE_SIGNAL_DIRECTORY);
-        info.capability_flags |= AXDR_CAPABILITY_PASSIVE_OBSERVATION;
+        info.capability_flags |= AXDR_CAPABILITY_PASSIVE_OBSERVATION |
+                                 AXDR_CAPABILITY_OBSERVATION_20K_STREAM |
+                                 AXDR_CAPABILITY_OBSERVATION_BLOCK_STREAM;
         info.supported_opcode_mask &= ~0xF8000000u;
         memcpy(response_payload, &info, sizeof(info));
     }
@@ -529,8 +531,8 @@ uint8_t service_scope_route(void *context, uint16_t opcode,
         memcpy(&info, response_payload, sizeof(info));
         info.firmware_major = 0u;
         info.firmware_minor = 7u;
-        info.firmware_patch = 7u;
-        info.build_id = 0x20261013u;
+        info.firmware_patch = 9u;
+        info.build_id = 0x20261028u;
         memcpy(response_payload, &info, sizeof(info));
     }
     return reason;

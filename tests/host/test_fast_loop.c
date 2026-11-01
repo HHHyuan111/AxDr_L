@@ -6,10 +6,15 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
+#include "board_adapter.h"
 #include "common.h"
+#include "drive.h"
+#include "drive_cycle.h"
 #include "fast_loop.h"
 #include "main.h"
+#include "position_adapter.h"
 #include "target_irq_profile.h"
 
 typedef enum
@@ -43,6 +48,9 @@ static const foc_t *last_motor;
 static encoder_state_t *last_pos_box;
 static bool encoder_valid = true;
 static bool current_valid = true;
+static bool position_valid = true;
+static bool feedback_unchanged_during_sampling = true;
+static foc_fb_state_t feedback_before;
 
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc);
 
@@ -59,28 +67,43 @@ bool encoder_sample(encoder_state_t *pos_box)
     return encoder_valid;
 }
 
-bool position_update(foc_t *motor)
+bool position_update(foc_t *motor, position_sample_t *sample)
 {
     last_motor = motor;
     log_event(EVENT_POSITION_UPDATE);
-    return true;
+    if (position_valid)
+    {
+        sample->theta_e = 0.25f;
+        sample->pos_r = 3.5f;
+        sample->pos_m = 1.75f;
+    }
+    return position_valid;
 }
 
-bool foc_adc_sample(foc_t *motor)
+bool foc_adc_sample(foc_t *motor, board_sample_t *sample)
 {
     last_motor = motor;
     log_event(EVENT_ADC_SAMPLE);
+    feedback_unchanged_during_sampling = feedback_unchanged_during_sampling
+        && (memcmp(&motor->fb, &feedback_before, sizeof(motor->fb)) == 0);
+    if (current_valid)
+    {
+        sample->ia = 1.0f;
+        sample->ib = -0.25f;
+        sample->ic = -0.75f;
+        sample->vbus = 24.0f;
+    }
     return current_valid;
 }
 
 void ctrl_fb_update(foc_t *motor, float vbus)
 {
-    (void)vbus;
+    motor->fb.vbus = vbus;
     last_motor = motor;
     log_event(EVENT_FEEDBACK_UPDATE);
 }
 
-void drive_fast_step(foc_t *motor)
+void fake_drive_result(foc_t *motor)
 {
     last_motor = motor;
     log_event(EVENT_DRIVE_STEP);
@@ -163,6 +186,7 @@ static bool test_explicit_motor_cycle(foc_t *motor)
     last_motor = NULL;
     last_pos_box = NULL;
 
+    feedback_before = motor->fb;
     fast_loop_step(motor);
 
     if (!expect_true(event_count == EVENT_COUNT_PER_CYCLE,
@@ -178,6 +202,18 @@ static bool test_explicit_motor_cycle(foc_t *motor)
         return false;
     }
 
+    if (!expect_true(feedback_unchanged_during_sampling,
+                     "采样结果不能提前装入控制反馈。") ||
+        !expect_true(motor->fb.ia == 1.0f && motor->fb.ib == -0.25f &&
+                     motor->fb.ic == -0.75f && motor->fb.vbus == 24.0f &&
+                     motor->fb.theta_e == 0.25f && motor->fb.pos_r == 3.5f &&
+                     motor->fb.pos_m == 1.75f,
+                     "新采样数值应经 input 完整传入控制周期。"))
+    {
+        return false;
+    }
+
+    feedback_before = motor->fb;
     fast_loop_step(motor);
 
     return expect_true(event_count == (2U * EVENT_COUNT_PER_CYCLE),
@@ -193,6 +229,7 @@ static bool test_sample_validity_is_forwarded(foc_t *motor)
     current_valid = false;
     event_count = 0U;
 
+    feedback_before = motor->fb;
     fast_loop_step(motor);
 
     return expect_true(event_count == (EVENT_COUNT_PER_CYCLE - 1U),
@@ -202,7 +239,35 @@ static bool test_sample_validity_is_forwarded(foc_t *motor)
            expect_true(motor->fb.vbus_valid,
                        "现有母线 ADC 直读结果应保持有效。") &&
            expect_true(!motor->fb.pos_valid,
-                       "编码器采样失败必须传到控制周期。");
+                       "编码器采样失败必须传到控制周期。") &&
+           expect_true(motor->fb.ia == feedback_before.ia &&
+                       motor->fb.ib == feedback_before.ib &&
+                       motor->fb.ic == feedback_before.ic &&
+                       motor->fb.vbus == feedback_before.vbus &&
+                       motor->fb.theta_e == feedback_before.theta_e &&
+                       motor->fb.pos_r == feedback_before.pos_r &&
+                       motor->fb.pos_m == feedback_before.pos_m,
+                       "无效采样应保留上拍数值，不能用未初始化数据覆盖。");
+}
+
+static bool test_position_conversion_failure(foc_t *motor)
+{
+    encoder_valid = true;
+    position_valid = false;
+    current_valid = true;
+    event_count = 0U;
+    motor->fb.theta_e = 0.5f;
+    motor->fb.pos_r = 7.0f;
+    motor->fb.pos_m = 3.5f;
+    feedback_before = motor->fb;
+    fast_loop_step(motor);
+    position_valid = true;
+
+    return expect_cycle_events(0U) &&
+           expect_true(!motor->fb.pos_valid && motor->fb.i_valid &&
+                       motor->fb.theta_e == 0.5f && motor->fb.pos_r == 7.0f &&
+                       motor->fb.pos_m == 3.5f && motor->fb.vbus == 24.0f,
+                       "读到编码器但换算失败时，只保留旧位置，电流仍正常更新。");
 }
 
 static bool test_hal_callback_uses_firmware_motor(void)
@@ -227,6 +292,7 @@ static bool test_hal_callback_uses_firmware_motor(void)
         return false;
     }
     axdr_test_adc1.flags = ADC_FLAG_JEOS;
+    feedback_before = g_foc.fb;
     HAL_ADCEx_InjectedConvCpltCallback(&adc);
 
     return expect_true(event_count == EVENT_COUNT_PER_CYCLE && observation_calls == 1U,
@@ -264,6 +330,13 @@ int main(void)
         return 4;
     }
 
+    if (!test_position_conversion_failure(&motor) ||
+        !expect_true(feedback_unchanged_during_sampling,
+                     "所有分支的控制反馈都应在采样完成后装入。"))
+    {
+        return 6;
+    }
+
     /* 周期计数自然回绕、超期及间隔异常分别记账，不把间隔异常称为漏采。 */
     {
         target_irq_profile_t profile;
@@ -289,3 +362,17 @@ int main(void)
 
     return 0;
 }
+
+void drive_check_protection(foc_t *foc) { (void)foc; }
+void drive_update_state(foc_t *foc)
+{ (void)foc; }
+void drive_handle_state(foc_t *foc, drive_cycle_t *cycle)
+{ (void)foc; (void)cycle; }
+void drive_output(foc_t *foc, drive_cycle_t *cycle)
+{ (void)cycle; fake_drive_result(foc); }
+
+void foc_update_current(foc_t *foc, float theta, foc_frame_t *frame)
+{ (void)foc; *frame = (foc_frame_t){.theta = theta}; }
+
+bool foc_execute(foc_t *foc, const foc_plan_t *cmd, const foc_frame_t *frame)
+{ (void)foc; (void)cmd; (void)frame; return true; }

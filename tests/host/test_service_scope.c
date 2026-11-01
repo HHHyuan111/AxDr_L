@@ -223,19 +223,25 @@ int main(void)
              AXDR_CAPABILITY_SCOPE_SIGNAL_DIRECTORY)) == 0u);
     expect("proto passive observation capability",
            (rd_u32(resp_payload(), 12u) & AXDR_CAPABILITY_PASSIVE_OBSERVATION) != 0u);
+    expect("proto 20k stream capability",
+           (rd_u32(resp_payload(), 12u) & AXDR_CAPABILITY_OBSERVATION_20K_STREAM) != 0u);
+    expect("proto block capability", (rd_u32(resp_payload(), 12u) & AXDR_CAPABILITY_OBSERVATION_BLOCK_STREAM) != 0u);
     expect("proto old mask removed",
            (rd_u32(resp_payload(), 16u) & 0xF8000000u) == 0u);
     expect("other capabilities preserved", (rd_u32(resp_payload(), 12u) & 1u) == 1u);
     expect("other opcode bits preserved", (rd_u32(resp_payload(), 16u) & 1u) == 1u);
     send_frame(NULL, 0u, 1000u, AXDR_OPCODE_GET_DEVICE_INFO);
     expect("device preserved", rd_u32(resp_payload(), 0u) == 0x12345678u);
-    expect("observation firmware identity", rd_u16(resp_payload(), 8u) == 0u && rd_u16(resp_payload(), 10u) == 7u && rd_u16(resp_payload(), 12u) == 7u && rd_u32(resp_payload(), 20u) == 0x20261013u);
+    expect("observation firmware identity", rd_u16(resp_payload(), 8u) == 0u && rd_u16(resp_payload(), 10u) == 7u && rd_u16(resp_payload(), 12u) == 9u && rd_u32(resp_payload(), 20u) == 0x20261028u);
     memset(dir_req, 0, sizeof(dir_req));
     dir_req[0] = 16u;
     dir_req[2] = 2u;
     send_frame(dir_req, sizeof(dir_req), 1001u, AXDR_OPCODE_OBSERVATION_DIRECTORY);
     expect("new passive directory routed", reason() == AXDR_REASON_NONE && rd_u16(resp_payload(), 2u) == 17u && rd_u16(resp_payload(), 8u) == 32u);
     expect("passive query never starts sweep", g_diag.active == false);
+
+    send_frame(NULL, 0u, 1002u, AXDR_OPCODE_OBSERVATION_BLOCK_CONFIGURE);
+    expect("block routed to validation", reason() == AXDR_REASON_INVALID_PAYLOAD);
 
     /* 2) 0x1B 合法配置：q 轴 20-1000Hz 11 点 0.2A（真门面暂存） */
     memset(&cfg, 0, sizeof(cfg));

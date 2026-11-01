@@ -480,6 +480,11 @@ typedef struct __attribute__((packed))
     uint32_t telemetry_capture_count;
     uint32_t telemetry_sent_count;
     uint32_t telemetry_drop_count;
+    /* 0.7.7 追加（载荷 36→44B）：首故障定格——fault 从 0→非 0 首拍的
+     * 位图与上电毫秒；DISARM 清故障时一并清零。宿主按载荷长度兼容
+     * 36B 旧固件。first_fault_bits=0 表示自上次清除后无故障。 */
+    uint32_t first_fault_bits;
+    uint32_t first_fault_tick_ms;
 } axdr_runtime_state_payload_t;
 
 typedef struct __attribute__((packed))

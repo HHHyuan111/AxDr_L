@@ -8,6 +8,7 @@
 #include <stdio.h>
 
 #include "common.h"
+#include "foc_run.h"
 #include "drive_mode.h"
 
 typedef enum
@@ -79,8 +80,9 @@ bool drive_diag_prepare(foc_t *foc)
     return true;
 }
 
-bool drive_diag_step(foc_t *foc)
+bool drive_diag_step(foc_t *foc, foc_plan_t *cmd)
 {
+    (void)cmd;
     (void)foc;
     log_event(EVENT_IDENTIFICATION);
     return true;
@@ -92,10 +94,12 @@ static void log_event(mode_event_e event)
     event_count++;
 }
 
-void mit_step(foc_t *foc)
+bool mit_step(foc_t *foc, foc_plan_t *cmd)
 {
+    (void)cmd;
     (void)foc;
     log_event(EVENT_MIT);
+    return true;
 }
 
 void pt_tor_mode(foc_t *foc)
@@ -104,40 +108,52 @@ void pt_tor_mode(foc_t *foc)
     log_event(EVENT_TORQUE);
 }
 
-void pv_step(foc_t *foc)
+bool pv_step(foc_t *foc, foc_plan_t *cmd)
 {
+    (void)cmd;
     (void)foc;
     log_event(EVENT_VELOCITY);
+    return true;
 }
 
-void pp_step(foc_t *foc)
+bool pp_step(foc_t *foc, foc_plan_t *cmd)
 {
+    (void)cmd;
     (void)foc;
     log_event(EVENT_POSITION);
+    return true;
 }
 
-void cst_step(foc_t *foc)
+bool cst_step(foc_t *foc, foc_plan_t *cmd)
 {
+    (void)cmd;
     (void)foc;
     log_event(EVENT_CST);
+    return true;
 }
 
-void csv_step(foc_t *foc)
+bool csv_step(foc_t *foc, foc_plan_t *cmd)
 {
+    (void)cmd;
     (void)foc;
     log_event(EVENT_CSV);
+    return true;
 }
 
-void csp_step(foc_t *foc)
+bool csp_step(foc_t *foc, foc_plan_t *cmd)
 {
+    (void)cmd;
     (void)foc;
     log_event(EVENT_CSP);
+    return true;
 }
 
-void quick_stop_step(foc_t *foc)
+bool quick_stop_step(foc_t *foc, foc_plan_t *cmd)
 {
+    (void)cmd;
     (void)foc;
     log_event(EVENT_QUICK_STOP);
+    return true;
 }
 
 void fault_stop_step(foc_t *foc)
@@ -158,16 +174,20 @@ void anticogging_calibration(foc_t *foc)
     log_event(EVENT_ANTICOGGING);
 }
 
-void open_volt_step(foc_t *foc)
+bool open_volt_step(foc_t *foc, foc_plan_t *cmd)
 {
+    (void)cmd;
     (void)foc;
     log_event(EVENT_FORCE_VOLTAGE);
+    return true;
 }
 
-void open_cur_step(foc_t *foc)
+bool open_cur_step(foc_t *foc, foc_plan_t *cmd)
 {
+    (void)cmd;
     (void)foc;
     log_event(EVENT_FORCE_CURRENT);
+    return true;
 }
 
 bool foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float pos)
@@ -222,6 +242,25 @@ bool drive_pwm_commit(foc_t *foc)
     return true;
 }
 
+static bool run_mode(foc_t *foc)
+{
+    foc_plan_t cmd;
+    if (!drive_mode_step(foc, &cmd)) return false;
+    if (commit_count != 0U) return false; /* 生成给定不得提交 PWM。 */
+    if (foc->mode.sys != debug_mode || foc->mode.debug == drag_vf || foc->mode.debug == drag_if)
+        return true;
+    bool valid = false;
+    switch (cmd.ref.mode)
+    {
+        case FOC_CTRL_MODE_VOLT: valid = foc_volt_step(foc,cmd.ref.vd,cmd.ref.vq,cmd.theta); break;
+        case FOC_CTRL_MODE_CUR: valid = foc_cur_step(foc,cmd.ref.id_ref,cmd.ref.iq_ref,cmd.theta); break;
+        case FOC_CTRL_MODE_SPD: valid = foc_spd_step(foc,cmd.ref.spd_ref,cmd.ref.cur_lim,cmd.theta); break;
+        case FOC_CTRL_MODE_POS: valid = foc_pos_step(foc,cmd.ref.pos_ref,cmd.ref.spd_lim,cmd.ref.cur_lim,cmd.theta); break;
+        default: return false;
+    }
+    return valid && drive_pwm_commit(foc);
+}
+
 static bool expect_true(bool condition, const char *message)
 {
     if (condition)
@@ -240,7 +279,7 @@ static bool expect_dispatch(foc_t *foc,
     bool mode_valid;
 
     reset_fakes();
-    mode_valid = drive_mode_step(foc);
+    mode_valid = run_mode(foc);
 
     return expect_true(mode_valid, "已实现模式应返回有效。") &&
            expect_true(event_count == 1U, "模式应且只应调用一个实现。") &&
@@ -278,7 +317,7 @@ static bool test_release_modes(foc_t *foc)
     command_valid = false;
     foc->mode.release = cst_mode;
 
-    return expect_true(!drive_mode_step(foc),
+    return expect_true(!run_mode(foc),
                        "无效发布命令必须终止本周期模式。") &&
            expect_true(event_count == 0U,
                        "无效发布命令不能进入控制算法。");
@@ -321,7 +360,7 @@ static bool test_debug_modes(foc_t *foc)
     reset_fakes();
     foc_result_valid = false;
     foc->mode.debug = volt_op;
-    const bool mode_valid = drive_mode_step(foc);
+    const bool mode_valid = run_mode(foc);
 
     return expect_true(!mode_valid, "无效 FOC 结果应报告本周期模式失败。") &&
            expect_true(event_count == 1U, "无效 FOC 结果仍应完成本模式计算。") &&
@@ -362,7 +401,7 @@ static bool test_unimplemented_modes_do_nothing(foc_t *foc)
         foc->mode.release = release_modes[index];
         if (!expect_true(!drive_mode_is_supported(foc),
                          "未验证的发布模式不能标记为正式支持。") ||
-            !expect_true(!drive_mode_step(foc),
+            !expect_true(!run_mode(foc),
                          "未验证的发布模式必须明确返回失败。") ||
             !expect_true(event_count == 0U,
                          "未验证的发布模式不应调用算法实现。"))
@@ -378,7 +417,7 @@ static bool test_unimplemented_modes_do_nothing(foc_t *foc)
     {
         reset_fakes();
         foc->mode.calibrat = calibration_modes[index];
-        const bool mode_valid = drive_mode_step(foc);
+        const bool mode_valid = run_mode(foc);
         if (!expect_true(!mode_valid,
                          "未实现的标定模式必须明确返回失败。") ||
             !expect_true(event_count == 0U,
@@ -393,7 +432,7 @@ static bool test_unimplemented_modes_do_nothing(foc_t *foc)
     foc->mode.halt = fault_mode;
     if (!expect_true(!drive_mode_is_supported(foc),
                      "故障停车由 Drive 故障链直接处理，不进入运行模式。") ||
-        !expect_true(!drive_mode_step(foc),
+        !expect_true(!run_mode(foc),
                      "未接入的故障停车模式必须明确返回失败。"))
     {
         return false;
@@ -404,7 +443,7 @@ static bool test_unimplemented_modes_do_nothing(foc_t *foc)
     {
         reset_fakes();
         foc->mode.debug = debug_modes[index];
-        const bool mode_valid = drive_mode_step(foc);
+        const bool mode_valid = run_mode(foc);
         if (!expect_true(!mode_valid,
                          "未实现的调试模式必须明确返回失败。") ||
             !expect_true(event_count == 0U,
@@ -422,7 +461,7 @@ static bool test_unknown_system_mode_returns_failure(foc_t *foc)
     reset_fakes();
     foc->mode.sys = (sys_mode_e)99;
 
-    return expect_true(!drive_mode_step(foc),
+    return expect_true(!run_mode(foc),
                        "未知系统模式必须明确返回失败。") &&
            expect_true(event_count == 0U,
                        "未知系统模式不应调用任何实现。");

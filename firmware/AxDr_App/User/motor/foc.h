@@ -8,7 +8,10 @@
 
 #include "foc_fwd.h"
 
-/** @brief 固件唯一的 FOC 总对象，由快速控制周期独占写入。 */
+/** 硬件快速周期入口；反馈读取和状态调度都在控制主流程内。 */
+void foc_run(foc_t *foc);
+
+/** @brief FOC 总对象；反馈/运行状态由快环更新，服务层在短临界区发布给定。 */
 extern foc_t g_foc;
 
 /**

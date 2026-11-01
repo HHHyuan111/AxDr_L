@@ -14,6 +14,7 @@
 #include "common.h"
 #include "encoder_config.h"
 #include "math_const.h"
+#include "position_adapter.h"
 #include "speed_adapter.h"
 #include "target_encoder.h"
 
@@ -79,6 +80,7 @@ int main(void)
 {
     int fail = 0;
     encoder_data_t *abz = &g_foc.enc.abz;
+    position_sample_t sample = {0};
 
     /* 场景 1：编码器参数与换算（encoder_init 的 ABZ 分支）。 */
     encoder_init(&g_foc.enc);
@@ -105,45 +107,52 @@ int main(void)
 
     qenc_stub_count = 9990;
     (void)read_abz_raw(abz);
-    (void)position_update(&g_foc);
-    float pos_r_before = g_foc.fb.pos_r;
+    (void)position_update(&g_foc, &sample);
+    float pos_r_before = sample.pos_r;
     int rev_before = g_foc.fb.rev;
 
     qenc_stub_count = 5; /* 跨回绕 */
     (void)read_abz_raw(abz);
-    (void)position_update(&g_foc);
+    (void)position_update(&g_foc, &sample);
 
     /* dir=-1 在读数源头应用：TIM3 计数 9990→5 对应角度反转跨绕，rev 减、增量为负。 */
     fail += expect_i("rev decrement on reverse wrap", (long)g_foc.fb.rev, (long)(rev_before - 1));
     fail += expect_f("pos continuity",
-                     g_foc.fb.pos_r - pos_r_before,
+                     sample.pos_r - pos_r_before,
                      -15.0f * MATH_2PI / 10000.0f,
                      1e-3f);
 
     /* 场景 4：电角度换算：单圈角 θ，电角度 = θ×pn mod 2π。 */
     fail += expect_f("theta_e scaled",
-                     g_foc.fb.theta_e,
+                     sample.theta_e,
                      fmodf(g_foc.fb.enc_pos_r * 5.0f, MATH_2PI),
                      1e-4f);
 
+    fail += expect_f("fb theta waits for control", g_foc.fb.theta_e, 0.0f, 0.0f);
+    fail += expect_f("fb pos_r waits for control", g_foc.fb.pos_r, 0.0f, 0.0f);
+    fail += expect_f("fb pos_m waits for control", g_foc.fb.pos_m, 0.0f, 0.0f);
+    fail += expect_i("no fresh sample", position_update(&g_foc, &sample), false);
+    fail += expect_f("stale sample retained", sample.pos_r,
+                     pos_r_before - 15.0f * MATH_2PI / 10000.0f, 1e-3f);
+
     /* 场景 5：影子测速。窗口 2、fs 20000、每拍 +0.001 rad → Δ2拍=0.002，
      * 速度 = 0.002 × 20000 / 2 = 20 rad/s。 */
-    speed_est_init();
+    speed_est_init(&g_foc.speed);
     float pos = 1.0f;
     for (int i = 0; i < 4; i++)
     {
-        speed_est_step(pos, 20000.0f);
+        speed_est_step(&g_foc.speed, pos, 20000.0f, (uint32_t)i, true);
         pos += 0.001f;
     }
-    fail += expect_f("speed window", speed_est_get(), 20.0f, 1e-3f);
+    fail += expect_f("speed window", speed_est_get(&g_foc.speed), 20.0f, 1e-3f);
 
     /* 场景 6：测速跨零回绕：6.2820 → 0.0005 → 0.0015，速度仍应为 +10 rad/s。 */
-    speed_est_init();
-    speed_est_step(6.2820f, 20000.0f);
-    speed_est_step(0.0005f, 20000.0f); /* Δ 实际 +0.0025？不：2π=6.28319，6.2820→0.0005 绕回 Δ=+0.00131 */
-    speed_est_step(0.0015f, 20000.0f); /* 此拍与 6.2820 差 2 拍窗：Δ=0.0015-6.2820+2π=+0.00299 */
+    speed_est_init(&g_foc.speed);
+    speed_est_step(&g_foc.speed, 6.2820f, 20000.0f, 0U, true);
+    speed_est_step(&g_foc.speed, 0.0005f, 20000.0f, 1U, true); /* Δ 实际 +0.0025？不：2π=6.28319，6.2820→0.0005 绕回 Δ=+0.00131 */
+    speed_est_step(&g_foc.speed, 0.0015f, 20000.0f, 2U, true); /* 此拍与 6.2820 差 2 拍窗：Δ=0.0015-6.2820+2π=+0.00299 */
     /* 窗口 2：第 3 拍对比第 1 拍 */
-    fail += expect_f("speed wrap", speed_est_get(),
+    fail += expect_f("speed wrap", speed_est_get(&g_foc.speed),
                      (0.0015f - 6.2820f + MATH_2PI) * 20000.0f / 2.0f, 1e-2f);
 
     if (fail == 0)

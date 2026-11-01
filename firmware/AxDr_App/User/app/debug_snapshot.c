@@ -77,7 +77,7 @@ _RAM_FUNC void debug_snapshot_publish(const foc_t *foc)
     /* 关口①影子观测（只读诊断，不参与控制）。 */
     g_debug_snapshot.abz_raw = foc->enc.abz.raw;
     g_debug_snapshot.abz_pos = foc->enc.abz.pos;
-    g_debug_snapshot.abz_spd_raw = speed_est_get();
+    g_debug_snapshot.abz_spd_raw = speed_est_get(&foc->speed);
     g_debug_snapshot.abz_z = target_qenc_z_count();
 
     g_debug_snapshot.id_ref = foc->ref.id;

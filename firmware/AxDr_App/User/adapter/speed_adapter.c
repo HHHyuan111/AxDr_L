@@ -1,78 +1,60 @@
-/**
- * @file speed_adapter.c
- * @brief 位置差分测速（影子链）实现。
- *
- * 与 B 库 axdr_speed_estimator 同构：N 点历史环形缓冲 + 窗口差分 + 解卷绕。
- * 差分对单圈角做 ±π 回绕处理，因此跨零点转动不会产生虚假速度尖峰。
+/** @file speed_adapter.c
+ *  @brief 连续位置窗口差分。历史属于各自电机，不使用文件静态状态。
  */
-
 #include "speed_adapter.h"
-
-#include <stdbool.h>
-
+#include <math.h>
 #include "encoder_config.h"
 #include "math_const.h"
+_Static_assert(ABZ_SPEED_WINDOW_TICKS > 0U &&
+               ABZ_SPEED_WINDOW_TICKS < SPEED_HISTORY_DEPTH,
+               "Speed window must fit the position history");
 
-#define EST_HISTORY_DEPTH 8U /* B 库同深度 */
-
-static float est_hist[EST_HISTORY_DEPTH];
-static float est_speed;
-static uint32_t est_index;
-static bool est_ready;
-
-void speed_est_init(void)
+void speed_est_init(speed_est_t *est)
 {
-    uint32_t i;
-
-    for (i = 0U; i < EST_HISTORY_DEPTH; i++)
-    {
-        est_hist[i] = 0.0f;
-    }
-    est_index = 0U;
-    est_speed = 0.0f;
-    est_ready = false;
+    *est = (speed_est_t){0};
 }
 
-void speed_est_step(float pos_rad, float fs_hz)
+void speed_est_step(speed_est_t *est, float pos_rad, float fs_hz,
+                    uint32_t seq, bool valid)
 {
-    static const uint32_t window = ABZ_SPEED_WINDOW_TICKS;
-    float diff;
-
-    est_hist[est_index % EST_HISTORY_DEPTH] = pos_rad;
-    est_index++;
-
-    if (!est_ready && (est_index >= window))
+    const uint32_t window = ABZ_SPEED_WINDOW_TICKS;
+    /* 无效样本不进入窗口；序号用无符号差，正常回绕仍相差一拍。 */
+    if (!valid || !isfinite(pos_rad) || !isfinite(fs_hz) || fs_hz <= 0.0f)
     {
-        est_ready = true;
-    }
-    if (!est_ready)
-    {
+        est->count = 0U;
+        est->index = 0U;
         return;
     }
-
-    /* 窗口差分：当前值 减 window 拍前的历史值。
-     * est_index 已在写入后自增，当前值位于 (est_index-1)，窗口起点再往前 window 拍。 */
-    diff = pos_rad
-        - est_hist[(est_index - 1U + EST_HISTORY_DEPTH - window) % EST_HISTORY_DEPTH];
-
-    /* 单圈角解卷绕：差值折回 (-π, π] */
-    if (diff > MATH_PI)
+    if (est->count != 0U && seq - est->seq != 1U)
     {
-        diff -= MATH_2PI;
+        est->count = 0U;
+        est->index = 0U;
     }
-    else if (diff < -MATH_PI)
+    if (est->count >= window)
     {
-        diff += MATH_2PI;
+        const uint32_t past = (est->index + SPEED_HISTORY_DEPTH - window) % SPEED_HISTORY_DEPTH;
+        float diff = pos_rad - est->hist[past];
+        /* 沿用单圈角的解卷绕；窗口内转角须小于 pi。 */
+        if (diff > MATH_PI)
+        {
+            diff -= MATH_2PI;
+        }
+        else if (diff < -MATH_PI)
+        {
+            diff += MATH_2PI;
+        }
+        est->speed = diff * fs_hz / (float)window;
     }
     else
     {
-        /* 无回绕 */
+        ++est->count;
     }
-
-    est_speed = diff * fs_hz / (float)window;
+    est->hist[est->index] = pos_rad;
+    est->index = (est->index + 1U) % SPEED_HISTORY_DEPTH;
+    est->seq = seq;
 }
 
-float speed_est_get(void)
+float speed_est_get(const speed_est_t *est)
 {
-    return est_speed;
+    return est->speed;
 }

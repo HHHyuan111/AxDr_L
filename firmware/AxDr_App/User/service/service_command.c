@@ -27,11 +27,13 @@
 
 #include "axdr_command_core.h"
 #include "common.h"
+#include "service_drive_state.h"
 #include "drive.h" /* drive_fault_clear：DISARM 故障恢复路径清驱动锁存位 */
 #include "motor_config.h"
 #include "encoder_type.h"
 #include "service_telemetry.h"
 #include "service_usb.h"
+#include "target_irq_lock.h"
 
 /* ---- 板级/固件身份（上位机 GetDeviceInfo/GetProtocolInfo 匹配用） ---- */
 #define SVC_FW_MAJOR 0u
@@ -45,8 +47,10 @@
  * 再也使能不了，只能断电重启"的死局。
  * 上位机只按 major/minor 判兼容，patch 递增仅供操作员分辨新旧固件。
  * 0.7.6：SET_SPEED/SET_CURRENT 补 isfinite——NaN 与任何数比较恒假，
- * 纯范围检查放行 NaN 会毒化速度/电流参考（14 号政策阴招③）。 */
-#define SVC_FW_PATCH 6u
+ * 纯范围检查放行 NaN 会毒化速度/电流参考（14 号政策阴招③）。
+ * 0.7.7：运行态补首故障定格（fault 0→非 0 首拍位图+毫秒，DISARM
+ * 一并清除），GetRuntimeState 载荷 36→44B，宿主按长度兼容。 */
+#define SVC_FW_PATCH 7u
 #define SVC_DEVICE_FAMILY 0x00000001u /* 沉沙/AxDrive-L 驱动 */
 #define SVC_BOARD_PROFILE 0x00000003u /* hw_rev v1.3 */
 #define SVC_PRODUCT_NAME "AxDrService"
@@ -330,13 +334,21 @@ static uint8_t provide_runtime_state(uint8_t *resp, uint16_t cap,
     memset(&p, 0, sizeof(p));
     p.tick_ms = now_ms();
     p.ctrl_bit = (uint8_t)g_foc.req;
-    p.state_bit = (uint8_t)g_foc.state;
+    p.state_bit = service_drive_state(g_foc.state);
     p.sys_mode = (uint8_t)g_foc.mode.sys;
     p.debug_mode = (uint8_t)g_foc.mode.debug;
     p.release_mode = (uint8_t)g_foc.mode.release;
     p.encoder_type = (uint8_t)g_foc.enc.primary;
     p.phase_order = (uint8_t)g_foc.motor.phase_order;
     p.fault_bits = g_foc.fault.all;
+    p.first_fault_bits = g_foc.first_fault_bits;
+    p.first_fault_tick_ms = 0U;
+    if ((g_foc.first_fault_bits != 0U) && (g_foc.rate.foc_fs > 0.0f))
+    {
+        /* 控制拍序号换算毫秒：seq / (foc_fs/1000)。 */
+        p.first_fault_tick_ms = (uint32_t)((float)g_foc.first_fault_seq /
+                                           (g_foc.rate.foc_fs * 0.001f));
+    }
     p.telemetry_decimation = service_telemetry_decimation();
     p.telemetry_capture_count = service_telemetry_capture_count();
     p.telemetry_sent_count = service_telemetry_sent_count();
@@ -787,6 +799,14 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 return reason;
             }
+            /* 控制中断只能看到整组旧给定或整组新给定。
+             * 校验之后仍可能发生故障，所以关中断后再检查一次。 */
+            const irq_lock_key_t key = irq_lock();
+            if (g_foc.fault.all != 0u || g_foc.state == DRIVE_STATE_FAULT)
+            {
+                irq_unlock(key);
+                return AXDR_REASON_FAULT_ACTIVE;
+            }
             g_foc.mode.sys = debug_mode;
             g_foc.mode.debug = spd_curr_cl;
             g_foc.ref.iq = req->iq_limit_A;
@@ -795,6 +815,7 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 g_foc.req = DRIVE_REQ_START;
             }
+            irq_unlock(key);
             /* 合同：Set* 的 Applied 响应携带 40B 控制快照（active=1，
              * mode=协议编号），宿主校验一致才承认生效。 */
             *ack_state = AXDR_ACK_APPLIED;
@@ -826,6 +847,14 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 return reason;
             }
+            /* 控制中断只能看到整组旧给定或整组新给定。
+             * 校验之后仍可能发生故障，所以关中断后再检查一次。 */
+            const irq_lock_key_t key = irq_lock();
+            if (g_foc.fault.all != 0u || g_foc.state == DRIVE_STATE_FAULT)
+            {
+                irq_unlock(key);
+                return AXDR_REASON_FAULT_ACTIVE;
+            }
             g_foc.mode.sys = debug_mode;
             g_foc.mode.debug = curr_cl;
             g_foc.ref.id = req->id_target_A;
@@ -837,6 +866,7 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 g_foc.req = DRIVE_REQ_START;
             }
+            irq_unlock(key);
             /* 同 SET_SPEED：Applied 携带控制快照（active=1，mode=2）。 */
             *ack_state = AXDR_ACK_APPLIED;
             return provide_control_state(response_payload,
@@ -879,6 +909,14 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             }
             command_deadline_ms = now_ms() + 4000u;
             command_active = 1u;
+            /* 控制中断只能看到整组旧给定或整组新给定。
+             * 校验之后仍可能发生故障，所以关中断后再检查一次。 */
+            const irq_lock_key_t key = irq_lock();
+            if (g_foc.fault.all != 0u || g_foc.state == DRIVE_STATE_FAULT)
+            {
+                irq_unlock(key);
+                return AXDR_REASON_FAULT_ACTIVE;
+            }
             if (g_foc.enc_aligned == 0u)
             {
                 /* 触发内置对齐：START → STARTING 预定位（1s 电流渐变
@@ -891,6 +929,7 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
                 g_foc.ref.spd_r = 0.0f;
                 g_foc.req = DRIVE_REQ_START;
             }
+            irq_unlock(key);
             /* 已对齐：幂等成功，宿主轮询 alignment_valid 即刻完成。 */
             *ack_state = AXDR_ACK_APPLIED;
             return provide_control_state(response_payload,
@@ -934,18 +973,22 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             {
                 return AXDR_REASON_OUT_OF_RANGE;
             }
-            if (g_foc.state != DRIVE_STATE_STOP)
+            const irq_lock_key_t key = irq_lock();
+            if (g_foc.state != DRIVE_STATE_STOP || g_foc.req != DRIVE_REQ_STOP || g_foc.pwm_active)
             {
+                irq_unlock(key);
                 return AXDR_REASON_INVALID_STATE;
             }
             if (g_foc.fault.all != 0u)
             {
+                irq_unlock(key);
                 return AXDR_REASON_FAULT_ACTIVE;
             }
             g_foc.id_pi.kp = req->kp;
             g_foc.id_pi.ki = req->ki;
             g_foc.iq_pi.kp = req->kp;
             g_foc.iq_pi.ki = req->ki;
+            irq_unlock(key);
             current_pi_override_active = 1u;
             current_pi_generation++;
             *ack_state = AXDR_ACK_APPLIED;
@@ -955,27 +998,33 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
         }
 
         case AXDR_OPCODE_RESTORE_CURRENT_PI:
+        {
             if (request_payload_length != 0u)
             {
                 return AXDR_REASON_INVALID_PAYLOAD;
             }
-            if (g_foc.state != DRIVE_STATE_STOP)
+            const irq_lock_key_t key = irq_lock();
+            if (g_foc.state != DRIVE_STATE_STOP || g_foc.req != DRIVE_REQ_STOP || g_foc.pwm_active)
             {
+                irq_unlock(key);
                 return AXDR_REASON_INVALID_STATE;
             }
             if (g_foc.fault.all != 0u)
             {
+                irq_unlock(key);
                 return AXDR_REASON_FAULT_ACTIVE;
             }
             /* 复用固件自带公式重算默认值，与上电初始化路径一致，
              * 不在此处手写第二份 Ls*ibw/Rs*ibw 常量。 */
             cur_pi_init(&g_foc);
+            irq_unlock(key);
             current_pi_override_active = 0u;
             current_pi_generation++;
             *ack_state = AXDR_ACK_APPLIED;
             return provide_current_pi_state(response_payload,
                                             response_payload_capacity,
                                             response_payload_length);
+        }
 
         default:
             return AXDR_REASON_UNKNOWN_OPCODE;

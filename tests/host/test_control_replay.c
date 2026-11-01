@@ -7,7 +7,11 @@
 #include <math.h>
 #include <stdio.h>
 
+#include <stdlib.h>
+#include "board_adapter.h"
+#include "position_adapter.h"
 #include "common.h"
+#include "foc_run.h"
 #include "control_cycle.h"
 #include "speed_adapter.h"
 
@@ -73,8 +77,9 @@ bool drive_diag_prepare(foc_t *motor)
     return false;
 }
 
-bool drive_diag_step(foc_t *motor)
+bool drive_diag_step(foc_t *motor, foc_plan_t *cmd)
 {
+    (void)cmd;
     (void)motor;
     return false;
 }
@@ -92,49 +97,49 @@ void obs_step(const foc_t *motor)
     (void)motor;
 }
 
-void open_volt_step(foc_t *motor)
+bool open_volt_step(foc_t *motor, foc_plan_t *cmd)
 {
-    (void)motor;
+    (void)motor; (void)cmd; return false;
 }
 
-void open_cur_step(foc_t *motor)
+bool open_cur_step(foc_t *motor, foc_plan_t *cmd)
 {
-    (void)motor;
+    (void)motor; (void)cmd; return false;
 }
 
-void mit_step(foc_t *motor)
+bool mit_step(foc_t *motor, foc_plan_t *cmd)
 {
-    (void)motor;
+    (void)motor; (void)cmd; return false;
 }
 
-void pv_step(foc_t *motor)
+bool pv_step(foc_t *motor, foc_plan_t *cmd)
 {
-    (void)motor;
+    (void)motor; (void)cmd; return false;
 }
 
-void pp_step(foc_t *motor)
+bool pp_step(foc_t *motor, foc_plan_t *cmd)
 {
-    (void)motor;
+    (void)motor; (void)cmd; return false;
 }
 
-void cst_step(foc_t *motor)
+bool cst_step(foc_t *motor, foc_plan_t *cmd)
 {
-    (void)motor;
+    (void)motor; (void)cmd; return false;
 }
 
-void csv_step(foc_t *motor)
+bool csv_step(foc_t *motor, foc_plan_t *cmd)
 {
-    (void)motor;
+    (void)motor; (void)cmd; return false;
 }
 
-void csp_step(foc_t *motor)
+bool csp_step(foc_t *motor, foc_plan_t *cmd)
 {
-    (void)motor;
+    (void)motor; (void)cmd; return false;
 }
 
-void quick_stop_step(foc_t *motor)
+bool quick_stop_step(foc_t *motor, foc_plan_t *cmd)
 {
-    (void)motor;
+    (void)motor; (void)cmd; return false;
 }
 
 bool foc_volt_step(foc_t *motor, float voltage_d_v, float voltage_q_v, float angle_rad)
@@ -255,21 +260,21 @@ static int replay_speed_scenario(void)
         input.pos_r = pos;
         control_cycle_step(&motor, &input, &output);
     }
-    if (!(fabsf(speed_est_get() - 20.0f) <= 5.0e-3f))
+    if (!(fabsf(speed_est_get(&motor.speed) - 20.0f) <= 5.0e-3f))
     {
         (void)fprintf(stderr,
                       "回放速度断言失败：spd_r_raw=%.6f，期望 20。\n",
-                      (double)speed_est_get());
+                      (double)speed_est_get(&motor.speed));
         return 2;
     }
 
     /* 丢样本拍：速度必须冻结（保持上一拍值） */
     {
-        const float frozen = speed_est_get();
+        const float frozen = speed_est_get(&motor.speed);
         input = replay_sample(113U);
         input.pos_valid = false;
         control_cycle_step(&motor, &input, &output);
-        if (speed_est_get() != frozen)
+        if (speed_est_get(&motor.speed) != frozen)
         {
             (void)fprintf(stderr,
                           "丢样本拍速度未冻结：%.6f -> %.6f\n",
@@ -361,3 +366,20 @@ int main(void)
     }
     return 0;
 }
+
+/* 显式输入测试禁止访问硬件采样分支。 */
+bool encoder_sample(encoder_state_t *enc) { (void)enc; abort(); }
+bool position_update(foc_t *foc, position_sample_t *s) { (void)foc; (void)s; abort(); }
+bool foc_adc_sample(foc_t *foc, board_sample_t *s) { (void)foc; (void)s; abort(); }
+
+void foc_update_current(foc_t *foc, float theta, foc_frame_t *frame)
+{ (void)foc; *frame = (foc_frame_t){.theta = theta}; }
+
+bool foc_execute(foc_t *foc, const foc_plan_t *cmd, const foc_frame_t *frame)
+{ (void)frame;
+  if (cmd->ref.mode == FOC_CTRL_MODE_CUR)
+    return foc_cur_step(foc,cmd->ref.id_ref,cmd->ref.iq_ref,cmd->theta);
+  return false;
+}
+bool drive_diag_check_output(foc_t *foc, const foc_plan_t *cmd)
+{ (void)foc; (void)cmd; return true; }

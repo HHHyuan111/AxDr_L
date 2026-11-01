@@ -10,6 +10,7 @@
 
 #include "board_config.h"
 #include "common.h"
+#include "foc_run.h"
 #include "diag_runtime.h"
 #include "drive_diag.h"
 #include "service_param_store.h"
@@ -165,6 +166,19 @@ bool drive_pwm_commit(foc_t *foc)
     return true;
 }
 
+/* 验证生成/执行/验收三个边界；生产统一提交另由主流程测试覆盖。 */
+static bool run_diag(foc_t *foc)
+{
+    foc_plan_t cmd;
+    if (!drive_diag_step(foc, &cmd)) return false;
+    if (cmd.ref.mode == FOC_CTRL_MODE_CUR)
+        (void)foc_cur_step(foc, cmd.ref.id_ref, cmd.ref.iq_ref, cmd.theta);
+    else
+        (void)foc_volt_step(foc, cmd.ref.vd, cmd.ref.vq, cmd.theta);
+    if (!drive_diag_check_output(foc, &cmd)) return false;
+    return drive_pwm_commit(foc);
+}
+
 static bool expect_true(bool condition, const char *message)
 {
     if (condition)
@@ -302,7 +316,7 @@ static bool test_current_command_uses_fresh_feedback(void)
         .enable_request = true,
     };
 
-    if (!expect_true(drive_diag_step(&foc),
+    if (!expect_true(run_diag(&foc),
                      "有效电流命令应完成一次 FOC 和 PWM 提交。"))
     {
         return false;
@@ -343,7 +357,7 @@ static bool test_openloop_voltage_uses_command_angle(void)
         .enable_request = true,
     };
 
-    return expect_true(drive_diag_step(&foc),
+    return expect_true(run_diag(&foc),
                        "有效开环电压命令应完成一次 PWM 提交。")
         && expect_true(voltage_call_count == 1U,
                        "开环电压命令应调用现有电压控制。")
@@ -361,7 +375,7 @@ static bool test_finish_and_limit_return_to_stop(void)
     reset_fakes();
     g_diag.active = true;
     fake_step_status = MC_DONE;
-    if (!expect_true(!drive_diag_step(&done_pm),
+    if (!expect_true(!run_diag(&done_pm),
                      "任务完成后本周期应停止继续输出。")
         || !expect_true(done_pm.req == DRIVE_REQ_STOP,
                         "任务完成后应请求 Drive 停止。")
@@ -379,7 +393,7 @@ static bool test_finish_and_limit_return_to_stop(void)
         .enable_request = true,
     };
     g_diag.profile.voltage_limit_v = 0.5f;
-    return expect_true(!drive_diag_step(&limited_pm),
+    return expect_true(!run_diag(&limited_pm),
                        "FOC 输出超过诊断电压上限时必须停止。")
         && expect_true(abort_count == 1U,
                        "越过已确认电压上限时应中止当前任务。")

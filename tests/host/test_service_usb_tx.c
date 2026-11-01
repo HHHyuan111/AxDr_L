@@ -223,6 +223,35 @@ static void test_wrap_and_sustained_priority(void)
 
 int main(void)
 {
+    /* 20 kHz 四帧合发跨 14 个 USB 包；仍由最终回调释放且命令优先。 */
+    for (unsigned trial = 0u; trial < 2u; ++trial)
+    {
+        const unsigned length = trial == 0u ? 848u : 564u;
+        uint8_t batch[848];
+        uint8_t expected[848];
+        uint8_t command[32] = {0};
+        uint8_t oversize[SERVICE_USB_TX_DATA_MAX_SIZE + 1u] = {0};
+        reset();
+        for (unsigned i = 0; i < sizeof(batch); ++i) batch[i] = (uint8_t)i;
+        memcpy(expected, batch, sizeof(batch));
+        assert(service_usb_tx_enqueue_data(oversize, sizeof(oversize)) == 2);
+        assert(service_usb_tx_enqueue_data(batch, (uint16_t)length) == 0);
+        service_usb_tx_poll();
+        memset(batch, 0, sizeof(batch));
+        assert(service_usb_tx_enqueue_command(command, sizeof(command)) == 0);
+        for (unsigned offset = 0; offset < length; offset += 64u)
+        {
+            const unsigned count = length - offset < 64u ? length - offset : 64u;
+            assert(memcmp(inflight + offset, expected + offset, count) == 0);
+            service_usb_tx_poll();
+            assert(snapshot().data_completed == 0u);
+        }
+        complete();
+        service_usb_tx_poll();
+        assert(inflight_length == sizeof(command));
+        complete();
+        assert(snapshot().data_completed == 1u && snapshot().command_completed == 1u);
+    }
     test_delayed_multipacket_and_priority();
     test_busy_errors_and_full_queue();
     test_disconnect_reset_and_zlp();

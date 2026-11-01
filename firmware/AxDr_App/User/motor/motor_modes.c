@@ -1,59 +1,64 @@
 /**
  * @file motor_modes.c
- * @brief 当前正式 Drive 模式使用的电机控制适配函数。
+ * @brief 控制模式给定生成：轨迹、单位换算和控制角度。此文件不输出 PWM。
  */
 
 #include "common.h"
+#include "foc_run.h"
 
 #include <math.h>
 #include "algorithm_config.h"
 #include "control_limit.h"
 #include "control_mit.h"
 #include "control_traj.h"
-#include "drive_pwm.h"
+
 
 /**
- * @brief 按给定机械速度积分出电角度，执行开环电压控制并提交 PWM。
+ * @brief 按给定机械速度积分出电角度，生成开环电压给定。
  */
-_RAM_FUNC void open_volt_step(foc_t *foc)
+_RAM_FUNC bool open_volt_step(foc_t *foc, foc_plan_t *cmd)
 {
     foc->ref.spd_e = foc->ref.spd_r * foc->motor.pn;
     foc->ref.theta_step = foc->ref.spd_e * foc->rate.foc_ts;
     foc->ref.theta_e += foc->ref.theta_step;
     wrap_0_2pi(foc->ref.theta_e);
 
-    if (foc_volt_step(foc,
-                 foc->ref.vd,
-                 foc->ref.vq,
-                 foc->ref.theta_e))
-    {
-        (void)drive_pwm_commit(foc);
-    }
+    *cmd = (foc_plan_t){
+        .ref = {
+            .mode = FOC_CTRL_MODE_VOLT,
+            .vd = foc->ref.vd,
+            .vq = foc->ref.vq,
+        },
+        .theta = foc->ref.theta_e,
+    };
+    return true;
 }
 
 /**
- * @brief 按给定机械速度积分出电角度，执行开环电流控制并提交 PWM。
+ * @brief 按给定机械速度积分出电角度，生成开环电流给定。
  */
-_RAM_FUNC void open_cur_step(foc_t *foc)
+_RAM_FUNC bool open_cur_step(foc_t *foc, foc_plan_t *cmd)
 {
     foc->ref.spd_e = foc->ref.spd_r * foc->motor.pn;
     foc->ref.theta_step = foc->ref.spd_e * foc->rate.foc_ts;
     foc->ref.theta_e += foc->ref.theta_step;
     wrap_0_2pi(foc->ref.theta_e);
 
-    if (foc_cur_step(foc,
-                 foc->ref.id,
-                 foc->ref.iq,
-                 foc->ref.theta_e))
-    {
-        (void)drive_pwm_commit(foc);
-    }
+    *cmd = (foc_plan_t){
+        .ref = {
+            .mode = FOC_CTRL_MODE_CUR,
+            .id_ref = foc->ref.id,
+            .iq_ref = foc->ref.iq,
+        },
+        .theta = foc->ref.theta_e,
+    };
+    return true;
 }
 
 /**
- * @brief 执行 MIT 位置、速度和前馈转矩控制，并进入 FOC 电流环。
+ * @brief 把 MIT 位置、速度和前馈转矩换算为电流环给定。
  */
-_RAM_FUNC void mit_step(foc_t *foc)
+_RAM_FUNC bool mit_step(foc_t *foc, foc_plan_t *cmd)
 {
     const control_mit_input_t input = {
         .position_ref_rad = foc->ref.pos_m,
@@ -73,19 +78,21 @@ _RAM_FUNC void mit_step(foc_t *foc)
     foc->ref.torq_r = foc->ref.torq_mit * foc->motor.div_Gr;
     foc->ref.iq = foc->ref.torq_r * foc->motor.div_Kt;
 
-    if (foc_cur_step(foc,
-                     foc->ref.id,
-                     foc->ref.iq,
-                     foc->fb.theta_e))
-    {
-        (void)drive_pwm_commit(foc);
-    }
+    *cmd = (foc_plan_t){
+        .ref = {
+            .mode = FOC_CTRL_MODE_CUR,
+            .id_ref = foc->ref.id,
+            .iq_ref = foc->ref.iq,
+        },
+        .theta = foc->fb.theta_e,
+    };
+    return true;
 }
 
 /**
- * @brief 执行轮廓速度模式：先生成平滑速度参考，再运行速度—电流级联。
+ * @brief 执行轮廓速度模式：生成平滑速度参考，选择速度—电流级联。
  */
-_RAM_FUNC void pv_step(foc_t *foc)
+_RAM_FUNC bool pv_step(foc_t *foc, foc_plan_t *cmd)
 {
     foc->ref.spd_m_ramp = traj_spd_step(&foc->spd_traj,
                                      foc->ref.spd_m,
@@ -97,28 +104,31 @@ _RAM_FUNC void pv_step(foc_t *foc)
     foc->ref.iq = foc->ref.torq_r * foc->motor.div_Kt;
     foc->app.vel_reached = (foc->ref.spd_m_ramp == foc->ref.spd_m);
 
-    if (foc_spd_step(foc,
-                     foc->ref.spd_r,
-                     foc->ref.iq,
-                     foc->fb.theta_e))
-    {
-        (void)drive_pwm_commit(foc);
-    }
+    *cmd = (foc_plan_t){
+        .ref = {
+            .mode = FOC_CTRL_MODE_SPD,
+            .spd_ref = foc->ref.spd_r,
+            .cur_lim = foc->ref.iq,
+            .id_ref = foc->ref.id,
+        },
+        .theta = foc->fb.theta_e,
+    };
+    return true;
 }
 
 /**
- * @brief 执行轮廓位置模式：在线生成位置参考，再运行位置—速度—电流级联。
+ * @brief 执行轮廓位置模式：在线生成位置参考，选择位置—速度—电流级联。
  */
-_RAM_FUNC void pp_step(foc_t *foc)
+_RAM_FUNC bool pp_step(foc_t *foc, foc_plan_t *cmd)
 {
     float target;
     float spd_lim;
 
     if (foc->app.pos_pause)
     {
-        stop_ramp_step(foc, foc->app.pause_dec);
+        const bool ready = stop_ramp_step(foc, foc->app.pause_dec, cmd);
         foc->app.last_pos_pause = true;
-        return;
+        return ready;
     }
 
     if (foc->app.pos_ctrl_mode == abs_pos_mode)
@@ -142,7 +152,7 @@ _RAM_FUNC void pp_step(foc_t *foc)
     }
     else
     {
-        return;
+        return false;
     }
 
     spd_lim = fabsf(foc->ref.spd_m);
@@ -164,56 +174,64 @@ _RAM_FUNC void pp_step(foc_t *foc)
     foc->app.pos_reached = foc->pos_traj.done;
     foc->app.last_pos_pause = false;
 
-    if (foc_pos_step(foc,
-                     foc->ref.pos_r,
-                     foc->ref.spd_r,
-                     foc->ref.iq,
-                     foc->fb.theta_e))
-    {
-        (void)drive_pwm_commit(foc);
-    }
+    *cmd = (foc_plan_t){
+        .ref = {
+            .mode = FOC_CTRL_MODE_POS,
+            .pos_ref = foc->ref.pos_r,
+            .spd_lim = foc->ref.spd_r,
+            .cur_lim = foc->ref.iq,
+            .id_ref = foc->ref.id,
+        },
+        .theta = foc->fb.theta_e,
+    };
+    return true;
 }
 
 /**
- * @brief 把输出轴转矩指令换算为 q 轴电流，执行 CST 电流环。
+ * @brief 把输出轴转矩指令换算为 q 轴电流，生成 CST 电流环给定。
  */
-_RAM_FUNC void cst_step(foc_t *foc)
+_RAM_FUNC bool cst_step(foc_t *foc, foc_plan_t *cmd)
 {
     foc->ref.torq_r = foc->ref.torq_m * foc->motor.div_Gr;
     foc->ref.iq = foc->ref.torq_r * foc->motor.div_Kt;
 
-    if (foc_cur_step(foc,
-                 foc->ref.id,
-                 foc->ref.iq,
-                 foc->fb.theta_e))
-    {
-        (void)drive_pwm_commit(foc);
-    }
+    *cmd = (foc_plan_t){
+        .ref = {
+            .mode = FOC_CTRL_MODE_CUR,
+            .id_ref = foc->ref.id,
+            .iq_ref = foc->ref.iq,
+        },
+        .theta = foc->fb.theta_e,
+    };
+    return true;
 }
 
 /**
- * @brief 把输出轴速度指令换算到转子侧，执行 CSV 速度—电流级联。
+ * @brief 把输出轴速度指令换算到转子侧，生成 CSV 速度—电流级联给定。
  */
-_RAM_FUNC void csv_step(foc_t *foc)
+_RAM_FUNC bool csv_step(foc_t *foc, foc_plan_t *cmd)
 {
     foc->ref.spd_m_ramp = foc->ref.spd_m;
     foc->ref.spd_r = foc->ref.spd_m_ramp * foc->motor.Gr;
     foc->ref.torq_r = foc->ref.torq_m * foc->motor.div_Gr;
     foc->ref.iq = foc->ref.torq_r * foc->motor.div_Kt;
 
-    if (foc_spd_step(foc,
-                foc->ref.spd_r,
-                foc->ref.iq,
-                foc->fb.theta_e))
-    {
-        (void)drive_pwm_commit(foc);
-    }
+    *cmd = (foc_plan_t){
+        .ref = {
+            .mode = FOC_CTRL_MODE_SPD,
+            .spd_ref = foc->ref.spd_r,
+            .cur_lim = foc->ref.iq,
+            .id_ref = foc->ref.id,
+        },
+        .theta = foc->fb.theta_e,
+    };
+    return true;
 }
 
 /**
- * @brief 把输出轴位置指令换算到转子侧，执行 CSP 位置—速度—电流级联。
+ * @brief 把输出轴位置指令换算到转子侧，生成 CSP 位置—速度—电流级联给定。
  */
-_RAM_FUNC void csp_step(foc_t *foc)
+_RAM_FUNC bool csp_step(foc_t *foc, foc_plan_t *cmd)
 {
     foc->ref.pos_m_ramp = foc->ref.pos_m;
     foc->ref.pos_r = foc->ref.pos_m_ramp * foc->motor.Gr;
@@ -221,22 +239,25 @@ _RAM_FUNC void csp_step(foc_t *foc)
     foc->ref.torq_r = foc->ref.torq_m * foc->motor.div_Gr;
     foc->ref.iq = foc->ref.torq_r * foc->motor.div_Kt;
 
-    if (foc_pos_step(foc,
-                foc->ref.pos_r,
-                foc->ref.spd_r,
-                foc->ref.iq,
-                foc->fb.theta_e))
-    {
-        (void)drive_pwm_commit(foc);
-    }
+    *cmd = (foc_plan_t){
+        .ref = {
+            .mode = FOC_CTRL_MODE_POS,
+            .pos_ref = foc->ref.pos_r,
+            .spd_lim = foc->ref.spd_r,
+            .cur_lim = foc->ref.iq,
+            .id_ref = foc->ref.id,
+        },
+        .theta = foc->fb.theta_e,
+    };
+    return true;
 }
 
 /**
- * @brief 按给定减速度逐周期降低速度指令，并继续执行闭环速度控制。
+ * @brief 按给定减速度逐周期降低速度指令，生成减速期间的速度环给定。
  *
  * @param[in] deceleration_rad_s2 输出轴减速度绝对值，单位为 rad/s²。
  */
-_RAM_FUNC void stop_ramp_step(foc_t *foc, float deceleration_rad_s2)
+_RAM_FUNC bool stop_ramp_step(foc_t *foc, float deceleration_rad_s2, foc_plan_t *cmd)
 {
     if (foc->ref.spd_m > 0.0f)
     {
@@ -255,24 +276,28 @@ _RAM_FUNC void stop_ramp_step(foc_t *foc, float deceleration_rad_s2)
         }
     }
 
-    if (foc_spd_step(foc,
-                foc->ref.spd_r,
-                foc->ref.iq,
-                foc->fb.theta_e))
-    {
-        (void)drive_pwm_commit(foc);
-    }
+    *cmd = (foc_plan_t){
+        .ref = {
+            .mode = FOC_CTRL_MODE_SPD,
+            .spd_ref = foc->ref.spd_r,
+            .cur_lim = foc->ref.iq,
+            .id_ref = foc->ref.id,
+        },
+        .theta = foc->fb.theta_e,
+    };
+    return true;
 }
 
 /**
  * @brief 执行快速停机减速；转子速度足够低后切回 STOP 请求。
  */
-_RAM_FUNC void quick_stop_step(foc_t *foc)
+_RAM_FUNC bool quick_stop_step(foc_t *foc, foc_plan_t *cmd)
 {
-    stop_ramp_step(foc, foc->app.quick_stop_dec);
+    const bool ready = stop_ramp_step(foc, foc->app.quick_stop_dec, cmd);
     if (fabsf(foc->fb.spd_r) < CTRL_QUICK_STOP_SPEED_THRESHOLD_RAD_S)
     {
         foc->req = DRIVE_REQ_STOP;
         foc->mode.sys = release_mode;
     }
+    return ready;
 }

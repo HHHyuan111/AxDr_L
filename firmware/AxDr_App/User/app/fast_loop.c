@@ -1,9 +1,10 @@
 /**
  * @file fast_loop.c
- * @brief 电机快速控制周期编排。
+ * @brief ADC 中断中的电机控制入口，每 50 us 执行一次（20 kHz）。
  *
- * 数据流：ADC 周期中断 -> 编码器与 ADC 采样 -> 反馈更新 -> Drive -> 调试快照。
- * 本文件只负责安排调用顺序，统一使用 foc_t 总对象，不展开硬件或控制公式。
+ * 执行顺序：调用 FOC 主流程 → 保存观测结果。
+ * 电流单位 A，电压单位 V，机械角和电角度单位 rad。
+ * 启停、保护和 PWM 提交由 FOC 主流程内的 Drive 处理。
  */
 
 #include "fast_loop.h"
@@ -11,16 +12,13 @@
 #include <stdbool.h>
 
 #include "common.h"
-#include "control_cycle.h"
 #include "cycle_record.h"
 #include "debug_snapshot.h"
 
-/*
- * 主初始化流程只把本标志从 false 写为 true 一次，ADC 中断只读取它。
- * volatile 保证中断每次都读取最新值；它不承担通用的多线程同步功能。
- */
+/* 初始化完成前禁止执行控制；主程序只置位一次，中断只读。 */
 static volatile bool fast_loop_enabled = false;
 
+/* 由主程序在控制器初始化、参数恢复之后调用；这不等于使能功率输出。 */
 void fast_loop_enable(void)
 {
     fast_loop_enabled = true;
@@ -28,52 +26,18 @@ void fast_loop_enable(void)
 
 _RAM_FUNC void fast_loop_step(foc_t *foc)
 {
-    bool current_valid;
-    bool encoder_valid;
-    bool position_valid;
-    control_cycle_input_t input;
-    control_cycle_output_t output;
-
-    /*
-     * ADC 和 TIM1 通道 4 必须先运行，电流零偏校准才能取得持续更新的采样值；
-     * 但 foc_init() 完成以前，不能让中断访问正在初始化的 FOC 对象。
-     */
+    /* 零偏校准期间 ADC 已运行，但控制器还未就绪。 */
     if (!fast_loop_enabled)
     {
         return;
     }
 
-    /* 本序号标识一次完整快速周期；自然回绕不改变周期先后关系。 */
+    /* 采样、控制和观测共用本周期编号。 */
     foc->fast_seq++;
 
-    /* 第 1 步：读取编码器，并更新机械角、电角度和多圈位置。 */
-    encoder_valid = encoder_sample(&foc->enc);
-    position_valid = encoder_valid && position_update(foc);
+    foc_run(foc);
 
-    /* 第 2 步：读取 ADC 原始值，并换算本周期三相电流。 */
-    current_valid = foc_adc_sample(foc);
-
-    /* 第 3 步：把本周期物理反馈整理为硬件无关的控制输入。 */
-    input = (control_cycle_input_t){
-        .seq = foc->fast_seq,
-        .i_valid = current_valid,
-        .vbus_valid = true,
-        .pos_valid = position_valid,
-        .ia = foc->fb.ia,
-        .ib = foc->fb.ib,
-        .ic = foc->fb.ic,
-        .vbus = foc->fb.vbus,
-        .theta_e = foc->fb.theta_e,
-        .pos_r = foc->fb.pos_r,
-        .pos_m = foc->fb.pos_m,
-    };
-
-    /* 第 4 步：使用显式输入执行反馈更新、状态机和当前控制模式。 */
-    control_cycle_step(foc, &input, &output);
-
-    /* 第 5 步：复制本周期最终结果，仅供调试器观察，不参与控制。 */
+    /* 保存控制后的结果。周期记录仅在人工启用时保留最近 32 拍。 */
     debug_snapshot_publish(foc);
-
-    /* 第 6 步：仅在人工启用时，保存最近 32 个周期供离线分析。 */
     cycle_record_publish(foc);
 }

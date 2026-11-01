@@ -21,6 +21,7 @@
 #include "encoder_type.h"
 #include "foc.h"
 #include "phase_order.h"
+#include "speed_est.h"
 
 #define _RAM_FUNC PLATFORM_FAST_CODE
 #define _RAM_DATA PLATFORM_FAST_DATA
@@ -147,6 +148,8 @@ typedef enum
     DRIVE_STATE_STARTING,
     DRIVE_STATE_RUN,
     DRIVE_STATE_FAULT,
+    DRIVE_STATE_ALIGN,    /* 上电定零；完成后回 STOP，等待再次启动。 */
+    DRIVE_STATE_DIAG,     /* 已授权的诊断控制。 */
 } drive_state_e;
 
 typedef enum
@@ -459,6 +462,10 @@ struct foc
     foc_out_state_t out;
     ctrl_rate_cfg_t rate;
     foc_fault_t fault;
+    /* 首故障定格：fault 从 0→非 0 的首拍锁存（位图+当时 fast_seq），
+     * DISARM 清故障时一并清零。上报换算 ms=seq/(foc_fs/1000)。 */
+    uint32_t first_fault_bits;
+    uint32_t first_fault_seq;
     drive_protection_config_t prot_cfg;
     drive_protection_state_t prot_state;
     encoder_state_t enc;
@@ -484,33 +491,24 @@ struct foc
     lpf_t wr_lpf;
     traj_spd_t spd_traj;
     traj_pos_t pos_traj;
+    speed_est_t speed; /* 每个电机独立保存测速窗口；旧成员偏移不变。 */
 };
 
 void ctrl_fb_update(foc_t *foc, float vbus);
-bool foc_adc_sample(foc_t *foc);
 void cur_offset_init(foc_t *foc);
 void cur_pi_init(foc_t *foc);
 void spd_pi_init(foc_t *foc);
 
-bool foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float angle);
-bool foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float angle);
-bool foc_spd_step(foc_t *foc, float spd_ref, float cur_lim, float angle);
-bool foc_pos_step(foc_t *foc,
-                  float pos_ref,
-                  float spd_lim,
-                  float cur_lim,
-                  float angle);
-
-void stop_ramp_step(foc_t *foc, float dec);
-void quick_stop_step(foc_t *foc);
-void open_volt_step(foc_t *foc);
-void open_cur_step(foc_t *foc);
-void mit_step(foc_t *foc);
-void pv_step(foc_t *foc);
-void pp_step(foc_t *foc);
-void cst_step(foc_t *foc);
-void csv_step(foc_t *foc);
-void csp_step(foc_t *foc);
+bool stop_ramp_step(foc_t *foc, float dec, foc_plan_t *cmd);
+bool quick_stop_step(foc_t *foc, foc_plan_t *cmd);
+bool open_volt_step(foc_t *foc, foc_plan_t *cmd);
+bool open_cur_step(foc_t *foc, foc_plan_t *cmd);
+bool mit_step(foc_t *foc, foc_plan_t *cmd);
+bool pv_step(foc_t *foc, foc_plan_t *cmd);
+bool pp_step(foc_t *foc, foc_plan_t *cmd);
+bool cst_step(foc_t *foc, foc_plan_t *cmd);
+bool csv_step(foc_t *foc, foc_plan_t *cmd);
+bool csp_step(foc_t *foc, foc_plan_t *cmd);
 
 void encoder_init(encoder_state_t *enc);
 bool read_mt6816_raw(encoder_data_t *enc);
@@ -518,8 +516,6 @@ bool read_abz_raw(encoder_data_t *enc);
 bool read_ma732_raw(encoder_data_t *enc);
 void encoder_update_angle(encoder_data_t *enc);
 bool encoder_sample(encoder_state_t *enc);
-bool position_update(foc_t *foc);
-void position_update_single_encoder(foc_t *foc);
 
 /* 仅由 tests/legacy 的数值对照实现使用。 */
 float sin_f32(float x);

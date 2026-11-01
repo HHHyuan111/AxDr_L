@@ -1,6 +1,13 @@
 #ifndef AXDR_HOST_TEST_FAKE_MAIN_H
 #define AXDR_HOST_TEST_FAKE_MAIN_H
 
+unsigned __get_PRIMASK(void);
+void __disable_irq(void);
+void __set_PRIMASK(unsigned key);
+
+/* 仅让含初始化代码的 foc_drv.c 通过宿主编译；测试不调用延时/零偏校准。 */
+void HAL_Delay(unsigned int ms);
+
 /* common.h 在电脑端只需要 CMSIS 提供的两个类型限定符。 */
 #ifndef __IO
 #define __IO volatile

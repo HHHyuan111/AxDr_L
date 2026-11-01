@@ -10,6 +10,14 @@
 
 #include "foc_fwd.h"
 
+typedef struct drive_cycle drive_cycle_t;
+
+/* 下列四步由 control_cycle_step 依次调用；内部上下文定义见 drive_cycle.h。 */
+void drive_check_protection(foc_t *foc);
+void drive_update_state(foc_t *foc);
+void drive_handle_state(foc_t *foc, drive_cycle_t *cycle);
+void drive_output(foc_t *foc, drive_cycle_t *cycle);
+
 /**
  * @brief 在功率输出已经关闭时清除 Drive 锁存故障。
  *
@@ -20,17 +28,5 @@
  * 会在保护链中再次锁存故障。本函数不启动或停止硬件。
  */
 bool drive_fault_clear(foc_t *foc);
-
-/**
- * @brief 执行一次 Drive 状态与模式调度。
- *
- * @param[in,out] foc 电机控制对象。
- *
- * @pre foc 必须指向已经初始化、由当前快速周期独占写入的有效对象。
- *
- * 本函数由 20 kHz 快速周期调用。START 请求只执行一次启动动作，随后自动转为
- * RUN 请求；STOP 和 FAULT 会关闭三相 PWM。函数不改变 FOC 公式和控制参数。
- */
-void drive_fast_step(foc_t *foc);
 
 #endif /* AXDR_DRIVE_H */

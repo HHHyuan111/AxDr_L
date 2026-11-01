@@ -29,16 +29,16 @@ bool drive_mode_is_supported(const foc_t *foc);
 bool drive_mode_prepare(foc_t *foc);
 
 /**
- * @brief 执行当前选定的 PMSM 控制、标定或辨识模式。
+ * @brief 生成当前控制模式的给定和角度，不执行控制器或 PWM。
  *
  * @param[in,out] foc 电机控制对象。
  * @pre foc 指向快速周期独占写入的有效对象，Drive 已确认当前允许运行。
  *
- * @return 当前模式存在可执行实现时返回 true；模式无效、未实现或本周期控制计算
+ * @return 当前模式存在可执行实现时返回 true；模式无效、未实现或本周期给定生成
  *         失败时返回 false。返回 false 后由 Drive 统一关闭功率输出。
  *
  * 本函数只按 mode 分派到现有实现，不决定 START/STOP/FAULT 状态。
  */
-bool drive_mode_step(foc_t *foc);
+bool drive_mode_step(foc_t *foc, foc_plan_t *cmd);
 
 #endif /* AXDR_DRIVE_MODE_H */

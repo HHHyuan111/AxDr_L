@@ -1,4 +1,5 @@
 #include "common.h"
+#include "foc_run.h"
 #include "motor_profile.h"
 #include "speed_adapter.h"
 
@@ -186,7 +187,7 @@ void foc_init(foc_t *foc)
     foc->enc.source = POSITION_SOURCE_ENCODER;
     foc->enc.primary = ENCODER_SELECTED_TYPE;
     encoder_init(&foc->enc);
-    speed_est_init(); /* 影子测速历史清零（关口①对照链） */
+    speed_est_init(&foc->speed); /* 清本电机测速历史。 */
 
     /* 默认使用零电流闭环调试；切换模式前仍需显式发送 START 请求。 */
     foc->mode.sys = debug_mode;
@@ -250,10 +251,10 @@ _RAM_FUNC void spd_pi_init(foc_t *foc)
 /**
  * @brief 把现有电机对象映射到可移植控制主链，并将本周期结果写回。
  */
-static _RAM_FUNC bool foc_ctrl_run(
+_RAM_FUNC bool foc_execute(
     foc_t *foc,
-    float theta_e,
-    const foc_ref_t *ref)
+    const foc_plan_t *cmd,
+    const foc_frame_t *frame)
 {
     foc_ctrl_t ctrl = {
         .cur_rate = {
@@ -286,18 +287,14 @@ static _RAM_FUNC bool foc_ctrl_run(
         },
     };
     const foc_fb_t fb = {
-        .sample = {
-            .ia = foc->fb.ia,
-            .ib = foc->fb.ib,
-            .ic = foc->fb.ic,
-            .theta = theta_e,
-        },
         .inv_vbus = foc->fb.inv_vbus,
         .spd = foc->fb.spd_r,
         .pos = foc->fb.pos_r,
     };
     foc_out_t out;
-    const bool valid = foc_ctrl_step(&ctrl, &fb, ref, &out);
+    const bool valid = foc_ctrl_execute(&ctrl, &fb, &cmd->ref, frame, &out);
+
+    foc->out.mode = (foc_mode_e)cmd->ref.mode;
 
     foc->rate.cur_pid_cnt = ctrl.cur_rate.count;
     foc->rate.spd_pid_cnt = ctrl.spd_rate.count;
@@ -305,13 +302,6 @@ static _RAM_FUNC bool foc_ctrl_run(
     foc->ref.iq_lim = ctrl.iq_ref;
     foc->ref.spd_r_lim = ctrl.spd_ref;
 
-    foc->out.theta = out.frame.theta;
-    foc->out.sin = out.frame.sin;
-    foc->out.cos = out.frame.cos;
-    foc->fb.ialpha = out.frame.ialpha;
-    foc->fb.ibeta = out.frame.ibeta;
-    foc->fb.id = out.frame.id;
-    foc->fb.iq = out.frame.iq;
     foc->out.vd = out.vd;
     foc->out.vq = out.vq;
     foc->out.valpha = out.pwm.valpha;
@@ -323,104 +313,20 @@ static _RAM_FUNC bool foc_ctrl_run(
     return valid;
 }
 
-/**
-***********************************************************************
-* @brief:      foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float angle)
-* @param[in]:  foc 指向 PMSM 参数结构体的指针
-* @param[in]:  vd_ref d轴电压参考值
-* @param[in]:  vq_ref q轴电压参考值
-* @param[in]:  pos    电机电气位置（角度/弧度）
-* @retval:     true 占空比有效，可提交到 PWM；false 不应更新 PWM
-* @details:    电压控制，设置d/q轴电压参考值，完成Clarke、Park变换及SVPWM计算
-***********************************************************************
-**/
-_RAM_FUNC bool foc_volt_step(foc_t *foc, float vd_ref, float vq_ref, float angle)
+/* 电流和角度转换只有这一处；角度由状态/模式在前一步选好。 */
+_RAM_FUNC void foc_update_current(foc_t *foc, float theta, foc_frame_t *frame)
 {
-    const foc_ref_t ref = {
-        .mode = FOC_CTRL_MODE_VOLT,
-        .vd = vd_ref,
-        .vq = vq_ref,
+    const foc_sample_t sample = {
+        .ia = foc->fb.ia, .ib = foc->fb.ib, .ic = foc->fb.ic, .theta = theta,
     };
-
-    foc->out.mode = foc_volt_mode;
-    return foc_ctrl_run(foc, angle, &ref);
-}
-
-
-/**
-***********************************************************************
-* @brief:      foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float angle)
-* @param[in]:  foc      指向 PMSM 参数结构体的指针
-* @param[in]:  id_set  d轴电流设定值
-* @param[in]:  iq_set  q轴电流设定值
-* @param[in]:  pos     电机电气位置（角度/弧度）
-* @retval:     true 占空比有效，可提交到 PWM；false 不应更新 PWM
-* @details:    电流环控制，完成Clarke、Park变换、PI调节和SVPWM计算
-***********************************************************************
-**/
-_RAM_FUNC bool foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float angle)
-{
-    const foc_ref_t ref = {
-        .mode = FOC_CTRL_MODE_CUR,
-        .id_ref = id_ref,
-        .iq_ref = iq_ref,
-    };
-
-    foc->out.mode = foc_curr_mode;
-    return foc_ctrl_run(foc, angle, &ref);
-}
-/**
-***********************************************************************
-* @brief:      foc_spd_step(foc_t *foc, float spd_ref, float cur_lim, float angle)
-* @param[in]:  foc      指向 PMSM 参数结构体的指针
-* @param[in]:  vel_set 速度设定值
-* @param[in]:  iq_set  q轴电流设定值，实则是电流限制值
-* @param[in]:  pos     电机电气位置（角度/弧度）
-* @retval:     true 占空比有效，可提交到 PWM；false 不应更新 PWM
-* @details:    速度环控制，完成Clarke、Park变换、PI调节、电流限制和SVPWM计算
-***********************************************************************
-**/
-_RAM_FUNC bool foc_spd_step(foc_t *foc, float spd_ref, float cur_lim, float angle)
-{
-    const foc_ref_t ref = {
-        .mode = FOC_CTRL_MODE_SPD,
-        .id_ref = foc->ref.id,
-        .spd_ref = spd_ref,
-        .cur_lim = cur_lim,
-    };
-
-    foc->out.mode = foc_vel_mode;
-    return foc_ctrl_run(foc, angle, &ref);
-}
-
-/**
-***********************************************************************
-* @brief:      foc_pos_step(foc_t *foc, float pos_ref, float spd_lim, float cur_lim, float angle)
-* @param[in]:  foc       指向 PMSM 参数结构体的指针
-* @param[in]:  pos_set  位置设定值
-* @param[in]:  vel_set  速度设定值，实则是速度限制
-* @param[in]:  iq_set   q轴电流设定值，实则是电流限制值
-* @param[in]:  pos      电机电气位置（角度/弧度）
-* @retval:     true 占空比有效，可提交到 PWM；false 不应更新 PWM
-* @details:    位置环控制，完成Clarke、Park变换、PI调节、速度/电流限制和SVPWM计算
-***********************************************************************
-**/
-_RAM_FUNC bool foc_pos_step(foc_t *foc,
-                            float pos_ref,
-                            float spd_lim,
-                            float cur_lim,
-                            float angle)
-{
-    const foc_ref_t ref = {
-        .mode = FOC_CTRL_MODE_POS,
-        .id_ref = foc->ref.id,
-        .pos_ref = pos_ref,
-        .cur_lim = cur_lim,
-        .spd_lim = spd_lim,
-    };
-
-    foc->out.mode = foc_pos_mode;
-    return foc_ctrl_run(foc, angle, &ref);
+    foc_core_prepare(&sample, frame);
+    foc->out.theta = frame->theta;
+    foc->out.sin = frame->sin;
+    foc->out.cos = frame->cos;
+    foc->fb.ialpha = frame->ialpha;
+    foc->fb.ibeta = frame->ibeta;
+    foc->fb.id = frame->id;
+    foc->fb.iq = frame->iq;
 }
 
 /**
@@ -470,7 +376,7 @@ _RAM_FUNC void ctrl_fb_update(foc_t *foc, float vbus)
      * 旧链为电角度单拍差分（foc->elec_speed_diff），已由 speed_adapter 取代；
      * fb.spd_e 无其他消费者，保留字段由新测速推导以维持可观测性。 */
     {
-        float spd_r = speed_est_get(); /* rad/s，转子机械角速度 */
+        float spd_r = speed_est_get(&foc->speed); /* rad/s，转子机械角速度 */
         foc->fb.spd_e = spd_r * foc->motor.pn;
         foc->fb.spd_r_raw = spd_r; /* rad/s */
     }
@@ -513,52 +419,4 @@ void cur_offset_init(foc_t *foc)
     foc->adc.ia_off = ia_sum * 0.001f;
     foc->adc.ib_off = ib_sum * 0.001f;
     foc->adc.ic_off = ic_sum * 0.001f;
-}
-
-/**
- * @brief 读取本控制周期的原始 ADC 数据并换算三相电流。
- *
- * @param[in,out] foc 电机控制对象，用于保存原始 ADC 值和换算后的三相电流。
- *
- * 函数依次完成三件事：从板级适配层取得原始计数值；根据 ABC/ACB 接线关系
- * 映射到 A、B、C 相；扣除零偏并乘以电流换算系数。采样触发和 DMA 不在这里处理。
- *
- * @return 相序有效并完成电流换算返回 true，否则返回 false。
- */
-_RAM_FUNC bool foc_adc_sample(foc_t *foc)
-{
-    const board_adc_cfg_t cfg = {
-        .phase_order = foc->motor.phase_order,
-        .i_scale = foc->board.i_ratio,
-        .v_scale = foc->board.v_ratio,
-        .i_offset_a = foc->adc.ia_off,
-        .i_offset_b = foc->adc.ib_off,
-        .i_offset_c = foc->adc.ic_off,
-    };
-    target_adc_raw_t raw;
-    board_sample_t sample;
-
-    /* 第 1 步：从板级适配层取得当前已经完成的 ADC 原始结果。 */
-    target_adc_read_raw(&raw);
-
-    /* 第 2 步：适配层统一完成相序映射、零偏扣除和物理量换算。 */
-    if (!board_adc_convert(&cfg, &raw, &sample))
-    {
-        return false;
-    }
-
-    foc->adc.raw.ia = sample.i_raw.a;
-    foc->adc.raw.ib = sample.i_raw.b;
-    foc->adc.raw.ic = sample.i_raw.c;
-    foc->adc.raw.va = sample.v_raw.a;
-    foc->adc.raw.vb = sample.v_raw.b;
-    foc->adc.raw.vc = sample.v_raw.c;
-    foc->adc.raw.vbus = sample.v_bus_raw;
-
-    foc->fb.ia = sample.ia;
-    foc->fb.ib = sample.ib;
-    foc->fb.ic = sample.ic;
-    foc->fb.vbus = sample.vbus;
-
-    return true;
 }

@@ -4,6 +4,7 @@
  */
 
 #include "drive.h"
+#include "drive_cycle.h"
 
 #include <math.h>
 
@@ -227,27 +228,10 @@ static _RAM_FUNC void drive_stop_pwm(foc_t *foc)
     }
 }
 
-/**
- * @brief 执行本周期入口请求对应的动作。
- *
- * @param[in,out] foc 电机控制对象。
- * @param[in] req 本周期入口锁存的请求。
- */
-/*
- * ABZ 上电自动对齐（参考预定位+整圈扫场）：电流幅值 1s 线性渐变
- * 0→档案值（参考 CALIB_RISE_CNT），随后场角扫一整圈收尾到 0，
- * 全电流保持，末 0.3s 对 fb.theta_e 做圆均值定零。
- * 扫场注：本台架联轴静摩擦 ~3A 等效，转子停位离场 0 仅 ~34° 电角
- * （sin 小），纯静场（参考做法）拉力上限不足以破摩擦——多轮真机
- * 对齐期位置曲线全平（2026-10-18 三轮实测）。场扫一整圈必经过
- * 转子正交位（拉力=满幅），转子被移动场拖到场 0 落位，参考
- * "吸合停位=零位"的前提才成立。定零=参考 __HAL_TIM_SET_COUNTER
- * (htim3,0) 的等价实现：e_off -= 均值 (mod 2pi)（不清计数器，
- * 位置链无差分突变）。
- * 完成：置 enc_aligned 并回 STOP（对齐是校准不是运行授权，上位机
- * 轮询 alignment_valid 后自行失能，再显式使能进模式）。
- * 唯一拒绝条件 R̄ < 0.9（在转/编码器异常样本分散，同 0x12 诊断档；
- * 静止转子恒通过）——参考无到位验收，不设。
+/* ABZ 上电定零：1 s 电流渐变 → 1.5 s 扫场 → 0.7 s 保持。
+ * 末 0.3 s 对电角度做圆均值，更新 e_off；不清编码器计数器。
+ * 扫场沿用既有台架方案和参数。圆均值集中度只检查样本是否集中，
+ * 不能独立证明转子跟场到位。成功后关闭输出，等待下一次显式 START。
  */
 #define DRIVE_ALIGN_RISE_S         (1.0f)  /* 电流线性渐变（参考 CALIB_RISE_CNT） */
 #define DRIVE_ALIGN_SWEEP_S        (1.5f)  /* 场扫一整圈 0→2pi 收尾到 0 */
@@ -270,21 +254,12 @@ static _RAM_FUNC void drive_align_reject(foc_t *foc)
     drive_align_reset(foc);
 }
 
-static _RAM_FUNC void drive_align_tick(foc_t *foc)
+static _RAM_FUNC void drive_align_prepare(foc_t *foc, foc_plan_t *cmd)
 {
-    const uint32_t rise_ticks =
-        (uint32_t)(DRIVE_ALIGN_RISE_S * foc->rate.foc_fs);
-    const uint32_t sweep_ticks =
-        (uint32_t)(DRIVE_ALIGN_SWEEP_S * foc->rate.foc_fs);
-    const uint32_t hold_ticks =
-        (uint32_t)(DRIVE_ALIGN_HOLD_S * foc->rate.foc_fs);
-    const uint32_t avg_ticks =
-        (uint32_t)(DRIVE_ALIGN_AVG_S * foc->rate.foc_fs);
+    const uint32_t rise_ticks = (uint32_t)(DRIVE_ALIGN_RISE_S * foc->rate.foc_fs);
+    const uint32_t sweep_ticks = (uint32_t)(DRIVE_ALIGN_SWEEP_S * foc->rate.foc_fs);
     const uint32_t sweep_end = rise_ticks + sweep_ticks;
-    const uint32_t total_ticks = sweep_end + hold_ticks;
-    const uint32_t avg_start = total_ticks - avg_ticks;
     const uint32_t n = foc->align_ticks;
-
     {
         /* 参考预定位：电流线性渐变+保持；渐变后场扫一整圈收尾到 0，
          * 移动场拖转子到场 0 落位（纯静场在本台架拉不动，见块注释） */
@@ -299,11 +274,28 @@ static _RAM_FUNC void drive_align_tick(foc_t *foc)
         {
             field = M_2PI * (float)(n - rise_ticks) / (float)sweep_ticks;
         }
-        if (foc_cur_step(foc, id_cmd, 0.0f, field))
-        {
-            (void)drive_pwm_commit(foc);
-        }
+        *cmd = (foc_plan_t){
+            .ref = {.mode = FOC_CTRL_MODE_CUR, .id_ref = id_cmd, .iq_ref = 0.0f},
+            .theta = field,
+        };
     }
+
+}
+
+static _RAM_FUNC void drive_align_finish(foc_t *foc)
+{
+    const uint32_t rise_ticks =
+        (uint32_t)(DRIVE_ALIGN_RISE_S * foc->rate.foc_fs);
+    const uint32_t sweep_ticks =
+        (uint32_t)(DRIVE_ALIGN_SWEEP_S * foc->rate.foc_fs);
+    const uint32_t hold_ticks =
+        (uint32_t)(DRIVE_ALIGN_HOLD_S * foc->rate.foc_fs);
+    const uint32_t avg_ticks =
+        (uint32_t)(DRIVE_ALIGN_AVG_S * foc->rate.foc_fs);
+    const uint32_t sweep_end = rise_ticks + sweep_ticks;
+    const uint32_t total_ticks = sweep_end + hold_ticks;
+    const uint32_t avg_start = total_ticks - avg_ticks;
+    const uint32_t n = foc->align_ticks;
 
     if (n < total_ticks)
     {
@@ -358,107 +350,6 @@ static _RAM_FUNC void drive_align_tick(foc_t *foc)
     }
 }
 
-static _RAM_FUNC void drive_exec_action(foc_t *foc, drive_req_e req)
-{
-    switch (req)
-    {
-        case DRIVE_REQ_STOP:
-            drive_stop_pwm(foc); /* 内部含未完成对齐的进度作废 */
-            break;
-
-        case DRIVE_REQ_START:
-            drive_start_pwm(foc); /* 内部一次性动作：中性占空比+启动+置 pwm_active */
-            if (foc->pwm_active)
-            {
-                if ((foc->enc.primary == ENCODER_TYPE_ABZ) &&
-                    !foc->enc_aligned)
-                {
-                    /* STARTING 期间逐拍执行自动对齐；完成后由对齐逻辑
-                     * 关断 PWM 并回到 STOP，等待下一次显式 START。 */
-                    drive_align_tick(foc);
-                }
-                else
-                {
-                    /* 绝对编码器或本上电周期已对齐：直接进 RUN */
-                    foc->req = DRIVE_REQ_RUN;
-                }
-            }
-            break;
-
-        case DRIVE_REQ_RUN:
-            if (foc->pwm_active)
-            {
-                const bool mode_valid = drive_mode_step(foc);
-
-                if (!mode_valid || !foc->pwm_cmd.valid)
-                {
-                    /* 未实现模式或无效计算不得继续沿用上一拍物理占空比。 */
-                    if (foc->pwm_active)
-                    {
-                        drive_stop_pwm(foc);
-                    }
-                    else
-                    {
-                        /* PWM 提交层已经关断硬件时，仍需清空控制器历史。 */
-                        drive_control_reset(foc);
-                    }
-                    foc->req = DRIVE_REQ_STOP;
-                }
-            }
-            break;
-
-        default:
-            /* 非法请求不允许继续保持功率输出。 */
-            drive_stop_pwm(foc);
-            break;
-    }
-}
-
-/**
- * @brief 根据入口请求和动作结果更新 Drive 状态。
- *
- * @param[in,out] foc 电机控制对象。
- * @param[in] req 本周期入口锁存的请求。
- */
-static _RAM_FUNC void drive_update_state(foc_t *foc, drive_req_e req)
-{
-    switch (req)
-    {
-        case DRIVE_REQ_STOP:
-            foc->state = DRIVE_STATE_STOP;
-            break;
-
-        case DRIVE_REQ_START:
-            if (foc->pwm_active)
-            {
-                foc->state = DRIVE_STATE_STARTING;
-            }
-            else
-            {
-                foc->state = DRIVE_STATE_STOP;
-                foc->req = DRIVE_REQ_STOP;
-            }
-            break;
-
-        case DRIVE_REQ_RUN:
-            if (foc->pwm_active)
-            {
-                foc->state = DRIVE_STATE_RUN;
-            }
-            else
-            {
-                foc->state = DRIVE_STATE_STOP;
-                foc->req = DRIVE_REQ_STOP;
-            }
-            break;
-
-        default:
-            foc->state = DRIVE_STATE_STOP;
-            foc->req = DRIVE_REQ_STOP;
-            break;
-    }
-}
-
 bool drive_fault_clear(foc_t *foc)
 {
     if (foc->pwm_active)
@@ -467,6 +358,8 @@ bool drive_fault_clear(foc_t *foc)
     }
 
     foc->fault.all = 0U;
+    foc->first_fault_bits = 0U;
+    foc->first_fault_seq = 0U;
     drive_protection_reset(&foc->prot_state);
     drive_control_reset(foc);
     foc->req = DRIVE_REQ_STOP;
@@ -474,10 +367,17 @@ bool drive_fault_clear(foc_t *foc)
     return true;
 }
 
-_RAM_FUNC void drive_fast_step(foc_t *foc)
+_RAM_FUNC void drive_check_protection(foc_t *foc)
 {
     drive_diag_poll_request(foc);
-    const drive_req_e req = foc->req;
+
+    /* 首故障定格：上一拍新置的锁存位在此首拍记录（含保护/对齐拒绝/
+     * 方向守卫/换向异常全部来源）。多故障同亮时保住首因不覆盖。 */
+    if ((foc->fault.all != 0U) && (foc->first_fault_bits == 0U))
+    {
+        foc->first_fault_bits = foc->fault.all;
+        foc->first_fault_seq = foc->fast_seq;
+    }
 
     /* 每周期从空命令开始；只有实际执行的启动或控制路径可以重新生成命令。 */
     foc->pwm_cmd.seq = foc->fast_seq;
@@ -486,30 +386,153 @@ _RAM_FUNC void drive_fast_step(foc_t *foc)
     drive_update_protection(foc);
     drive_direction_guard_step(foc);
 
-    /* 已锁存故障时，当前周期禁止执行 START 或 RUN。 */
-    if (foc->fault.all > 0U)
+
+}
+
+/* 先决定本拍运行状态，再执行状态动作。启动条件由保护和模式检查共同决定。 */
+_RAM_FUNC void drive_update_state(foc_t *foc, drive_cycle_t *cycle)
+{
+    *cycle = (drive_cycle_t){.state = DRIVE_IDLE};
+    if (foc->fault.all != 0U)
     {
-        drive_diag_on_fault();
-        drive_stop_pwm(foc);
-        foc->state = DRIVE_STATE_FAULT;
-        foc->req = DRIVE_REQ_STOP;
+        cycle->state = DRIVE_FAULT;
         return;
     }
 
-    drive_exec_action(foc, req);
-
-    if (foc->fault.all > 0U)
+    switch (foc->req)
     {
-        /* 故障在本周期末关闭输出；已关闭时不会重复调用停止接口。 */
-        drive_diag_on_fault();
-        drive_stop_pwm(foc);
-        foc->state = DRIVE_STATE_FAULT;
-        foc->req = DRIVE_REQ_STOP;
+        case DRIVE_REQ_START:
+            /* 启动必须先写 50% 再开输出，不能推迟到普通 PWM 提交之后。 */
+            drive_start_pwm(foc);
+            if (foc->fault.all != 0U)
+            {
+                cycle->state = DRIVE_FAULT;
+            }
+            else if (foc->pwm_active)
+            {
+                cycle->state = (foc->enc.primary == ENCODER_TYPE_ABZ && !foc->enc_aligned)
+                    ? DRIVE_ALIGN : DRIVE_STARTUP;
+            }
+            break;
+
+        case DRIVE_REQ_RUN:
+            if (foc->pwm_active)
+            {
+                cycle->state = foc->mode.sys == calibrat_mode
+                    ? DRIVE_DIAGNOSTIC : DRIVE_CONTROL;
+            }
+            break;
+
+        case DRIVE_REQ_STOP:
+        default:
+            break;
+    }
+}
+
+/* 特殊状态给出场角和参考值；运行状态按模式生成参考，均不执行 PI 或写 PWM。 */
+_RAM_FUNC void drive_handle_state(foc_t *foc, drive_cycle_t *cycle)
+{
+    switch (cycle->state)
+    {
+        case DRIVE_STARTUP:
+            foc->req = DRIVE_REQ_RUN; /* 本拍只启动，下一拍才进入控制。 */
+            break;
+        case DRIVE_ALIGN:
+            drive_align_prepare(foc, &cycle->cmd);
+            cycle->ready = true;
+            break;
+        case DRIVE_CONTROL:
+        case DRIVE_DIAGNOSTIC:
+            cycle->ready = drive_mode_step(foc, &cycle->cmd);
+            break;
+        case DRIVE_IDLE:
+        case DRIVE_FAULT:
+        default:
+            break;
+    }
+}
+
+static _RAM_FUNC void drive_fault_stop(foc_t *foc, drive_cycle_t *cycle)
+{
+    drive_diag_on_fault();
+    drive_stop_pwm(foc);
+    cycle->state = DRIVE_FAULT;
+    foc->state = DRIVE_STATE_FAULT;
+    foc->req = DRIVE_REQ_STOP;
+}
+
+/* 普通占空比只有这里提交。故障/无效计算不能沿用上拍输出。 */
+_RAM_FUNC void drive_output(foc_t *foc, drive_cycle_t *cycle)
+{
+    if (foc->fault.all != 0U || cycle->state == DRIVE_FAULT)
+    {
+        drive_fault_stop(foc, cycle);
         return;
     }
 
-    drive_update_state(foc, req);
+    if (cycle->state == DRIVE_CONTROL || cycle->state == DRIVE_DIAGNOSTIC ||
+        cycle->state == DRIVE_ALIGN)
+    {
+        bool valid = cycle->ready && cycle->valid;
+        if (valid && cycle->state == DRIVE_DIAGNOSTIC)
+        {
+            valid = drive_diag_check_output(foc, &cycle->cmd);
+        }
+        if (valid)
+        {
+            valid = drive_pwm_commit(foc);
+        }
+        if (!valid)
+        {
+            foc->pwm_cmd.valid = false;
+            if (cycle->state == DRIVE_DIAGNOSTIC)
+            {
+                drive_diag_on_fault();
+            }
+            if (foc->pwm_active)
+            {
+                drive_stop_pwm(foc);
+            }
+            else
+            {
+                drive_control_reset(foc);
+            }
+            if (!foc->enc_aligned)
+            {
+                drive_align_reset(foc);
+            }
+            cycle->state = DRIVE_IDLE;
+            foc->req = DRIVE_REQ_STOP;
+        }
+        else if (cycle->state == DRIVE_ALIGN)
+        {
+            /* 保持原顺序：本拍对齐电流输出后取样/收尾；成功后停机等待再启动。 */
+            drive_align_finish(foc);
+            if (!foc->pwm_active)
+            {
+                cycle->state = DRIVE_IDLE;
+            }
+        }
+    }
+    else if (cycle->state == DRIVE_IDLE)
+    {
+        drive_stop_pwm(foc);
+        foc->req = DRIVE_REQ_STOP;
+    }
 
-    /* START 一次性语义由 exec_action 内完成晋升（非对齐场景启动即置 RUN；
-     * ABZ 对齐场景由 drive_align_tick 在成功后主动关断并回到 STOP）。 */
+    if (foc->fault.all != 0U)
+    {
+        drive_fault_stop(foc, cycle);
+        return;
+    }
+
+    /* 保留 USB/上位机原四状态编号，对齐属于 STARTING，诊断属于 RUN。 */
+    switch (cycle->state)
+    {
+        case DRIVE_STARTUP:
+        case DRIVE_ALIGN:      foc->state = DRIVE_STATE_STARTING; break;
+        case DRIVE_CONTROL:
+        case DRIVE_DIAGNOSTIC: foc->state = DRIVE_STATE_RUN;      break;
+        default:              foc->state = DRIVE_STATE_STOP;     break;
+    }
 }

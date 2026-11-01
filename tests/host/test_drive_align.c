@@ -19,6 +19,8 @@
 
 #include "common.h"
 #include "drive.h"
+#include "drive_cycle_test.h"
+#include "foc_run.h"
 
 foc_t g_foc;
 
@@ -41,7 +43,7 @@ bool foc_cur_step(foc_t *foc, float id_ref, float iq_ref, float angle)
 static int commit_calls;
 bool drive_pwm_commit(foc_t *foc)
 {
-    (void)foc;
+    foc->pwm_cmd.valid = true;
     commit_calls++;
     return true;
 }
@@ -76,8 +78,9 @@ void drive_control_reset_for_start(foc_t *foc)
     (void)foc;
 }
 
-bool drive_mode_step(foc_t *foc)
+bool drive_mode_step(foc_t *foc, foc_plan_t *cmd)
 {
+    *cmd = (foc_plan_t){.ref = {.mode = FOC_CTRL_MODE_CUR}};
     /* 真实模式步进会生成并提交有效 PWM 命令；桩同步置 valid，
      * 否则 RUN 晋升断言会被 fast_step 的无效命令守卫误伤。 */
     foc->pwm_cmd.valid = true;
@@ -138,8 +141,8 @@ int main(void)
     m.fb.vbus_valid = true;
     m.fb.vbus = 24.0f;
     m.req = DRIVE_REQ_START;
-    drive_fast_step(&m);
-    expect("对齐首拍进入 STARTING", m.state == DRIVE_STATE_STARTING);
+    run_drive_cycle(&m);
+    expect("对齐首拍进入 ALIGN", m.state == DRIVE_STATE_ALIGN);
     expect("首拍电流=渐变起点 0", last_align_id == 0.0f);
     expect("首拍场角 0", last_align_theta == 0.0f);
     expect("iq 给定 0", last_align_iq == 0.0f);
@@ -167,7 +170,7 @@ int main(void)
         m.fb.i_valid = true;
         m.fb.vbus_valid = true;
         m.fb.vbus = 24.0f;
-        drive_fast_step(&m);
+        run_drive_cycle(&m);
         if (n == 5.0f)
         {
             expect("渐变中点电流=半幅", last_align_id == 1.0f);
@@ -193,11 +196,11 @@ int main(void)
 
     /* 场景 3：已对齐 → STOP 后再 START 直接晋升，不再注入对齐电流 */
     m.req = DRIVE_REQ_STOP;
-    drive_fast_step(&m);
+    run_drive_cycle(&m);
     expect("STOP 后回到 STOP 态", m.state == DRIVE_STATE_STOP);
     const int calls_before = foc_cur_calls;
     m.req = DRIVE_REQ_START;
-    drive_fast_step(&m);
+    run_drive_cycle(&m);
     expect("二次 START 直接晋升 RUN", m.req == DRIVE_REQ_RUN);
     expect("不再注入对齐电流", foc_cur_calls == calls_before);
 
@@ -205,18 +208,18 @@ int main(void)
     foc_t abs = make_align_motor();
     abs.enc.primary = ENCODER_TYPE_MT6816;
     abs.req = DRIVE_REQ_START;
-    drive_fast_step(&abs);
+    run_drive_cycle(&abs);
     expect("绝对编码器直接 RUN", abs.req == DRIVE_REQ_RUN && !abs.enc_aligned);
 
     /* 场景 5：对齐中断（STOP）进度作废，重启从第 0 拍计时 */
     foc_t m2 = make_align_motor();
     m2.req = DRIVE_REQ_START;
-    drive_fast_step(&m2);
-    drive_fast_step(&m2);
-    drive_fast_step(&m2); /* 3 拍进度 */
+    run_drive_cycle(&m2);
+    run_drive_cycle(&m2);
+    run_drive_cycle(&m2); /* 3 拍进度 */
     expect("中断前未完成", !m2.enc_aligned);
     m2.req = DRIVE_REQ_STOP;
-    drive_fast_step(&m2);
+    run_drive_cycle(&m2);
     expect("STOP 清对齐进度", m2.align_ticks == 0U);
 
     /* 场景 6：角度未收敛（样本 0/π 交替 → 圆均值矢量长 1/3 < 0.9）
@@ -231,7 +234,7 @@ int main(void)
         for (int i = 0; i < 45; i++)
         {
             m3.fb.theta_e = (m3.align_ticks % 2U == 0U) ? 0.0f : 3.14159265f;
-            drive_fast_step(&m3);
+            run_drive_cycle(&m3);
             if (m3.fault.all != 0U)
             {
                 break;
@@ -269,7 +272,7 @@ int main(void)
             {
                 m5.fb.theta_e = 0.5f;
             }
-            drive_fast_step(&m5);
+            run_drive_cycle(&m5);
             if (m5.enc_aligned)
             {
                 break;
@@ -293,7 +296,7 @@ int main(void)
         m6.req = DRIVE_REQ_START;
         for (int i = 0; i < 45; i++)
         {
-            drive_fast_step(&m6);
+            run_drive_cycle(&m6);
             if (m6.enc_aligned)
             {
                 break;
@@ -312,3 +315,12 @@ int main(void)
     (void)printf("test_drive_align: %d failure(s)\n", fail_count);
     return 1;
 }
+
+
+void foc_update_current(foc_t *foc, float theta, foc_frame_t *frame)
+{ (void)foc; *frame = (foc_frame_t){.theta = theta}; }
+
+bool drive_diag_check_output(foc_t *foc, const foc_plan_t *cmd)
+{ (void)foc; (void)cmd; return true; }
+bool foc_execute(foc_t *foc, const foc_plan_t *cmd, const foc_frame_t *frame)
+{ (void)frame; return foc_cur_step(foc, cmd->ref.id_ref, cmd->ref.iq_ref, cmd->theta); }

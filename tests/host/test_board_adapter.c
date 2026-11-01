@@ -6,8 +6,10 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "board_adapter.h"
+#include "common.h"
 
 #define TEST_TOLERANCE (1.0e-6f)
 
@@ -34,6 +36,52 @@ static target_adc_raw_t make_raw(void)
         .v = {.a = 100U, .b = 200U, .c = 300U},
         .vbus = 1000U,
     };
+}
+
+/* 只替代硬件读取；生产采样与换算函数参与测试。 */
+void target_adc_read_raw(target_adc_raw_t *raw)
+{
+    *raw = make_raw();
+}
+
+static bool test_sample_result_and_failure(void)
+{
+    foc_t motor = {0};
+    board_sample_t sample = {0};
+    motor.motor.phase_order = PHASE_ORDER_ACB;
+    motor.board.i_ratio = 0.01f;
+    motor.board.v_ratio = 0.02f;
+    motor.adc.ia_off = 2000.0f;
+    motor.adc.ib_off = 2000.0f;
+    motor.adc.ic_off = 2000.0f;
+    motor.fb.ia = 9.0f;
+    motor.fb.ib = 8.0f;
+    motor.fb.ic = 7.0f;
+    motor.fb.vbus = 6.0f;
+    const foc_fb_state_t fb_before = motor.fb;
+
+    if (!expect_true(foc_adc_sample(&motor, &sample), "有效相序应返回新样本。") ||
+        !expect_close(sample.ia, 1.0f, "采样 A 相换算错误。") ||
+        !expect_close(sample.ib, 3.0f, "采样 B 相换算错误。") ||
+        !expect_close(sample.ic, 2.0f, "采样 C 相换算错误。") ||
+        !expect_close(sample.vbus, 20.0f, "采样母线换算错误。") ||
+        !expect_true(motor.adc.raw.ia == 2100U && motor.adc.raw.ib == 2300U &&
+                     motor.adc.raw.ic == 2200U && motor.adc.raw.va == 100U &&
+                     motor.adc.raw.vb == 300U && motor.adc.raw.vc == 200U &&
+                     motor.adc.raw.vbus == 1000U, "原始计数仍须按逻辑相序保存。") ||
+        !expect_true(memcmp(&motor.fb, &fb_before, sizeof(motor.fb)) == 0,
+                     "ADC 采样不能提前修改控制反馈。"))
+    {
+        return false;
+    }
+
+    const board_sample_t sample_before = sample;
+    motor.motor.phase_order = (phase_order_t)99;
+    const foc_t motor_before = motor;
+    return expect_true(!foc_adc_sample(&motor, &sample), "非法相序应返回失败。") &&
+           expect_true(memcmp(&sample, &sample_before, sizeof(sample)) == 0 &&
+                       memcmp(&motor, &motor_before, sizeof(motor)) == 0,
+                       "采样失败须保留输出、原始计数和控制状态。");
 }
 
 static board_adc_cfg_t make_cfg(phase_order_t order)
@@ -100,7 +148,8 @@ int main(void)
 {
     if (!test_abc_conversion()
         || !test_acb_conversion()
-        || !test_invalid_phase_order())
+        || !test_invalid_phase_order()
+        || !test_sample_result_and_failure())
     {
         return 1;
     }

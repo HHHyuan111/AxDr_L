@@ -56,9 +56,10 @@ typedef struct
  * @param[in,out] foc 已初始化的控制器上下文和历史状态，本周期独占写入。
  * @param[in] input 本周期物理反馈，所有浮点输入应为有限值，母线电压应不小于 0 V。
  * @param[out] output 本周期 Drive 状态和逻辑 PWM 命令。
- * @pre 三个指针有效且对象互不重叠。
+ * @pre foc 有效；非空的输入、输出与 foc 互不重叠。
  *
- * 本函数不采集硬件，也不等待外设。真实板卡、离线回放和 HIL 可以用不同方式生成
+ * input 为 NULL 时读取硬件，output 为 NULL 时不复制结果；foc_run 使用此路径。
+ * 显式 input 用于离线测试或 HIL，可以用不同方式生成
  * input，但共用相同的控制器上下文和本周期执行入口。
  */
 void control_cycle_step(foc_t *foc,

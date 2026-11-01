@@ -16,6 +16,11 @@
 #include "common.h"
 #include "diag_runtime.h"
 
+static unsigned irq_mask;
+unsigned __get_PRIMASK(void) { return irq_mask; }
+void __disable_irq(void) { irq_mask = 1U; }
+void __set_PRIMASK(unsigned key) { irq_mask = key; }
+
 foc_t g_foc; /* service_command 引用（S2 测试链接） */
 diag_runtime_t g_diag; /* service_scope 路由引用（测试链接，不做诊断） */
 

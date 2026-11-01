@@ -3,12 +3,19 @@
  * @brief 验证单周期显式输入、执行顺序和输出数据合同。
  */
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 
+#include <stdlib.h>
+#include "board_adapter.h"
+#include "position_adapter.h"
 #include "common.h"
+#include "drive.h"
+#include "drive_cycle.h"
 #include "control_cycle.h"
 
+static unsigned stage;
 static bool feedback_called;
 static bool drive_called;
 static bool observer_called;
@@ -17,6 +24,8 @@ static float received_bus_voltage_v;
 
 void ctrl_fb_update(foc_t *motor, float vbus)
 {
+    assert(stage == 0);
+    stage = 1;
     feedback_called = true;
     received_bus_voltage_v = vbus;
     input_visible = (motor->fast_seq == 42U) &&
@@ -32,7 +41,7 @@ void ctrl_fb_update(foc_t *motor, float vbus)
     motor->fb.vbus = vbus;
 }
 
-void drive_fast_step(foc_t *motor)
+void fake_drive_result(foc_t *motor)
 {
     drive_called = feedback_called;
     motor->state = DRIVE_STATE_RUN;
@@ -49,6 +58,8 @@ void drive_fast_step(foc_t *motor)
 
 void obs_step(const foc_t *motor)
 {
+    assert(stage == 7);
+    stage = 8;
     observer_called = drive_called && (motor->state == DRIVE_STATE_RUN);
 }
 
@@ -109,3 +120,22 @@ int main(void)
 
     return 0;
 }
+
+void drive_check_protection(foc_t *foc) { (void)foc; assert(stage == 1); stage = 2; }
+void drive_update_state(foc_t *foc)
+{ (void)foc; assert(stage == 2); stage = 3; }
+void drive_handle_state(foc_t *foc, drive_cycle_t *cycle)
+{ (void)foc; assert(stage == 3); stage = 4; cycle->ready = true; }
+void drive_output(foc_t *foc, drive_cycle_t *cycle)
+{ assert(stage == 6 && cycle->valid); stage = 7; fake_drive_result(foc); }
+
+void foc_update_current(foc_t *foc, float theta, foc_frame_t *frame)
+{ (void)foc; assert(stage == 4); stage = 5; *frame = (foc_frame_t){.theta = theta}; }
+
+bool foc_execute(foc_t *foc, const foc_plan_t *cmd, const foc_frame_t *frame)
+{ (void)foc; (void)cmd; (void)frame; assert(stage == 5); stage = 6; return true; }
+
+/* 显式输入测试禁止访问硬件采样分支。 */
+bool encoder_sample(encoder_state_t *enc) { (void)enc; abort(); }
+bool position_update(foc_t *foc, position_sample_t *s) { (void)foc; (void)s; abort(); }
+bool foc_adc_sample(foc_t *foc, board_sample_t *s) { (void)foc; (void)s; abort(); }

@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$Compiler = "gcc.exe"
 )
 
@@ -472,9 +472,10 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "Host C11/Drive 保护与故障锁存测试通过。"
 
 $compileOutput = @(
-    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+    & $compilerCommand.Source "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$configDir" "-I$diagnosticIncludeDir" -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" "-I$motorDir" "-I$driveDir" `
-        $driveTestSource $driveSource $driveProtectionSource `
+        "-I$serviceDirEarly" $driveTestSource $driveSource $driveProtectionSource $controlCycleSource $speedAdapterSource `
+        (Join-Path $testDir "fakes/drive_cycle_test.c") `
         -o $driveExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )
@@ -494,7 +495,8 @@ Write-Host "Host C11/Drive 状态测试通过。"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
-        "-I$adapterDir" "-I$bspIncludeDir" "-I$commonDir" `
+        "-I$adapterDir" "-I$bspIncludeDir" "-I$commonDir" "-I$motorDir" `
+        "-I$controlDir" "-I$algorithmDir" "-I$driveDir" `
         $boardAdapterTestSource $boardAdapterSource `
         -o $boardAdapterExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
@@ -734,9 +736,10 @@ $driveAlignTestSource = Join-Path $testDir "test_drive_align.c"
 $driveAlignExecutablePath = Join-Path $outputDir "test_drive_align.exe"
 
 $compileOutput = @(
-    & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+    & $compilerCommand.Source "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" "-I$configDir" "-I$diagnosticIncludeDir" -std=c11 -Wall -Wextra -Wpedantic -Werror `
         "-I$focFakeIncludeDir" "-I$commonDir" "-I$controlDir" "-I$algorithmDir" "-I$motorDir" "-I$driveDir" `
-        $driveAlignTestSource $driveSource $driveProtectionSource `
+        $driveAlignTestSource $driveSource $driveProtectionSource $controlCycleSource $speedAdapterSource `
+        (Join-Path $testDir "fakes/drive_cycle_test.c") `
         -o $driveAlignExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )
@@ -833,3 +836,32 @@ if ($LASTEXITCODE -ne 0) { throw "usb_acceptance selftest 运行失败" }
 Write-Host "Host C11/上位机基准验收工具编译与 selftest 回环测试通过。"
 
 & (Join-Path $PSScriptRoot "run_diagnostic_tests.ps1") -Compiler $Compiler
+
+
+# 七步主流程：真实 Drive/控制数学，替代硬件输出；不连接板端。
+$sequenceSources = @(
+    'app/control_cycle.c', 'adapter/speed_adapter.c', 'motor/foc_drv.c', 'motor/motor_modes.c',
+    'drive/drive.c', 'drive/drive_mode.c', 'drive/drive_pwm.c', 'drive/drive_protection.c', 'drive/drive_reset.c',
+    'control/foc_control.c', 'control/foc_core.c', 'control/control_cascade.c', 'control/control_mit.c',
+    'algorithm/control_pid.c', 'algorithm/control_filter.c', 'algorithm/control_limit.c',
+    'algorithm/control_traj.c', 'algorithm/foc_svm.c', 'algorithm/foc_transform.c'
+) | ForEach-Object { Join-Path $repoRoot ('firmware/AxDr_App/User/' + $_) }
+$sequenceExecutable = Join-Path $outputDir 'test_foc_sequence.exe'
+& $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+    "-I$focFakeIncludeDir" "-I$adapterDir" "-I$appDir" "-I$bspIncludeDir" `
+    "-I$commonDir" "-I$configDir" "-I$controlDir" "-I$algorithmDir" `
+    "-I$diagnosticIncludeDir" "-I$motorDir" "-I$driveDir" "-I$serviceDirEarly" `
+    (Join-Path $testDir 'test_foc_sequence.c') @sequenceSources -o $sequenceExecutable -lm
+if ($LASTEXITCODE -ne 0) { throw "FOC 七步主流程编译失败。" }
+& $sequenceExecutable --stages
+if ($LASTEXITCODE -ne 0) { throw "FOC 七步主流程输出边界检查失败。" }
+Write-Host "Host C11/FOC 七步主流程输出边界检查通过。"
+
+$speedExecutable = Join-Path $outputDir 'test_speed_adapter.exe'
+& $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
+    "-I$adapterDir" "-I$configDir" "-I$algorithmDir" "-I$commonDir" `
+    (Join-Path $testDir 'test_speed_adapter.c') $speedAdapterSource -o $speedExecutable -lm
+if ($LASTEXITCODE -ne 0) { throw "测速边界检查编译失败。" }
+& $speedExecutable
+if ($LASTEXITCODE -ne 0) { throw "测速边界检查失败。" }
+Write-Host "Host C11/测速初始化、丢样恢复与实例独立检查通过。"

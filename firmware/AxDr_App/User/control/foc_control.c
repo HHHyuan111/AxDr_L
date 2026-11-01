@@ -7,15 +7,16 @@
 
 #include "compiler.h"
 
-PLATFORM_FAST_CODE bool foc_ctrl_step(foc_ctrl_t *ctrl,
+PLATFORM_FAST_CODE bool foc_ctrl_execute(foc_ctrl_t *ctrl,
                                       const foc_fb_t *fb,
                                       const foc_ref_t *ref,
+                                      const foc_frame_t *frame,
                                       foc_out_t *out)
 {
     foc_voltage_t voltage;
 
     *out = (foc_out_t){0};
-    foc_core_prepare(&fb->sample, &out->frame);
+    out->frame = *frame;
 
     switch (ref->mode)
     {
@@ -96,4 +97,15 @@ PLATFORM_FAST_CODE bool foc_ctrl_step(foc_ctrl_t *ctrl,
     out->valid = foc_core_modulate(&out->frame, &voltage, &out->pwm);
 
     return out->valid;
+}
+
+/* 独立算法调用仍可一次完成坐标变换和控制；生产主流程使用分步接口。 */
+PLATFORM_FAST_CODE bool foc_ctrl_step(foc_ctrl_t *ctrl,
+                                      const foc_fb_t *fb,
+                                      const foc_ref_t *ref,
+                                      foc_out_t *out)
+{
+    foc_frame_t frame;
+    foc_core_prepare(&fb->sample, &frame);
+    return foc_ctrl_execute(ctrl, fb, ref, &frame, out);
 }

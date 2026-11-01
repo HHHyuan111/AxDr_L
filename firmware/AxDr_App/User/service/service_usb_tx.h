@@ -6,7 +6,7 @@
 #define SERVICE_USB_TX_COMMAND_CAPACITY 4u
 #define SERVICE_USB_TX_DATA_CAPACITY 2u
 #define SERVICE_USB_TX_COMMAND_MAX_SIZE 160u
-#define SERVICE_USB_TX_DATA_MAX_SIZE 512u
+#define SERVICE_USB_TX_DATA_MAX_SIZE 1024u
 
 /* 提交缝只登记指针：0=接受，1=忙，其他=未接受。接受后必须最终完成或先关闭端点。 */
 typedef int (*service_usb_tx_submit_fn)(const uint8_t *data, uint16_t length);

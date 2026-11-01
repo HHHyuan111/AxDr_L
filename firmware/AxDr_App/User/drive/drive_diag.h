@@ -27,8 +27,11 @@ bool drive_diag_is_supported(const foc_t *foc);
 /** 在 PWM 关闭时启动选定的诊断任务。 */
 bool drive_diag_prepare(foc_t *foc);
 
-/** 用本周期反馈推进一次算法，并通过现有 FOC/PWM 链执行输出。 */
-bool drive_diag_step(foc_t *foc);
+/** 用本周期反馈推进一次诊断，只生成控制给定。 */
+bool drive_diag_step(foc_t *foc, foc_plan_t *cmd);
+
+/** 生成占空比后检查诊断电压边界，失败则中止诊断。 */
+bool drive_diag_check_output(foc_t *foc, const foc_plan_t *cmd);
 
 /** PWM 确认关闭后，结束并释放当前诊断任务。 */
 void drive_diag_on_stopped(void);

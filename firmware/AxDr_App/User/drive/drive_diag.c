@@ -3,7 +3,7 @@
  * @brief 把诊断算法的通用采样和命令接入现有电机控制链。
  *
  * 数据流：当前电机反馈 -> mc_sample_t -> 诊断算法 -> mc_command_t
- *        -> 现有 foc_cur_step/foc_volt_step -> drive_pwm_commit。
+ *        -> 本拍控制给定；控制与 PWM 输出由主流程执行。
  */
 
 #include "drive_diag.h"
@@ -14,8 +14,9 @@
 
 #include "board_config.h"
 #include "common.h"
+#include "foc_run.h"
 #include "diag_runtime.h"
-#include "drive_pwm.h"
+
 #include "foc.h"
 #include "foc_core.h"
 #include "service_param_store.h"
@@ -279,13 +280,12 @@ bool drive_diag_prepare(foc_t *foc)
     return status == MC_OK;
 }
 
-_RAM_FUNC bool drive_diag_step(foc_t *foc)
+_RAM_FUNC bool drive_diag_step(foc_t *foc, foc_plan_t *cmd)
 {
     mc_sample_t sample;
     mc_command_t command;
     mc_status_t status;
     float control_angle_rad;
-    bool foc_valid;
 
     drive_diag_build_sample(foc, &sample);
     status = diag_runtime_step(&g_diag, &sample, &command);
@@ -301,46 +301,40 @@ _RAM_FUNC bool drive_diag_step(foc_t *foc)
         ? command.openloop_theta_e_rad
         : foc->fb.theta_e;
 
+    *cmd = (foc_plan_t){.theta = control_angle_rad};
     switch (command.mode)
     {
         case MC_CONTROL_CURRENT:
-            foc_valid = foc_cur_step(foc,
-                                 command.id_ref_a,
-                                 command.iq_ref_a,
-                                 control_angle_rad);
-            break;
-
+            cmd->ref = (foc_ref_t){.mode = FOC_CTRL_MODE_CUR,
+                .id_ref = command.id_ref_a, .iq_ref = command.iq_ref_a};
+            return true;
         case MC_CONTROL_VOLTAGE:
-            foc_valid = foc_volt_step(foc,
-                                 command.vd_ref_v,
-                                 command.vq_ref_v,
-                                 control_angle_rad);
-            break;
-
-        case MC_CONTROL_IDLE:
+            cmd->ref = (foc_ref_t){.mode = FOC_CTRL_MODE_VOLT,
+                .vd = command.vd_ref_v, .vq = command.vq_ref_v};
+            return true;
         default:
-            foc_valid = false;
-            break;
+            drive_diag_abort_task();
+            foc->req = DRIVE_REQ_STOP;
+            return false;
     }
+}
 
-    if (!foc_valid || !drive_diag_voltage_is_allowed(foc, &command))
+/* 控制计算后、PWM 提交前检查诊断电压限值。 */
+_RAM_FUNC bool drive_diag_check_output(foc_t *foc, const foc_plan_t *cmd)
+{
+    const mc_command_t command = {
+        .mode = cmd->ref.mode == FOC_CTRL_MODE_VOLT ? MC_CONTROL_VOLTAGE : MC_CONTROL_CURRENT,
+        .vd_ref_v = cmd->ref.vd, .vq_ref_v = cmd->ref.vq,
+    };
+    if (!drive_diag_voltage_is_allowed(foc, &command))
     {
         drive_diag_abort_task();
         foc->req = DRIVE_REQ_STOP;
         return false;
     }
-
     g_diag.voltage_saturated =
         (foc->ref.v_lim > 0.0f)
         && (hypotf(foc->out.vd, foc->out.vq) >= (0.999f * foc->ref.v_lim));
-
-    if (!drive_pwm_commit(foc))
-    {
-        drive_diag_abort_task();
-        foc->req = DRIVE_REQ_STOP;
-        return false;
-    }
-
     return true;
 }
 

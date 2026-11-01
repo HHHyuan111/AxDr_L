@@ -6,6 +6,10 @@
 
 /* 普通版被动观测协议。与 0x1B～0x1F 的主动扫频隔离；不改变控制状态。 */
 #define AXDR_CAPABILITY_PASSIVE_OBSERVATION (1u << 25)
+#define AXDR_CAPABILITY_OBSERVATION_20K_STREAM (1u << 26)
+#define AXDR_CAPABILITY_OBSERVATION_BLOCK_STREAM (1u << 27)
+#define AXDR_OBSERVATION_BLOCK_MAGIC 0x42535841u /* AXSB */
+#define AXDR_OBSERVATION_BLOCK_SAMPLES 32u
 #define AXDR_OBSERVATION_SCHEMA_VERSION 1u
 #define AXDR_OBSERVATION_MAX_CHANNELS 4u
 #define AXDR_OBSERVATION_CAPTURE_SAMPLES 1024u
@@ -19,9 +23,32 @@
 #define AXDR_OPCODE_OBSERVATION_DIRECTORY 0x0034u
 #define AXDR_OPCODE_OBSERVATION_DIAGNOSTICS 0x0035u
 #define AXDR_OPCODE_OBSERVATION_CANCEL 0x0036u
+#define AXDR_OPCODE_OBSERVATION_BLOCK_CONFIGURE 0x0037u
+
+/* 仅 0x37 显式请求产生此格式；四路 20kHz、32 点、564B。旧 AXSF 不变。 */
+typedef struct __attribute__((packed, aligned(4)))
+{
+    uint32_t magic;
+    uint16_t version;
+    uint16_t frame_size;
+    uint32_t stream_id;
+    uint32_t packet_sequence;
+    uint32_t first_control_tick;
+    uint16_t control_rate_hz;
+    uint16_t sample_period_ticks;
+    uint8_t sample_count;
+    uint8_t channel_count;
+    uint16_t flags;
+    uint32_t dropped_samples;
+    uint16_t channel_ids[8];
+    float values[AXDR_OBSERVATION_BLOCK_SAMPLES * 4u];
+    uint32_t crc32;
+} axdr_observation_block_t;
 
 /* Configure 请求/响应与 AXSF v1 数据包复用 axdr_scope_contract.h。
- * 本版只接受 1～4 路、500/1000 Hz，未用 channel_ids 必须为 0。
+ * 本版只接受 1～4 路、500/1000/2000/5000/20000 Hz（整除控制率），
+ * 20000 Hz 需 bit26；表示可请求，不代表当前链路吞吐已经通过实机验收。
+ * 未用 channel_ids 必须为 0。
  * Capture 复用 arm 请求形状，仅支持 MANUAL、pretrigger=0、20000 Hz。
  * READ 复用 chunk 请求/响应；data 为逐样本逐通道的小端 IEEE754 float。
  * DIRECTORY 复用目录分页请求/响应，只报告实际实现的信号。

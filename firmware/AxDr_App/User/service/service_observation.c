@@ -16,8 +16,11 @@
 #include "axdr_observation_contract.h"
 #include "common.h"
 
-#define OBS_RING_CAPACITY 8u
+/* 32 包 = 160 样本：5 kHz 档下发满一环 32ms，覆盖参数页擦除 ~22ms 的
+ * 主循环停顿（8 包只有 8ms 会丢样）。RAM 代价 32*212B ≈ 6.6KB。 */
+#define OBS_RING_CAPACITY 32u
 #define OBS_RING_MASK (OBS_RING_CAPACITY - 1u)
+#define OBS_BLOCK_CAPACITY 4u
 #define OBS_SIGNAL_COUNT 17u
 #define OBS_ACTION_NONE 0u
 #define OBS_ACTION_STREAM 1u
@@ -26,6 +29,9 @@
 #define OBS_FLAG_INVALID_FEEDBACK 2u
 
 _Static_assert(sizeof(float) == 4u, "observation requires float32");
+_Static_assert(sizeof(axdr_observation_block_t) == 564u, "block wire size");
+_Static_assert(offsetof(axdr_observation_block_t, values) == 48u, "block value offset");
+_Static_assert(offsetof(axdr_observation_block_t, crc32) == 560u, "block CRC offset");
 _Static_assert(sizeof(axdr_scope_stream_frame_v1_t) == 212u, "stream wire size");
 _Static_assert(sizeof(axdr_observation_capture_state_t) == 52u, "capture wire size");
 _Static_assert(sizeof(axdr_observation_diagnostics_t) == 80u, "diagnostic wire size");
@@ -47,6 +53,7 @@ typedef struct
     uint16_t rate;
     uint8_t enabled;
     uint8_t count;
+    uint8_t compact;
     uint16_t ids[AXDR_OBSERVATION_MAX_CHANNELS];
 } observation_config_t;
 
@@ -66,6 +73,12 @@ static axdr_scope_stream_frame_v1_t building_frame;
 static axdr_scope_stream_frame_v1_t stream_ring[OBS_RING_CAPACITY];
 static volatile uint32_t ring_head;
 static volatile uint32_t ring_tail;
+static axdr_observation_block_t building_block;
+static axdr_observation_block_t block_ring[OBS_BLOCK_CAPACITY];
+static axdr_observation_block_t pending_block;
+static volatile uint32_t block_head;
+static volatile uint32_t block_tail;
+static uint8_t pending_block_valid;
 static uint32_t stream_countdown;
 static uint32_t stream_packet_sequence;
 static volatile uint32_t produced_samples;
@@ -82,8 +95,10 @@ static uint32_t capture_values[AXDR_OBSERVATION_CAPTURE_SAMPLES *
 static volatile uint32_t capture_guard;
 static volatile axdr_observation_capture_state_t capture_state;
 static service_observation_tx_fn transmit;
-static axdr_scope_stream_frame_v1_t pending_tx; /* 主循环独占。 */
+static axdr_scope_stream_frame_v1_t pending_tx[4]; /* 主循环独占；攒批发送。 */
+static uint8_t pending_tx_count;
 static uint8_t pending_tx_valid;
+static uint8_t tx_batch[4u * sizeof(axdr_scope_stream_frame_v1_t)];
 static axdr_observation_diagnostics_t external_diagnostics;
 
 static uint32_t allocate_id(uint32_t *id)
@@ -148,10 +163,10 @@ static uint32_t signal_bits(uint16_t id)
                             (g_foc.mode.debug == pos_spd_curr_cl);
     const uint8_t output_current = g_foc.pwm_active && g_foc.pwm_commit.valid &&
                                    (g_foc.pwm_commit.seq == g_foc.fast_seq);
-    const uint8_t alignment_current = (g_foc.state == DRIVE_STATE_STARTING) &&
-                                      (g_foc.align_ticks != 0u);
+    const uint8_t alignment_current = (g_foc.state == DRIVE_STATE_ALIGN);
     const uint8_t control_current = output_current &&
-        ((g_foc.state == DRIVE_STATE_RUN) || (alignment_current != 0u));
+        ((g_foc.state == DRIVE_STATE_RUN) || (g_foc.state == DRIVE_STATE_DIAG) ||
+         (alignment_current != 0u));
     if ((id <= 5u) && !g_foc.fb.i_valid) return 0x7FC00000u;
     /* STOP/首次中性占空比不执行 FOC，不能把缓存 dq/Vdq 当成本拍结果。 */
     if ((id >= 4u) && (id <= 7u) && (control_current == 0u)) return 0x7FC00000u;
@@ -245,6 +260,9 @@ void service_observation_init(void)
     requested_stream_id = 0u;
     ring_head = 0u;
     ring_tail = 0u;
+    block_head = block_tail = 0u;
+    pending_block_valid = 0u;
+    memset(&building_block, 0, sizeof(building_block));
     stream_countdown = 0u;
     stream_packet_sequence = 0u;
     produced_samples = 0u;
@@ -270,11 +288,13 @@ void service_observation_reset_link(void)
 {
     requested_stream_id = 0u;
     pending_tx_valid = 0u;
+    pending_block_valid = 0u;
     main_dropped_samples = 0u;
     ++reset_requested;
     observation_barrier();
     /* 此处不写 head；ISR 可能在下一拍完成旧包，poll 会按会话丢弃。 */
     ring_tail = ring_head;
+    block_tail = block_head;
 }
 
 static void consume_action(void)
@@ -285,6 +305,7 @@ static void consume_action(void)
     {
         stream_config.enabled = 0u;
         building_frame.sample_count = 0u;
+        building_block.sample_count = 0u;
         produced_samples = 0u;
         dropped_samples = 0u;
         capture_gap_events = 0u;
@@ -299,6 +320,7 @@ static void consume_action(void)
     {
         stream_config.enabled = 0u;
         building_frame.sample_count = 0u;
+        building_block.sample_count = 0u;
         if (capture_state.state != AXDR_SCOPE_CAPTURE_COMPLETE) capture_clear();
         mailbox_action = OBS_ACTION_NONE;
         observation_barrier();
@@ -312,6 +334,7 @@ static void consume_action(void)
     {
         stream_config = mailbox;
         building_frame.sample_count = 0u;
+        building_block.sample_count = 0u;
         stream_packet_sequence = 0u;
         stream_countdown = 0u;
         next_packet_flags = 0u;
@@ -375,12 +398,87 @@ static void capture_one(uint32_t tick, uint32_t elapsed, uint8_t timing_gap)
     capture_end_write();
 }
 
+static void block_one(uint32_t tick, uint32_t elapsed, uint8_t timing_gap)
+{
+    uint8_t i;
+    uint32_t head;
+    uint16_t period;
+    if (stream_config.enabled == 0u) return;
+    period = (uint16_t)(AXDR_SCOPE_CONTROL_RATE_HZ / stream_config.rate);
+    if ((elapsed != 1u) || (timing_gap != 0u))
+    {
+        if ((elapsed - 1u) > stream_countdown)
+        {
+            dropped_samples += 1u + (elapsed - 2u - stream_countdown) / period;
+        }
+        dropped_samples += building_block.sample_count;
+        building_block.sample_count = 0u;
+        stream_countdown = 0u;
+        next_packet_flags |= OBS_FLAG_DISCONTINUITY;
+    }
+    if (stream_countdown != 0u)
+    {
+        --stream_countdown;
+        return;
+    }
+    stream_countdown = period - 1u;
+    if (building_block.sample_count == 0u)
+    {
+        memset(&building_block, 0, sizeof(building_block));
+        building_block.magic = AXDR_OBSERVATION_BLOCK_MAGIC;
+        building_block.version = AXDR_SCOPE_STREAM_VERSION;
+        building_block.frame_size = sizeof(building_block);
+        building_block.stream_id = stream_config.id;
+        building_block.first_control_tick = tick;
+        building_block.control_rate_hz = AXDR_SCOPE_CONTROL_RATE_HZ;
+        building_block.sample_period_ticks = period;
+        building_block.channel_count = stream_config.count;
+        building_block.flags = next_packet_flags;
+        next_packet_flags = 0u;
+        for (i = 0u; i < stream_config.count; ++i)
+        {
+            building_block.channel_ids[i] = stream_config.ids[i];
+        }
+    }
+    for (i = 0u; i < stream_config.count; ++i)
+    {
+        const uint32_t bits = signal_bits(stream_config.ids[i]);
+        const uint32_t index = building_block.sample_count * stream_config.count + i;
+        memcpy((uint8_t *)&building_block + offsetof(axdr_observation_block_t, values) +
+               index * sizeof(bits), &bits, sizeof(bits));
+        if ((bits & 0x7F800000u) == 0x7F800000u) building_block.flags |= OBS_FLAG_INVALID_FEEDBACK;
+    }
+    ++building_block.sample_count;
+    ++produced_samples;
+    if (building_block.sample_count != AXDR_OBSERVATION_BLOCK_SAMPLES) return;
+    building_block.packet_sequence = ++stream_packet_sequence;
+    head = block_head;
+    if ((head - block_tail) < OBS_BLOCK_CAPACITY)
+    {
+        block_ring[head & (OBS_BLOCK_CAPACITY - 1u)] = building_block;
+        observation_barrier();
+        block_head = head + 1u;
+    }
+    else
+    {
+        dropped_samples += AXDR_OBSERVATION_BLOCK_SAMPLES;
+        next_packet_flags |= OBS_FLAG_DISCONTINUITY;
+    }
+    building_block.sample_count = 0u;
+}
+
+
 static void stream_one(uint32_t tick, uint32_t elapsed, uint8_t timing_gap)
 {
     uint8_t i;
     uint32_t head;
     uint16_t period;
     if (stream_config.enabled == 0u) return;
+    if (stream_config.compact != 0u)
+    {
+        block_one(tick, elapsed, timing_gap);
+        return;
+    }
     period = (uint16_t)(AXDR_SCOPE_CONTROL_RATE_HZ / stream_config.rate);
     if ((elapsed != 1u) || (timing_gap != 0u))
     {
@@ -467,24 +565,81 @@ void service_observation_note_timing_gap(void)
     if (initialized != 0u) timing_gap_pending = 1u;
 }
 
+static void poll_block(void)
+{
+    const uint32_t tail = block_tail;
+    int result;
+    if (tail == block_head) return;
+    observation_barrier();
+    if ((requested_stream_id == 0u) ||
+        (block_ring[tail & (OBS_BLOCK_CAPACITY - 1u)].stream_id != requested_stream_id))
+    {
+        observation_barrier();
+        block_tail = tail + 1u;
+        pending_block_valid = 0u;
+        return;
+    }
+    if (pending_block_valid == 0u)
+    {
+        pending_block = block_ring[tail & (OBS_BLOCK_CAPACITY - 1u)];
+        pending_block.dropped_samples = dropped_samples + main_dropped_samples;
+        pending_block.crc32 = axdr_command_crc32((const uint8_t *)&pending_block,
+                                                offsetof(axdr_observation_block_t, crc32));
+        pending_block_valid = 1u;
+    }
+    if (transmit == NULL) return;
+    result = transmit((const uint8_t *)&pending_block, sizeof(pending_block));
+    if (result == 1) return;
+    if (result != 0) main_dropped_samples += pending_block.sample_count;
+    observation_barrier();
+    block_tail = tail + 1u;
+    pending_block_valid = 0u;
+}
+
 void service_observation_poll(void)
 {
     uint32_t tail;
+    uint16_t bytes;
+    uint8_t i;
     int result;
     if (initialized == 0u) return;
     tail = ring_tail;
-    if (tail == ring_head) return;
+    if (tail == ring_head)
+    {
+        poll_block();
+        return;
+    }
     if (pending_tx_valid == 0u)
     {
+        uint8_t limit;
+        uint32_t head;
+        /* 20 kHz 至多四帧 848B；旧档仍至多两帧。不等待凑批，不阻塞 ISR。
+         * 保存一次 head 快照，当前批不能读尚未发布的槽或混入另一流。 */
+        pending_tx_count = 1u;
+        head = ring_head;
         observation_barrier();
-        pending_tx = stream_ring[tail & OBS_RING_MASK];
-        pending_tx.dropped_samples = dropped_samples + main_dropped_samples;
-        pending_tx.crc32 = axdr_command_crc32((const uint8_t *)&pending_tx,
-                                            offsetof(axdr_scope_stream_frame_v1_t, crc32));
+        pending_tx[0] = stream_ring[tail & OBS_RING_MASK];
+        limit = pending_tx[0].sample_period_ticks == 1u ? 4u : 2u;
+        while ((pending_tx_count < limit) &&
+               ((uint32_t)(tail + pending_tx_count) != head))
+        {
+            const axdr_scope_stream_frame_v1_t *next =
+                &stream_ring[(tail + pending_tx_count) & OBS_RING_MASK];
+            if (next->stream_id != pending_tx[0].stream_id) break;
+            pending_tx[pending_tx_count++] = *next;
+        }
+        for (i = 0u; i < pending_tx_count; ++i)
+        {
+            pending_tx[i].dropped_samples =
+                dropped_samples + main_dropped_samples;
+            pending_tx[i].crc32 = axdr_command_crc32(
+                (const uint8_t *)&pending_tx[i],
+                offsetof(axdr_scope_stream_frame_v1_t, crc32));
+        }
         pending_tx_valid = 1u;
     }
     if ((requested_stream_id == 0u) ||
-        (pending_tx.stream_id != requested_stream_id))
+        (pending_tx[0].stream_id != requested_stream_id))
     {
         observation_barrier();
         ring_tail = tail + 1u;
@@ -492,11 +647,19 @@ void service_observation_poll(void)
         return;
     }
     if (transmit == NULL) return;
-    result = transmit((const uint8_t *)&pending_tx, sizeof(pending_tx));
+    bytes = (uint16_t)(pending_tx_count * sizeof(pending_tx[0]));
+    memcpy(tx_batch, pending_tx, bytes);
+    result = transmit(tx_batch, bytes);
     if (result == 1) return;
-    if (result != 0) main_dropped_samples += pending_tx.sample_count;
+    if (result != 0)
+    {
+        for (i = 0u; i < pending_tx_count; ++i)
+        {
+            main_dropped_samples += pending_tx[i].sample_count;
+        }
+    }
     observation_barrier();
-    ring_tail = tail + 1u;
+    ring_tail = tail + pending_tx_count;
     pending_tx_valid = 0u;
 }
 
@@ -539,7 +702,7 @@ static uint8_t payload_out(const void *data, uint16_t size, uint8_t *out,
     return AXDR_REASON_NONE;
 }
 
-static uint8_t configure_stream(const uint8_t *request, uint16_t length,
+static uint8_t configure_stream(uint8_t compact, const uint8_t *request, uint16_t length,
                                 uint8_t *response, uint16_t capacity,
                                 uint16_t *out_length)
 {
@@ -554,7 +717,12 @@ static uint8_t configure_stream(const uint8_t *request, uint16_t length,
     if (req.enabled > 1u) return AXDR_REASON_INVALID_PAYLOAD;
     if ((req.enabled != 0u) &&
         ((channels_valid(ids, req.channel_count, AXDR_SCOPE_STREAM_MAX_CHANNELS) == 0u) ||
-         ((req.sample_rate_hz != 500u) && (req.sample_rate_hz != 1000u))))
+         ((req.sample_rate_hz != 500u) && (req.sample_rate_hz != 1000u) &&
+          (req.sample_rate_hz != 2000u) && (req.sample_rate_hz != 5000u) &&
+          (req.sample_rate_hz != AXDR_SCOPE_CONTROL_RATE_HZ))))
+        return AXDR_REASON_INVALID_PAYLOAD;
+    if (compact && req.enabled &&
+        (req.channel_count != 4u || req.sample_rate_hz != AXDR_SCOPE_CONTROL_RATE_HZ))
         return AXDR_REASON_INVALID_PAYLOAD;
     if (mailbox_busy() != 0u) return AXDR_REASON_BUSY;
     if (capture_snapshot(&state) == 0u) return AXDR_REASON_BUSY;
@@ -562,6 +730,7 @@ static uint8_t configure_stream(const uint8_t *request, uint16_t length,
         (state.state == AXDR_SCOPE_CAPTURE_TRIGGERED)) return AXDR_REASON_BUSY;
     memset(&mailbox, 0, sizeof(mailbox));
     mailbox.enabled = req.enabled;
+    mailbox.compact = compact;
     if (req.enabled != 0u)
     {
         mailbox.id = allocate_id(&next_stream_id);
@@ -571,11 +740,12 @@ static uint8_t configure_stream(const uint8_t *request, uint16_t length,
     }
     requested_stream_id = mailbox.id;
     pending_tx_valid = 0u;
+    pending_block_valid = 0u;
     memset(&out, 0, sizeof(out));
     out.stream_id = mailbox.id;
     out.sample_rate_hz = mailbox.rate;
     out.channel_count = mailbox.count;
-    out.samples_per_packet = AXDR_SCOPE_STREAM_SAMPLES_PER_PACKET;
+    out.samples_per_packet = compact ? AXDR_OBSERVATION_BLOCK_SAMPLES : AXDR_SCOPE_STREAM_SAMPLES_PER_PACKET;
     memcpy(out.channel_ids, mailbox.ids, sizeof(mailbox.ids));
     out.dropped_samples = dropped_samples + main_dropped_samples;
     publish_action(OBS_ACTION_STREAM);
@@ -729,7 +899,10 @@ uint8_t service_observation_route(void *context, uint16_t opcode,
     switch (opcode)
     {
     case AXDR_OPCODE_OBSERVATION_CONFIGURE:
-        return configure_stream(request_payload, request_payload_length,
+        return configure_stream(0u, request_payload, request_payload_length,
+                                response_payload, response_payload_capacity, response_payload_length);
+    case AXDR_OPCODE_OBSERVATION_BLOCK_CONFIGURE:
+        return configure_stream(1u, request_payload, request_payload_length,
                                 response_payload, response_payload_capacity, response_payload_length);
     case AXDR_OPCODE_OBSERVATION_CAPTURE:
         return arm_capture(request_payload, request_payload_length,
@@ -756,7 +929,7 @@ uint8_t service_observation_route(void *context, uint16_t opcode,
         diag.stream_id = requested_stream_id;
         diag.produced_samples = produced_samples;
         diag.dropped_samples = dropped_samples + main_dropped_samples;
-        diag.queued_packets = ring_head - ring_tail;
+        diag.queued_packets = (ring_head - ring_tail) + (block_head - block_tail);
         diag.capture_id = state.capture_id;
         diag.capture_gaps = capture_gap_events;
         return payload_out(&diag, sizeof(diag), response_payload,
@@ -765,6 +938,7 @@ uint8_t service_observation_route(void *context, uint16_t opcode,
         if (request_payload_length != 0u) return AXDR_REASON_INVALID_PAYLOAD;
         requested_stream_id = 0u;
         pending_tx_valid = 0u;
+        pending_block_valid = 0u;
         ++cancel_requested;
         observation_barrier();
         /* 空 ACK 表示取消请求已接收；下一拍生效，随后可查询 STATE。 */

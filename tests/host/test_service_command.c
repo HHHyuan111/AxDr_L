@@ -24,6 +24,7 @@
 #include "diag_runtime.h"
 #include "service_command.h"
 #include "service_usb.h"
+#include "target_irq_lock.h"
 
 foc_t g_foc;
 diag_runtime_t g_diag; /* service_scope 路由引用（测试链接，不做诊断） */
@@ -43,6 +44,55 @@ bool drive_fault_clear(foc_t *foc)
 }
 
 static int fail_count;
+static unsigned irq_mask, irq_entries, blocked_attempts, mixed_reads;
+static bool watch_command, stop_on_unlock, fault_before_lock;
+typedef struct {
+    unsigned sys, mode, req;
+    float id, iq, speed;
+} command_view_t;
+static command_view_t old_command, new_command;
+
+static command_view_t command_view(void)
+{
+    return (command_view_t){g_foc.mode.sys, g_foc.mode.debug, g_foc.req,
+                           g_foc.ref.id, g_foc.ref.iq, g_foc.ref.spd_r};
+}
+static bool same_command(command_view_t a, command_view_t b)
+{
+    return a.sys == b.sys && a.mode == b.mode && a.req == b.req &&
+           a.id == b.id && a.iq == b.iq && a.speed == b.speed;
+}
+/* 临时插桩副本在每个给定字段写入后调用；正式固件没有测试钩子。 */
+void test_command_preempt(void)
+{
+    if (!watch_command) return;
+    if (irq_mask) { ++blocked_attempts; return; }
+    if (!same_command(command_view(), old_command) &&
+        !same_command(command_view(), new_command)) ++mixed_reads;
+}
+unsigned __get_PRIMASK(void) { return irq_mask; }
+void __disable_irq(void)
+{
+    if (fault_before_lock && irq_mask == 0U)
+    {
+        g_foc.fault.all = 1U;
+        g_foc.req = DRIVE_REQ_STOP;
+        g_foc.state = DRIVE_STATE_FAULT;
+        fault_before_lock = false;
+    }
+    test_command_preempt(); /* 允许在取得临界区前抢占。 */
+    irq_mask = 1U; ++irq_entries;
+}
+void __set_PRIMASK(unsigned key)
+{
+    irq_mask = key;
+    test_command_preempt();
+    if (!irq_mask && stop_on_unlock)
+    {
+        g_foc.req = DRIVE_REQ_STOP;
+        stop_on_unlock = false;
+    }
+}
 /* 用户电流 PI 协议 WIP 新增了该链接依赖。本安全链测试不验证 PI 恢复，
  * 意外调用必须报失败，不能以空替身冒充真实参数初始化。 */
 void cur_pi_init(foc_t *foc)
@@ -104,8 +154,28 @@ static void send_frame(const uint8_t *payload, uint16_t payload_length,
     memcpy(&frame[length - 4], &crc, 4);
 
     tx_len = 0u;
+    old_command = new_command = command_view();
+    watch_command = opcode == AXDR_OPCODE_SET_SPEED || opcode == AXDR_OPCODE_SET_CURRENT;
+    if (opcode == AXDR_OPCODE_SET_SPEED && payload_length == sizeof(axdr_speed_request_t))
+    {
+        axdr_speed_request_t req;
+        memcpy(&req, payload, sizeof(req));
+        new_command.sys = debug_mode; new_command.mode = spd_curr_cl;
+        new_command.iq = req.iq_limit_A; new_command.speed = req.target_rad_s;
+        if (g_foc.state != DRIVE_STATE_RUN) new_command.req = DRIVE_REQ_START;
+    }
+    if (opcode == AXDR_OPCODE_SET_CURRENT && payload_length == sizeof(axdr_current_request_t))
+    {
+        axdr_current_request_t req;
+        memcpy(&req, payload, sizeof(req));
+        new_command.sys = debug_mode; new_command.mode = curr_cl;
+        new_command.id = req.id_target_A; new_command.iq = req.iq_target_A;
+        new_command.speed = 0.0f;
+        if (g_foc.state != DRIVE_STATE_RUN) new_command.req = DRIVE_REQ_START;
+    }
     service_usb_rx(frame, length);
     service_usb_poll();
+    watch_command = false;
 }
 
 #define ack() tx_buf[14]
@@ -358,6 +428,16 @@ int main(void)
 
     /* ---- 15. ControlStop：无条件可用（安全方向），撤运行授权 ---- */
     {
+        const unsigned count_before = irq_entries;
+        irq_mask = 1U;
+        send_frame((const uint8_t *)&spd, sizeof(spd), 21001u, AXDR_OPCODE_SET_SPEED);
+        expect("嵌套更新恢复原中断屏蔽值", irq_mask == 1U && irq_entries > count_before);
+        irq_mask = 0U;
+        stop_on_unlock = true;
+        send_frame((const uint8_t *)&spd, sizeof(spd), 21002u, AXDR_OPCODE_SET_SPEED);
+        expect("发布后到达的 STOP 不被旧命令覆盖", g_foc.req == DRIVE_REQ_STOP && !stop_on_unlock);
+    }
+    {
         const uint32_t rejected_before = service_usb_stats()->tx_queue_full;
         tx_status = 1;
         send_frame(NULL, 0u, 22u, AXDR_OPCODE_CONTROL_STOP);
@@ -432,6 +512,35 @@ int main(void)
         expect("拒因 OUT_OF_RANGE", reason() == AXDR_REASON_OUT_OF_RANGE);
     }
 
+    /* PWM 尚未开启但 START 已排入本拍时，同样不允许改 PI。 */
+    {
+        const axdr_current_pi_set_request_t pi = {
+            .schema_version = AXDR_CURRENT_PI_SCHEMA_VERSION,
+            .payload_size = sizeof(pi), .kp = 0.5f, .ki = 100.0f,
+        };
+        g_foc.state = DRIVE_STATE_STOP;
+        g_foc.req = DRIVE_REQ_START;
+        send_frame((const uint8_t *)&pi, sizeof(pi), 30001u, AXDR_OPCODE_SET_CURRENT_PI);
+        expect("待启动时拒绝改 PI", ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_INVALID_STATE);
+        send_frame(NULL, 0u, 30002u, AXDR_OPCODE_RESTORE_CURRENT_PI);
+        expect("待启动时拒绝恢复 PI", ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_INVALID_STATE);
+        g_foc.req = DRIVE_REQ_STOP;
+        send_frame((const uint8_t *)&pi, sizeof(pi), 30003u, AXDR_OPCODE_SET_CURRENT_PI);
+        expect("已停止时成组写入 d/q PI", ack() == AXDR_ACK_APPLIED &&
+               g_foc.id_pi.kp == pi.kp && g_foc.iq_pi.kp == pi.kp &&
+               g_foc.id_pi.ki == pi.ki && g_foc.iq_pi.ki == pi.ki && irq_mask == 0U);
+    }
+
+    /* 校验通过之后、真正发布之前发生故障，不能仍然发布启动给定。 */
+    spd.iq_limit_A = 8.0f; spd.target_rad_s = 12.0f;
+    fault_before_lock = true;
+    send_frame((const uint8_t *)&spd, sizeof(spd), 31001u, AXDR_OPCODE_SET_SPEED);
+    expect("发布前新故障拒绝启动", ack() == AXDR_ACK_REJECTED &&
+           reason() == AXDR_REASON_FAULT_ACTIVE && g_foc.req == DRIVE_REQ_STOP);
+    expect("没有半组给定被控制中断读取", mixed_reads == 0U);
+    expect("正常更新恢复开中断", irq_mask == 0U);
+    printf("command publication: entries=%u blocked=%u mixed=%u\n",
+           irq_entries, blocked_attempts, mixed_reads);
     if (fail_count == 0)
     {
         (void)printf("test_service_command: all pass\n");
