@@ -222,6 +222,7 @@ int main(void)
         expect("已消费请求不重复执行", tx_capture_len == 0u);
     }
 
+
     if (fail_count == 0)
     {
         (void)printf("test_service_usb: all pass\n");
@@ -229,4 +230,19 @@ int main(void)
     }
     (void)printf("test_service_usb: %d failure(s)\n", fail_count);
     return 1;
+}
+
+/* ---- 固件资源应答的外部读取桩（只在此 TU 供链接，故标 unused） ---- */
+__attribute__((unused)) void target_irq_profile_read(void *profile)
+{
+    (void)profile;
+}
+__attribute__((unused)) uint8_t service_param_store_boot_id_read(uint32_t *out)
+{
+    *out = 0u;
+    return 0u;
+}
+__attribute__((unused)) uint32_t target_reset_reason(void)
+{
+    return 0u;
 }

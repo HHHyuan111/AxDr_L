@@ -23,6 +23,7 @@
 #include "axdr_command_core.h"
 #include "axdr_scope_contract.h"
 #include "axdr_observation_contract.h"
+#include "axdr_build_id.h"
 #include "service_observation.h"
 #include "common.h"
 #include "diag_runtime.h"
@@ -232,7 +233,7 @@ int main(void)
     expect("other opcode bits preserved", (rd_u32(resp_payload(), 16u) & 1u) == 1u);
     send_frame(NULL, 0u, 1000u, AXDR_OPCODE_GET_DEVICE_INFO);
     expect("device preserved", rd_u32(resp_payload(), 0u) == 0x12345678u);
-    expect("observation firmware identity", rd_u16(resp_payload(), 8u) == 0u && rd_u16(resp_payload(), 10u) == 7u && rd_u16(resp_payload(), 12u) == 9u && rd_u32(resp_payload(), 20u) == 0x20261028u);
+    expect("observation firmware identity", rd_u16(resp_payload(), 8u) == AXDR_FW_MAJOR && rd_u16(resp_payload(), 10u) == AXDR_FW_MINOR && rd_u16(resp_payload(), 12u) == AXDR_FW_PATCH && rd_u32(resp_payload(), 20u) == AXDR_BUILD_ID);
     memset(dir_req, 0, sizeof(dir_req));
     dir_req[0] = 16u;
     dir_req[2] = 2u;

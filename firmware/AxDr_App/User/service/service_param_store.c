@@ -255,3 +255,83 @@ void service_param_store_ident_poll(void)
     ident_stage_flag = 0U;
     (void)ps_ident_save_merged(&local);
 }
+
+/* ---- boot_id 追加记录（Bank2 第 3 页，独立页）----
+ * 每条 8B：每上电追加一条，页满才整页擦除（2KB 页 ≈ 256 条 ≈ 256 次上电擦 1 次），
+ * 满足"禁止每次整页擦除"约束；CRC 只覆盖 boot_id 本体。 */
+#define PS_BOOT_ADDR 0x08041000U /* Bank2 第 3 页 */
+
+typedef struct
+{
+    uint32_t boot_id;
+    uint32_t crc32;
+} ps_boot_record_t;
+
+_Static_assert(sizeof(ps_boot_record_t) == 8U, "ps_boot_record_t 须为 8B");
+
+uint8_t service_param_store_boot_id_read(uint32_t *out)
+{
+    ps_boot_record_t rec;
+    const uint32_t page_size = target_flash_page_size();
+    uint32_t addr = PS_BOOT_ADDR;
+    uint32_t last = 0U;
+    uint8_t found = 0U;
+
+    while (addr < PS_BOOT_ADDR + page_size)
+    {
+        target_flash_read(&rec, addr, sizeof(rec));
+        if ((rec.boot_id == 0xFFFFFFFFu) && (rec.crc32 == 0xFFFFFFFFu))
+        {
+            break; /* 首个空闲槽：后面全为未写区 */
+        }
+        if (rec.crc32 != axdr_command_crc32((const uint8_t *)&rec.boot_id,
+                                            sizeof(rec.boot_id)))
+        {
+            break; /* 半写或损坏：此后记录不再信任 */
+        }
+        last = rec.boot_id;
+        found = 1U;
+        addr += sizeof(rec);
+    }
+
+    if (found != 0U)
+    {
+        *out = last;
+    }
+    return found;
+}
+
+void service_param_store_boot_id_commit(uint32_t value)
+{
+    ps_boot_record_t rec;
+    const uint32_t page_size = target_flash_page_size();
+    uint32_t addr = PS_BOOT_ADDR;
+
+    while (addr < PS_BOOT_ADDR + page_size)
+    {
+        uint32_t head;
+        uint32_t tail;
+
+        target_flash_read(&head, addr, sizeof(head));
+        target_flash_read(&tail, addr + sizeof(head), sizeof(tail));
+        if ((head == 0xFFFFFFFFu) && (tail == 0xFFFFFFFFu))
+        {
+            break;
+        }
+        addr += sizeof(rec);
+    }
+
+    if (addr >= PS_BOOT_ADDR + page_size)
+    {
+        if (target_flash_erase_page(PS_BOOT_ADDR) != RET_OK)
+        {
+            return; /* 擦除失败：本次不记，下次上电重试 */
+        }
+        addr = PS_BOOT_ADDR;
+    }
+
+    rec.boot_id = value;
+    rec.crc32 = axdr_command_crc32((const uint8_t *)&rec.boot_id,
+                                   sizeof(rec.boot_id));
+    (void)target_flash_write(addr, &rec, sizeof(rec));
+}

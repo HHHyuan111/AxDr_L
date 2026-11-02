@@ -26,18 +26,23 @@
 #include <string.h>
 
 #include "axdr_command_core.h"
+#include "axdr_build_id.h"
 #include "common.h"
 #include "service_drive_state.h"
+#include "service_param_store.h"
 #include "drive.h" /* drive_fault_clear：DISARM 故障恢复路径清驱动锁存位 */
 #include "motor_config.h"
 #include "encoder_type.h"
 #include "service_telemetry.h"
 #include "service_usb.h"
 #include "target_irq_lock.h"
+#include "target_irq_profile.h"
+#include "target_reset.h"
 
-/* ---- 板级/固件身份（上位机 GetDeviceInfo/GetProtocolInfo 匹配用） ---- */
-#define SVC_FW_MAJOR 0u
-#define SVC_FW_MINOR 7u
+/* ---- 板级/固件身份（上位机 GetDeviceInfo/GetProtocolInfo 匹配用） ----
+ * 版本与 build_id 唯一来源：axdr_build_id.h（tools/gen_build_id.py 生成）。 */
+#define SVC_FW_MAJOR AXDR_FW_MAJOR
+#define SVC_FW_MINOR AXDR_FW_MINOR
 /* S6 互锁现场评估 + S8 限幅指纹 + S9 确认载荷在 0.7.1；S10 修复 0x08
  * 上电首查互锁清零（ensure 懒初始化晚于 observe，见 GET_SAFETY_STATE）。
  * 0.7.3 补 ENCODER_ALIGNMENT 能力位（双闸）；0.7.4 修 AlignEncoder 字段
@@ -50,7 +55,7 @@
  * 纯范围检查放行 NaN 会毒化速度/电流参考（14 号政策阴招③）。
  * 0.7.7：运行态补首故障定格（fault 0→非 0 首拍位图+毫秒，DISARM
  * 一并清除），GetRuntimeState 载荷 36→44B，宿主按长度兼容。 */
-#define SVC_FW_PATCH 7u
+#define SVC_FW_PATCH AXDR_FW_PATCH
 #define SVC_DEVICE_FAMILY 0x00000001u /* 沉沙/AxDrive-L 驱动 */
 #define SVC_BOARD_PROFILE 0x00000003u /* hw_rev v1.3 */
 #define SVC_PRODUCT_NAME "AxDrService"
@@ -302,7 +307,8 @@ static uint8_t provide_protocol_info(uint8_t *resp, uint16_t cap,
                          AXDR_CAPABILITY_MOTOR_PROFILE |
                          AXDR_CAPABILITY_MOTOR_PROFILE_CONFIRMATION |
                          AXDR_CAPABILITY_LINK_DIAGNOSTICS |
-                         AXDR_CAPABILITY_CURRENT_PI_RUNTIME_TUNING;
+                         AXDR_CAPABILITY_CURRENT_PI_RUNTIME_TUNING |
+                         AXDR_CAPABILITY_FIRMWARE_RESOURCE;
     p.supported_opcode_mask = SVC_SUPPORTED_MASK;
     p.parameter_count = 0u;
     return payload_out(&p, sizeof(p), resp, cap, len);
@@ -320,10 +326,47 @@ static uint8_t provide_device_info(uint8_t *resp, uint16_t cap,
     p.firmware_patch = SVC_FW_PATCH;
     p.telemetry_version = 1u;
     p.command_version = AXDR_COMMAND_VERSION;
-    p.build_id = 0x20261005u; /* 手写日期戳：重编译即代表当日修复集，供上位机分辨 */
+    p.build_id = AXDR_BUILD_ID; /* 每次构建唯一，由构建脚本生成 */
     /* strncpy 语义：源短于目标时补零（packed char[16]） */
     { const char *src = SVC_PRODUCT_NAME; uint16_t i = 0u;
       while (src[i] != 0 && i < sizeof(p.product_name)) { p.product_name[i] = src[i]; i++; } }
+    return payload_out(&p, sizeof(p), resp, cap, len);
+}
+
+/* 固件资源应答序号：每次查询自增（与 irq_count 无关的独立计数器）。 */
+static uint32_t resource_stats_seq;
+
+static uint8_t provide_firmware_resource(uint8_t *resp, uint16_t cap,
+                                         uint16_t *len)
+{
+    axdr_firmware_resource_payload_t p;
+    target_irq_profile_t irq;
+    uint32_t boot_id = 0u;
+    uint16_t i = 0u;
+
+    memset(&p, 0, sizeof(p));
+    p.schema_version = AXDR_FIRMWARE_RESOURCE_SCHEMA_VERSION;
+    p.payload_size = AXDR_FIRMWARE_RESOURCE_PAYLOAD_SIZE;
+    p.project_id = AXDR_PROJECT_ID;
+    p.target_id = AXDR_TARGET_ID;
+    p.build_id = AXDR_BUILD_ID;
+    { const char *src = AXDR_TARGET_NAME;
+      while (src[i] != 0 && i < sizeof(p.target_name)) { p.target_name[i] = src[i]; i++; } }
+    (void)service_param_store_boot_id_read(&boot_id);
+    p.boot_id = boot_id;
+    p.uptime_ms = g_foc.fast_seq / 20u; /* 20kHz 序号 → 毫秒，与 now_ms 同源 */
+    p.reset_reason = (uint8_t)target_reset_reason();
+    target_irq_profile_read(&irq);
+    p.stats_valid = (irq.count != 0u) ? 1u : 0u;
+    p.stats_seq = ++resource_stats_seq;
+    p.irq_count = irq.count;
+    p.irq_last_cycles = irq.last_cycles;
+    p.irq_max_cycles = irq.max_cycles;
+    p.irq_overruns = irq.overruns;
+    p.irq_gap_count = irq.gap_count;
+    p.adc_overruns = irq.adc_overruns;
+    p.core_clock_hz = irq.core_clock_hz;
+    p.stats_capability = AXDR_FIRMWARE_RESOURCE_STATS_IRQ_TIMING;
     return payload_out(&p, sizeof(p), resp, cap, len);
 }
 
@@ -541,6 +584,16 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             return provide_runtime_state(response_payload,
                                          response_payload_capacity,
                                          response_payload_length);
+
+        case AXDR_OPCODE_GET_FIRMWARE_RESOURCE:
+            if (request_payload_length != 0u)
+            {
+                return AXDR_REASON_INVALID_PAYLOAD;
+            }
+            *ack_state = AXDR_ACK_ACCEPTED;
+            return provide_firmware_resource(response_payload,
+                                             response_payload_capacity,
+                                             response_payload_length);
 
         case AXDR_OPCODE_GET_LINK_DIAGNOSTICS:
             if (request_payload_length != 0u)

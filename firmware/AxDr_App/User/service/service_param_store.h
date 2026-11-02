@@ -47,4 +47,10 @@ void service_param_store_ident_poll(void);
 /** @brief 读辨识档案（boot 用）。1=记录有效，0=无档/作废（出厂/换电机/坏 CRC）。 */
 uint8_t service_param_store_ident_read(service_ident_data_t *out);
 
+/** @brief 读最新 boot_id（Bank2 第 3 页追加记录）。1=有记录（*out 为最新值）。 */
+uint8_t service_param_store_boot_id_read(uint32_t *out);
+
+/** @brief 上电时追加一条 boot_id 记录（页满才整页擦除，约 256 次上电擦 1 次）。 */
+void service_param_store_boot_id_commit(uint32_t value);
+
 #endif /* SERVICE_PARAM_STORE_H */

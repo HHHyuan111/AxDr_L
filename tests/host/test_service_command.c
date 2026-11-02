@@ -19,12 +19,14 @@
 #include <string.h>
 
 #include "axdr_command_contract.h"
+#include "axdr_build_id.h"
 #include "axdr_command_core.h"
 #include "common.h"
 #include "diag_runtime.h"
 #include "service_command.h"
 #include "service_usb.h"
 #include "target_irq_lock.h"
+#include "target_irq_profile.h"
 
 foc_t g_foc;
 diag_runtime_t g_diag; /* service_scope 路由引用（测试链接，不做诊断） */
@@ -192,6 +194,28 @@ static uint32_t rd_u32(const uint8_t *base, uint16_t offset)
 static uint8_t rd_u8(const uint8_t *base, uint16_t offset)
 {
     return base[offset];
+}
+static uint16_t rd_u16(const uint8_t *base, uint16_t offset)
+{
+    uint16_t value;
+    memcpy(&value, &base[offset], 2);
+    return value;
+}
+
+/* ---- 固件资源应答的外部读取桩：测试提供受控值 ---- */
+static target_irq_profile_t stub_irq;
+void target_irq_profile_read(target_irq_profile_t *profile)
+{
+    *profile = stub_irq;
+}
+uint8_t service_param_store_boot_id_read(uint32_t *out)
+{
+    *out = 42u;
+    return 1u;
+}
+uint32_t target_reset_reason(void)
+{
+    return 0x1Cu;
 }
 
 /* ---- 时间推进：fast_seq @20kHz ---- */
@@ -539,6 +563,47 @@ int main(void)
            reason() == AXDR_REASON_FAULT_ACTIVE && g_foc.req == DRIVE_REQ_STOP);
     expect("没有半组给定被控制中断读取", mixed_reads == 0U);
     expect("正常更新恢复开中断", irq_mask == 0U);
+
+    /* ---- 固件资源应答（0x2B）：80B 固定偏移、快照一致、独立 stats_seq ---- */
+    {
+        const uint8_t *p;
+        uint8_t junk[2] = {0U, 0U};
+
+        stub_irq.count = 3u;
+        stub_irq.last_cycles = 4000u;
+        stub_irq.max_cycles = 5000u;
+        stub_irq.overruns = 1u;
+        stub_irq.gap_count = 2u;
+        stub_irq.adc_overruns = 0u;
+        stub_irq.core_clock_hz = 160000000u;
+        send_frame(NULL, 0u, 32001u, AXDR_OPCODE_GET_FIRMWARE_RESOURCE);
+        expect("资源应答 ack", ack() == AXDR_ACK_ACCEPTED);
+        expect("资源应答含 80B 载荷", tx_len >= 20u + 80u + 4u);
+        p = resp_payload();
+        expect("schema=1", rd_u16(p, 0u) == 1u);
+        expect("payload_size=80", rd_u16(p, 2u) == 80u);
+        expect("project_id=1", rd_u32(p, 4u) == 1u);
+        expect("target_id=AXDR_TARGET_ID", rd_u32(p, 8u) == AXDR_TARGET_ID);
+        expect("build_id=AXDR_BUILD_ID", rd_u32(p, 12u) == AXDR_BUILD_ID);
+        expect("boot_id=桩值42", rd_u32(p, 32u) == 42u);
+        expect("stats_valid=1", rd_u8(p, 41u) == 1u);
+        expect("reserved=0", rd_u16(p, 42u) == 0u);
+        expect("stats_seq=1", rd_u32(p, 44u) == 1u);
+        expect("irq_count=3", rd_u32(p, 48u) == 3u);
+        expect("irq_last=4000", rd_u32(p, 52u) == 4000u);
+        expect("irq_max=5000", rd_u32(p, 56u) == 5000u);
+        expect("irq_overruns=1", rd_u32(p, 60u) == 1u);
+        expect("gap_count=2", rd_u32(p, 64u) == 2u);
+        expect("core_clock=160MHz", rd_u32(p, 72u) == 160000000u);
+        expect("capability=bit0", rd_u32(p, 76u) == AXDR_FIRMWARE_RESOURCE_STATS_IRQ_TIMING);
+        send_frame(NULL, 0u, 32002u, AXDR_OPCODE_GET_FIRMWARE_RESOURCE);
+        expect("stats_seq 独立自增", rd_u32(resp_payload(), 44u) == 2u);
+        stub_irq.count = 0u;
+        send_frame(NULL, 0u, 32003u, AXDR_OPCODE_GET_FIRMWARE_RESOURCE);
+        expect("无快环样本 stats_valid=0", rd_u8(resp_payload(), 41u) == 0u);
+        send_frame(junk, sizeof(junk), 32004u, AXDR_OPCODE_GET_FIRMWARE_RESOURCE);
+        expect("资源请求非空载荷拒", ack() == AXDR_ACK_REJECTED);
+    }
     printf("command publication: entries=%u blocked=%u mixed=%u\n",
            irq_entries, blocked_attempts, mixed_reads);
     if (fail_count == 0)

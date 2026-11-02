@@ -41,6 +41,8 @@ include_directories(
     "User/drive"
     "User/motor"
     "User/moldue/inc"
+    "User/debug"
+    "User/debug/segger"
 )
 
 set(AXDR_USER_SOURCES
@@ -70,6 +72,7 @@ set(AXDR_USER_SOURCES
     User/bsp/target_irq.c
     User/bsp/target_pwm.c
     User/bsp/target_qenc.c
+    User/bsp/target_reset.c
     User/bsp/target_time.c
     User/control/control_cascade.c
     User/algorithm/control_filter.c
@@ -109,6 +112,8 @@ set(AXDR_USER_SOURCES
     User/motor/foc_drv.c
     User/motor/foc_mapping.c
     User/motor/motor_modes.c
+    User/debug/rtt_log.c
+    User/debug/segger/SEGGER_RTT.c
 )
 
 # Create an executable object type

@@ -217,6 +217,44 @@ int main(void)
     expect("失败后不再重试", rd_u32(0) == 0x53585041U &&
                                  service_param_store_loaded() == 0U);
 
+    /* ---- boot_id 追加记录（Bank2 第 3 页）：不整页擦除、损坏截断、页满回绕 ---- */
+    {
+        uint32_t id = 0u;
+
+        fake_flash_reset();
+        expect("空页无 boot 记录", service_param_store_boot_id_read(&id) == 0U);
+        service_param_store_boot_id_commit(1u);
+        expect("首条 boot_id=1", service_param_store_boot_id_read(&id) == 1U && id == 1u);
+        service_param_store_boot_id_commit(2u);
+        expect("追加后读最新=2", service_param_store_boot_id_read(&id) == 1U && id == 2u);
+        service_param_store_boot_id_commit(3u);
+        service_param_store_boot_id_commit(4u);
+        expect("多追加读最新=4", service_param_store_boot_id_read(&id) == 1U && id == 4u);
+        /* 半写损坏：扫描在损坏处停止，返回上一条有效值 */
+        {
+            const uint8_t bad[8] = {0xAAu, 0xBBu, 0xCCu, 0xDDu,
+                                    0x01u, 0x02u, 0x03u, 0x04u};
+            (void)target_flash_write(0x08041000U + 4u * 8u, bad, sizeof(bad));
+            id = 0u;
+            expect("损坏记录截断扫描",
+                   service_param_store_boot_id_read(&id) == 1U && id == 4u);
+        }
+        /* 页满回绕：2KB 页 256 条，第 257 条触发整页擦除后重写 */
+        fake_flash_reset();
+        for (uint32_t i = 1u; i <= 256u; i++)
+        {
+            service_param_store_boot_id_commit(i);
+        }
+        expect("页满前最后一条=256",
+               service_param_store_boot_id_read(&id) == 1U && id == 256u);
+        service_param_store_boot_id_commit(257u);
+        expect("页满后擦除重写=257",
+               service_param_store_boot_id_read(&id) == 1U && id == 257u);
+        service_param_store_boot_id_commit(258u);
+        expect("重写后继续追加=258",
+               service_param_store_boot_id_read(&id) == 1U && id == 258u);
+    }
+
     if (fail_count == 0)
     {
         (void)printf("test_service_param_store: all pass\n");

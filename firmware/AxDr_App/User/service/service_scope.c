@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "axdr_command_contract.h"
+#include "axdr_build_id.h"
 #include "axdr_scope_contract.h"
 #include "common.h"
 #include "diag_runtime.h"
@@ -529,10 +530,10 @@ uint8_t service_scope_route(void *context, uint16_t opcode,
     {
         axdr_device_info_payload_t info;
         memcpy(&info, response_payload, sizeof(info));
-        info.firmware_major = 0u;
-        info.firmware_minor = 7u;
-        info.firmware_patch = 9u;
-        info.build_id = 0x20261028u;
+        info.firmware_major = AXDR_FW_MAJOR;
+        info.firmware_minor = AXDR_FW_MINOR;
+        info.firmware_patch = AXDR_FW_PATCH;
+        info.build_id = AXDR_BUILD_ID;
         memcpy(response_payload, &info, sizeof(info));
     }
     return reason;

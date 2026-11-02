@@ -30,3 +30,11 @@ firmware/AxDr_App/MDK-ARM/build_log.txt
 
 # 本机验收证据、录波和冻结镜像；中文结论保存在文档/开发记录
 /artifacts/
+# 固件资源模块生成物（回执与冻结产物不入库，交接走文件路径）
+firmware/AxDr_App/MDK-ARM/build_log_release.txt
+firmware/AxDr_App/MDK-ARM/build_log_debug.txt
+firmware/AxDr_App/MDK-ARM/build_identity.json
+firmware/AxDr_App/MDK-ARM/build-result.json
+firmware/AxDr_App/MDK-ARM/frozen/
+firmware/AxDr_App/MDK-ARM/DebugConfig/
+tools/.build_counter

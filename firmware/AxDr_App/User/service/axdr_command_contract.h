@@ -55,6 +55,8 @@
 /* bit 23 由 Qt 侧遗留的 CapabilitySpeedOnly 占用（AxDrCommandCodec.h），
  * 固件契约与 Qt 协议常量必须同值，故电流环用 24，不用 23。 */
 #define AXDR_CAPABILITY_CURRENT_PI_RUNTIME_TUNING (1u << 24)
+/* bit 25~27 在 axdr_observation_contract.h（被动观测/20k 流/分块流）。 */
+#define AXDR_CAPABILITY_FIRMWARE_RESOURCE (1u << 28)
 
 typedef enum
 {
@@ -101,7 +103,8 @@ typedef enum
     AXDR_OPCODE_RESTORE_SPEED_PI = 0x0027u,
     AXDR_OPCODE_GET_CURRENT_PI = 0x0028u,
     AXDR_OPCODE_SET_CURRENT_PI = 0x0029u,
-    AXDR_OPCODE_RESTORE_CURRENT_PI = 0x002Au
+    AXDR_OPCODE_RESTORE_CURRENT_PI = 0x002Au,
+    AXDR_OPCODE_GET_FIRMWARE_RESOURCE = 0x002Bu
 } axdr_command_opcode_t;
 
 #define AXDR_SPEED_PI_SCHEMA_VERSION 1u
@@ -894,5 +897,42 @@ typedef struct __attribute__((packed))
     uint8_t value_type;
     float proposed_value;
 } axdr_parameter_draft_result_t;
+
+/* ---- 固件资源应答（0x2B）：固定 80B，小端序，字段按固定偏移 ---- */
+
+#define AXDR_FIRMWARE_RESOURCE_SCHEMA_VERSION 1u
+#define AXDR_FIRMWARE_RESOURCE_PAYLOAD_SIZE 80u
+#define AXDR_FIRMWARE_RESOURCE_PROJECT_AXDR_L 0x00000001u
+#define AXDR_FIRMWARE_RESOURCE_TARGET_RELEASE 0u
+#define AXDR_FIRMWARE_RESOURCE_TARGET_DEBUG 1u
+/* stats_capability：不支持的指标位保持 0，上位机据此灰显。 */
+#define AXDR_FIRMWARE_RESOURCE_STATS_IRQ_TIMING (1u << 0)
+
+typedef struct __attribute__((packed))
+{
+    uint16_t schema_version;      /* 0:  恒 1 */
+    uint16_t payload_size;        /* 2:  恒 80 */
+    uint32_t project_id;          /* 4:  AXDR_FIRMWARE_RESOURCE_PROJECT_AXDR_L */
+    uint32_t target_id;           /* 8:  0=AxDr(Release) 1=AxDr-Debug */
+    uint32_t build_id;            /* 12: 每次构建唯一（脚本生成）；0=未产包构建 */
+    char     target_name[16];     /* 16: "AxDr" / "AxDr-Debug"，0 填充 */
+    uint32_t boot_id;             /* 32: flash 持久，上电 +1；0=尚无记录 */
+    uint32_t uptime_ms;           /* 36: 上电毫秒（fast_seq/20），回绕用差值比较 */
+    uint8_t  reset_reason;        /* 40: RCC->CSR 复位标志，启动时锁存 */
+    uint8_t  stats_valid;         /* 41: 0=快环未跑够一拍，统计字段无意义 */
+    uint16_t reserved;            /* 42: 恒 0 */
+    uint32_t stats_seq;           /* 44: 每次查询自增的应答序号（与 irq_count 无关） */
+    uint32_t irq_count;           /* 48: 快环执行总拍数（次） */
+    uint32_t irq_last_cycles;     /* 52: 最近一拍 ISR 耗时（核时钟周期，160MHz 下 1 周期=6.25ns） */
+    uint32_t irq_max_cycles;      /* 56: 历史最坏一拍 ISR 耗时（周期） */
+    uint32_t irq_overruns;        /* 60: 单拍耗时 ≥ 一拍周期 的拍数（次） */
+    uint32_t irq_gap_count;       /* 64: 相邻中断间隔 >1.5 倍周期 的次数（次） */
+    uint32_t adc_overruns;        /* 68: ADC 溢出次数（次） */
+    uint32_t core_clock_hz;       /* 72: 内核时钟（Hz） */
+    uint32_t stats_capability;    /* 76: bit0=IRQ 计时 */
+} axdr_firmware_resource_payload_t;
+
+_Static_assert(sizeof(axdr_firmware_resource_payload_t) == 80u,
+               "固件资源应答必须为 80B 固定偏移");
 
 #endif /* AXDR_COMMAND_CONTRACT_H */

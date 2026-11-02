@@ -33,6 +33,7 @@
 #include "foc.h"
 #include "current_offset.h"
 #include "drive_diag.h"
+#include "rtt_log.h"
 #include "target_adc.h"
 #include "target_time.h"
 #include "target_irq_profile.h"
@@ -44,6 +45,7 @@
 #include "service_usb.h"
 #include "service_usb_tx.h"
 #include "service_observation.h"
+#include "target_reset.h"
 #include "usbd_cdc_if.h"
 #include "axdr_command_contract.h"
 #include <string.h>
@@ -113,6 +115,9 @@ int main(void)
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
+
+  /* 复位原因最早锁存：之后任何代码清掉 RCC->CSR 都会丢原因。 */
+  target_reset_latch();
 
   /* USER CODE BEGIN Init */
 
@@ -210,9 +215,11 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 /* 电机初始化 -------------------------------------------------------------- */
 
-/* ADC 先提供零偏校准所需的采样；控制器和参数就绪后才允许执行快环。 */
+/* ADC 先提供零偏校准所需的采样；控制器和参数就绪后才允许执行快环。
+ * 每一步完成都写 RTT 日志：上电卡住时看日志即知卡在哪一步。 */
 static void app_motor_init(void)
 {
+    rtt_log_init();
     HAL_Delay(1000);
     HAL_TIM_Base_Start(&htim3);
 
@@ -223,13 +230,28 @@ static void app_motor_init(void)
         Error_Handler();
     }
     target_irq_priority_apply();
+    rtt_log_str("adc started");
 
     /* 恢复参数时快环仍被禁止；ABZ 上电后仍需重新对齐。 */
     foc_init(&g_foc);
+    rtt_log_str("foc init done");
     cur_offset_init(&g_foc);
+    rtt_log_str("current offset done");
     service_param_store_boot();
+    rtt_log_str("param restore done");
+    {
+        /* 上电自增 boot_id（追加记录，页满才擦）：上位机以此区分重启。 */
+        uint32_t boot_id = 0u;
+
+        (void)service_param_store_boot_id_read(&boot_id);
+        boot_id += 1u;
+        service_param_store_boot_id_commit(boot_id);
+        rtt_log_u32("boot_id", boot_id);
+        rtt_log_u32("reset_reason", target_reset_reason());
+    }
     drive_diag_ident_load();
     fast_loop_enable();
+    rtt_log_str("fast loop enabled");
 }
 
 /* 通信与显示初始化 -------------------------------------------------------- */
