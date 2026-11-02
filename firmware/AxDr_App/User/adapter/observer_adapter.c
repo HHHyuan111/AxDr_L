@@ -32,7 +32,7 @@ void obs_init(const foc_t *foc)
                  foc->motor.Rs,
                  foc->motor.Ld,
                  foc->motor.flux * foc->motor.pn * foc->motor.peak_speed,
-                 2000.0f,
+                 1000.0f, /* 反电动势滤波：接管期谐波大，比旁路期更深的滤波 */
                  foc->rate.foc_ts,
                  0.0f, 0.0f,
                  foc->motor.peak_speed * foc->motor.pn * 1.2f);

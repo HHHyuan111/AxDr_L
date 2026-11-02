@@ -33,6 +33,8 @@ typedef struct
     float eb_f;    /* β 轴反电动势滤波值 V */
     float theta;   /* 估计电角度 rad，[0, 2π) */
     float spd;     /* 估计电角速度 rad/s */
+    float spd_f;   /* 速度输出低通值（速度环反馈用，抑制 kp 项噪声） */
+    float e_mag;   /* 本拍反电动势幅值 V（失锁检测用） */
     float pll_int; /* PLL 积分状态 */
 } foc_smo_t;
 

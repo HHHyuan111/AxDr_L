@@ -175,8 +175,12 @@ static _RAM_FUNC bool drive_sensorless_step(foc_t *foc, foc_plan_t *cmd)
     {
         if (t >= CTRL_SENSORLESS_RAMP_S)
         {
-            /* 切态对齐：SMO 角度直接对准虚拟轴，PLL 随后在真实反电动势上收敛。 */
+            /* 切态对齐：SMO 角度对准虚拟轴，速度与积分器初始化为已知场速——
+             * 转子此时接近场速，这比 PLL 的瞬态噪声值可靠得多。 */
             g_obs.smo.theta = foc->ref.theta_e;
+            g_obs.smo.spd = CTRL_SENSORLESS_SWITCH_WE_RAD_S;
+            g_obs.smo.spd_f = CTRL_SENSORLESS_SWITCH_WE_RAD_S;
+            g_obs.smo.pll_int = CTRL_SENSORLESS_SWITCH_WE_RAD_S / g_obs.smo.pll_ki;
             foc->sensorless_phase = DRIVE_SENSORLESS_SWITCH;
             foc->sensorless_ticks = 0U;
         }
@@ -223,8 +227,31 @@ _RAM_FUNC void drive_handle_state(foc_t *foc, drive_cycle_t *cycle)
                 if ((foc->sensorless_enabled != 0U) &&
                     (foc->sensorless_phase == DRIVE_SENSORLESS_RUN))
                 {
-                    /* SMO 角度接管：模式计算照旧，只换控制角度。 */
+                    /* SMO 角度与速度接管：模式计算照旧，只换控制反馈。
+                     * 保护（第 2 步）仍读编码器值——有编码器场合照常工作，
+                     * 无编码器前提在 S5.5 按模式化。 */
                     cycle->cmd.theta = g_obs.smo.theta;
+                    foc->fb.spd_r = g_obs.smo.spd_f / foc->motor.pn;
+
+                    /* 失锁检测：速度宣称高但反电动势幅值对不上（转子停转时
+                     * SMO 会锁在电流谐波上形成自欺回路）→ 持续 0.2s 才停机，
+                     * 切换瞬态的滤波建立期不会被误杀。 */
+                    if ((fabsf(g_obs.smo.spd) > 20.0f) &&
+                        (g_obs.smo.e_mag <
+                         0.12f * foc->motor.flux * foc->motor.pn *
+                         fabsf(g_obs.smo.spd)))
+                    {
+                        foc->sensorless_losstick++;
+                    }
+                    else
+                    {
+                        foc->sensorless_losstick = 0U;
+                    }
+                    if (foc->sensorless_losstick >
+                        (uint32_t)(0.2f * foc->rate.foc_fs))
+                    {
+                        foc->fault.bit.enc_err = 1U;
+                    }
                 }
             }
             break;

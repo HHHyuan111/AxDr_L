@@ -54,7 +54,7 @@ int main(void)
 
     foc_smo_init(&smo, rs, ls, 5.0f, 2000.0f, ts, 0.0f, 0.0f, 300.0f);
 
-    for (i = 0; i < 2000; ++i) /* 100ms */
+    for (i = 0; i < 6000; ++i) /* 300ms：默认 PLL 带宽 40 rad/s 的收敛窗口 */
     {
         float ea;
         float eb;

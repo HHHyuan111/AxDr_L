@@ -503,6 +503,7 @@ struct foc
     uint8_t sensorless_enabled; /* 1=START 走 I/F 起动并切换到 SMO 角度 */
     uint8_t sensorless_phase;   /* 见 drive_sensorless_phase_e */
     uint32_t sensorless_ticks;
+    uint32_t sensorless_losstick; /* 失锁嫌疑连续拍数（0.2s 确认才停机） */
 };
 
 void ctrl_fb_update(foc_t *foc, float vbus);

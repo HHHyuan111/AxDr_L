@@ -36,9 +36,9 @@ void foc_smo_init(foc_smo_t *s, float rs, float ls, float kslide,
     s->spd_max = spd_max;
     if ((pll_kp <= 0.0f) || (pll_ki <= 0.0f))
     {
-        /* 默认 PLL 带宽：自然频率 80 rad/s、阻尼 0.707——起动瞬态
-         * 反电动势小，带宽过高会放大归一化误差并造成积分超调。 */
-        const float wn = 80.0f;
+        /* 默认 PLL 带宽：自然频率 40 rad/s、阻尼 0.707——真机接管期实测
+         * 80 rad/s 时 kp 项放大电流谐波，角度抖动 0.5~1.1 rad。 */
+        const float wn = 40.0f;
 
         s->pll_kp = 2.0f * 0.707f * wn;
         s->pll_ki = wn * wn;
@@ -59,6 +59,8 @@ void foc_smo_reset(foc_smo_t *s)
     s->eb_f = 0.0f;
     s->theta = 0.0f;
     s->spd = 0.0f;
+    s->spd_f = 0.0f;
+    s->e_mag = 0.0f;
     s->pll_int = 0.0f;
 }
 
@@ -97,6 +99,7 @@ void foc_smo_step(foc_smo_t *s, float ua, float ub, float ia, float ib)
     theta_sin = sinf(s->theta);
     theta_cos = cosf(s->theta);
     e_mag = sqrtf(s->ea_f * s->ea_f + s->eb_f * s->eb_f);
+    s->e_mag = e_mag;
     if (e_mag < 0.05f)
     {
         return; /* 反电动势太小：保持当前估计，等待转速起来。 */
@@ -133,4 +136,8 @@ void foc_smo_step(foc_smo_t *s, float ua, float ub, float ia, float ib)
     {
         s->theta += M_2PI;
     }
+
+    /* 速度输出低通（截止 100 rad/s）：kp 项噪声 ±30 rad/s 级，
+     * 直接进速度环会被放大成振荡；积分项是速度主载波，滤波只去毛刺。 */
+    s->spd_f += (s->spd - s->spd_f) * (100.0f * s->ts / (1.0f + 100.0f * s->ts));
 }

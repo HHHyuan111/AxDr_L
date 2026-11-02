@@ -8,6 +8,6 @@
 #define AXDR_PROJECT_ID   0x00000001u
 #define AXDR_TARGET_ID    0u
 #define AXDR_TARGET_NAME  "AxDr"
-#define AXDR_BUILD_ID     0xE82B72FBu
+#define AXDR_BUILD_ID     0xB4F14D2Cu
 
 #endif /* AXDR_BUILD_ID_H */
