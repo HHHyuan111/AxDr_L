@@ -350,10 +350,10 @@ typedef struct {
  * 公共接口
  * ============================================================================*/
 
-/* 填默认配置：算法时序/门限为 G11 原值；激励幅值为沉沙电机档案
+/* 填默认配置：算法时序/门限为 G11 原值；激励幅值为200W 伺服电机档案
  * （5 对极，电流闸门 8A：Rs 六点阶梯 2→6A，jcal 档 6→12A 超限不照搬）；
  * current_limit_a 与 voltage_limit_v 保持 0（闸门：未确认试验条件禁止
- * 启动，start 拒绝）；nominal/tol 全 0（待沉沙首次辨识后回填，0=不检查
+ * 启动，start 拒绝）；nominal/tol 全 0（待200W 伺服电机首次辨识后回填，0=不检查
  * 偏差）。 */
 void mc_param_ident_default_config(mc_param_ident_config_t *cfg);
 

@@ -1,4 +1,4 @@
-/** @brief 位置差分测速的独立历史；只含数据，不依赖硬件和 FOC 总对象。 */
+/** @brief 位置差分测速的独立历史（纯数据，主机可测）。 */
 #ifndef SPEED_EST_H
 #define SPEED_EST_H
 #include <stdint.h>

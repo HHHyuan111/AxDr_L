@@ -9,7 +9,7 @@ typedef int (*service_observation_tx_fn)(const uint8_t *data, uint16_t length);
 /* init 仅启动时调用；capture 仅在完成当前拍控制更新后的 ADC ISR 调用。 */
 void service_observation_init(void);
 void service_observation_capture(void);
-/* ADC ISR 入口报告迟到/溢出；不能把 fast_seq 连号当作硬件采样连续。 */
+/* ADC ISR 入口报告迟到/溢出；fast_seq 连号只表示无迟到。 */
 void service_observation_note_timing_gap(void);
 void service_observation_poll(void);
 void service_observation_bind_tx(service_observation_tx_fn tx);

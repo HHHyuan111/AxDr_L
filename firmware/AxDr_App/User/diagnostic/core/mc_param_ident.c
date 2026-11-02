@@ -473,7 +473,7 @@ bool mc_param_ident_l_reg_solve_level(const mc_param_ident_l_reg_t *reg,
     }
     /* 联合回归先确定共同开关压降，再在单激励档仅拟合 L：
      * 单档内 x 与 sign(i) 高度相关，独立二参数拟合近共线，
-     * 不能用于档间一致性判断。 */
+     * 仅用于单档内部统计。 */
     l_est = (reg->xy - switch_drop_v * reg->xz) / reg->xx;
     if (!isfinite(l_est) || l_est <= 0.0f) return false;
     *out_l_h = l_est;
@@ -693,8 +693,8 @@ static bool ident_state_rs_sample(mc_param_ident_t *ctx,
 
             /* 全档残差均值直测死区（原两档平均推广，数值上=LS 截距）：
              * 锁 d 轴稳态下 vd̄ − Rs·ī 即逆变器死区沿电流矢量方向的等效
-             * 压降（锁轴几何）。供磁链段修正（×3/π 换旋转几何）；不依赖
-             * L 段回归拟合值——后者受梯形积分误差影响有 -5~-10% 系统
+             * 压降（锁轴几何）。供磁链段修正（×3/π 换旋转几何）；直接测量，
+             * 与 L 段回归拟合值区分——后者受梯形积分误差影响有 -5~-10% 系统
              * 偏差，仅作质量诊断输出。 */
             for (k = 0u; k < MC_IDENT_RS_POINTS; ++k) {
                 resid_sum += (double)v_mean[k]
@@ -788,7 +788,7 @@ static int ident_l_axis_process(mc_param_ident_t *ctx,
     command->vq_ref_v = q_axis ? (float)ctx->rt.test_sign * v_inj : 0.0f;
 
     /* step 位于 foc 运行后：toggle_tick=1 时新命令才写入 PWM，该拍电流
-     * 是正确窗口起点，不能把 toggle_tick=0 算进去。 */
+     * 窗口起点从首个翻转拍算起。 */
     if (ctx->rt.toggle_tick == MC_IDENT_L_COMMAND_DELAY_TICKS) {
         ctx->rt.l_edge_current = axis_current;
         ctx->rt.l_prev_current = axis_current;
@@ -1177,7 +1177,7 @@ void mc_param_ident_default_config(mc_param_ident_config_t *cfg)
     cfg->filter_alpha = 0.10f;
     cfg->vbus_min_v = 1.0f;          /* 保守阈值：仅检测完全断电 */
 
-    /* 激励层：沉沙电机档案（5 对极）。Rs 阶梯 2→6A 六档：末档
+    /* 激励层：200W 伺服电机档案（5 对极）。Rs 阶梯 2→6A 六档：末档
      * 6A ≤ 0.8×8A 电流闸门（jcal 档 6→12A 属 G11-50 硬件，超限
      * 不可照搬）；ΔI=0.8A×5 档跨度 SNR 优于旧两点 2/4A。 */
     cfg->pole_pairs = 5.0f;
@@ -1188,7 +1188,7 @@ void mc_param_ident_default_config(mc_param_ident_config_t *cfg)
     cfg->l_inject_lo_v = 1.5f;
     cfg->l_inject_hi_v = 3.0f;
     cfg->flux_voltage_v = 3.0f;
-    cfg->flux_target_erpm = 900.0f;  /* 沉沙 3000rpm 额定：180rpm 机械 */
+    cfg->flux_target_erpm = 900.0f;  /* 200W 伺服电机 3000rpm 额定：180rpm 机械 */
 
     /* 安全闸门：0=未确认实物试验条件，禁止启动（start 强制校验，
      * 家族 mc_rs_ident 的 safe_current_limit 同规）。 */

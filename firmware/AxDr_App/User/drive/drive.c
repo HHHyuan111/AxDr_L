@@ -90,7 +90,9 @@ _RAM_FUNC void drive_update_state(foc_t *foc)
                 break;
             }
             drive_enter_state(foc, DRIVE_STATE_STARTING);
+            /* 对齐门控按模式：VF/IF 用虚拟角度，不要求编码器对齐（02 规范 §3）。 */
             if (foc->state == DRIVE_STATE_STARTING &&
+                drive_mode_requires_encoder(foc) &&
                 foc->enc.primary == ENCODER_TYPE_ABZ && !foc->enc_aligned)
             {
                 drive_enter_state(foc, DRIVE_STATE_ALIGN);
@@ -233,10 +235,16 @@ static _RAM_FUNC void drive_update_protection(foc_t *foc)
     const bool bus_voltage_valid = foc->fb.vbus_valid &&
                                    isfinite(foc->fb.vbus) &&
                                    (foc->fb.vbus >= 0.0f);
-    const bool position_valid = foc->fb.pos_valid &&
-                                isfinite(foc->fb.theta_e) &&
-                                isfinite(foc->fb.pos_r) &&
-                                isfinite(foc->fb.pos_m);
+    bool position_valid = foc->fb.pos_valid &&
+                          isfinite(foc->fb.theta_e) &&
+                          isfinite(foc->fb.pos_r) &&
+                          isfinite(foc->fb.pos_m);
+    if (!drive_mode_requires_encoder(foc))
+    {
+        /* VF/IF 用虚拟角度：位置前提不参与保护（02 规范 §6.4）。
+         * 本板编码器仍工作，过速保护继续使用实测速度；无感前提在 S5 定义。 */
+        position_valid = true;
+    }
     const drive_protection_sample_t sample = {
         .ia = foc->fb.ia,
         .ib = foc->fb.ib,
@@ -559,12 +567,28 @@ _RAM_FUNC void drive_output(foc_t *foc, drive_cycle_t *cycle)
         {
             drive_control_reset(foc);
         }
-        drive_enter_state(foc, foc->fault.all ? DRIVE_STATE_FAULT : DRIVE_STATE_STOP);
+        {
+            drive_state_e next = DRIVE_STATE_STOP;
+
+            if (foc->fault.all != 0U)
+            {
+                next = DRIVE_STATE_FAULT;
+            }
+            drive_enter_state(foc, next);
+        }
         return;
     }
     if (foc->state == DRIVE_STATE_ALIGN && drive_align_finish(foc))
     {
         /* 对齐只是校准；完成后必须再次显式 START。 */
-        drive_enter_state(foc, foc->fault.all ? DRIVE_STATE_FAULT : DRIVE_STATE_STOP);
+        {
+            drive_state_e next = DRIVE_STATE_STOP;
+
+            if (foc->fault.all != 0U)
+            {
+                next = DRIVE_STATE_FAULT;
+            }
+            drive_enter_state(foc, next);
+        }
     }
 }

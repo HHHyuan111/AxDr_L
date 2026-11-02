@@ -21,3 +21,7 @@ void obs_step(const foc_t *foc) { (void)foc; }
 bool encoder_sample(encoder_state_t *e) { (void)e; abort(); }
 bool position_update(foc_t *f, position_sample_t *p) { (void)f; (void)p; abort(); }
 bool foc_adc_sample(foc_t *f, board_sample_t *p) { (void)f; (void)p; abort(); }
+
+/* drive.c 的对齐门控与保护前提调用（S2）：桩默认要求编码器，
+ * 保持既有 drive 测试的行为不变。 */
+bool drive_mode_requires_encoder(const foc_t *foc) { (void)foc; return true; }

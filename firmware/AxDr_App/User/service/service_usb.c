@@ -198,7 +198,7 @@ static uint8_t apply_link_reset(void)
     {
         return 0u;
     }
-    /* 重连前的半帧和响应缓存不能进入新会话。新连接最早一包允许由宿主重试。 */
+    /* 重连前的半帧和响应缓存在新会话作废。新连接最早一包允许由宿主重试。 */
     rx_tail = rx_head;
     parser_length = 0u;
     axdr_command_core_init(&command_core);

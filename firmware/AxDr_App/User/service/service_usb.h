@@ -15,7 +15,7 @@
 /** @brief 注入一段收到的字节（来自 CDC_Receive / 主机测试）。可分任意大小到达。 */
 void service_usb_rx(const uint8_t *data, uint16_t length);
 
-/** @brief 发送缝：0=已复制入队，1=队满，其他=失败；不能保存本函数栈缓冲指针。 */
+/** @brief 发送缝：0=已复制入队，1=队满，其他=失败；栈缓冲在返回后失效。 */
 typedef int (*service_usb_tx_fn)(const uint8_t *data, uint16_t length);
 void service_usb_bind_tx(service_usb_tx_fn tx);
 
@@ -24,7 +24,7 @@ void service_usb_reset_link(void);
 /** @brief 装配层在 USB 锁内检查，防止命令执行期间重连后补发旧连接的响应。 */
 uint8_t service_usb_response_is_current(void);
 
-/** @brief 每轮最多消费 256 字节，半帧保留；持续接收不能挤占 Safety 和发送轮询。 */
+/** @brief 每轮最多消费 256 字节，半帧保留；Safety 与发送轮询每轮都能执行。 */
 void service_usb_poll(void);
 
 /** @brief 诊断计数（GetLinkDiagnostics 用）。 */

@@ -13,7 +13,7 @@
  *  F2 档案 CRC——档案 payload 只构造一次，CRC32 指纹（crc 字段清零、
  *    status_flags 排除）同时喂给 configure 注册与 GetMotorProfile 应答；
  *  F3 会话门卫（方案A）——首次 USB ARM 成功前 poll 不执法（台架模式，
- *    调试器手动运行不会被 observe 判成 FAULT_LOCKED）；首次 ARM 后全程执法；
+ *    调试器手动运行由 observe 放行（台架模式）；首次 ARM 后全程执法；
  *  F4 删除 service_safety_tick（防快环误用）；
  *  F5 负值/范围校验补齐。
  *
@@ -56,7 +56,7 @@
  * 0.7.7：运行态补首故障定格（fault 0→非 0 首拍位图+毫秒，DISARM
  * 一并清除），GetRuntimeState 载荷 36→44B，宿主按长度兼容。 */
 #define SVC_FW_PATCH AXDR_FW_PATCH
-#define SVC_DEVICE_FAMILY 0x00000001u /* 沉沙/AxDrive-L 驱动 */
+#define SVC_DEVICE_FAMILY 0x00000001u /* 200W 伺服电机/AxDrive-L 驱动 */
 #define SVC_BOARD_PROFILE 0x00000003u /* hw_rev v1.3 */
 #define SVC_PRODUCT_NAME "AxDrService"
 /* 档案标识用 motor_config.h 的 MOTOR_PROFILE_ID / MOTOR_PROFILE_REVISION */
@@ -100,7 +100,7 @@ static uint8_t fault_recovery_pending;
 
 /* 电流环运行时 PI 覆盖状态（RAM-only：复位/掉电回到 cur_pi_init 的
  * 档案默认值，不写 EEPROM——与 SpeedPi 契约里 ram_only 字段同语义）。
- * 边界取当前沉沙档案基准（Ls*ibw≈0.415、Rs*ibw≈420.5）的保守倍程，
+ * 边界取当前200W 伺服电机档案基准（Ls*ibw≈0.415、Rs*ibw≈420.5）的保守倍程，
  * 既给手动微调留空间，又挡掉会让电流环明显失稳的量级错误。 */
 #define SVC_CURRENT_PI_KP_MINIMUM 0.05f
 #define SVC_CURRENT_PI_KP_MAXIMUM 2.0f
@@ -138,19 +138,19 @@ static void build_profile_once(void)
     profile_payload.profile_id = MOTOR_PROFILE_ID;
     profile_payload.revision = MOTOR_PROFILE_REVISION;
     profile_payload.encoder_type = ENCODER_TYPE_ABZ;
-    profile_payload.pole_pairs = (uint8_t)CHENSHA_POLE_PAIRS;
+    profile_payload.pole_pairs = (uint8_t)SERVO200W_POLE_PAIRS;
     profile_payload.name_length = 10u;
-    memcpy(profile_payload.name, "chensha200", 10u);
-    profile_payload.phase_resistance_ohm = CHENSHA_PHASE_RESISTANCE_OHM;
-    profile_payload.d_axis_inductance_H = CHENSHA_D_AXIS_INDUCTANCE_H;
-    profile_payload.q_axis_inductance_H = CHENSHA_Q_AXIS_INDUCTANCE_H;
-    profile_payload.flux_linkage_Wb = CHENSHA_FLUX_LINKAGE_WB;
-    profile_payload.continuous_current_A = CHENSHA_RATED_CURRENT_A;
-    profile_payload.peak_current_A = CHENSHA_PEAK_CURRENT_A;
-    profile_payload.maximum_speed_rad_s = CHENSHA_PEAK_SPEED_RAD_S;
-    profile_payload.maximum_acceleration_rad_s2 = CHENSHA_ACCEL_LIMIT_RAD_S2;
-    profile_payload.minimum_bus_voltage_V = CHENSHA_UNDER_VOLTAGE_V;
-    profile_payload.maximum_bus_voltage_V = CHENSHA_OVER_VOLTAGE_V;
+    memcpy(profile_payload.name, "servo200w", 10u);
+    profile_payload.phase_resistance_ohm = SERVO200W_PHASE_RESISTANCE_OHM;
+    profile_payload.d_axis_inductance_H = SERVO200W_D_AXIS_INDUCTANCE_H;
+    profile_payload.q_axis_inductance_H = SERVO200W_Q_AXIS_INDUCTANCE_H;
+    profile_payload.flux_linkage_Wb = SERVO200W_FLUX_LINKAGE_WB;
+    profile_payload.continuous_current_A = SERVO200W_RATED_CURRENT_A;
+    profile_payload.peak_current_A = SERVO200W_PEAK_CURRENT_A;
+    profile_payload.maximum_speed_rad_s = SERVO200W_PEAK_SPEED_RAD_S;
+    profile_payload.maximum_acceleration_rad_s2 = SERVO200W_ACCEL_LIMIT_RAD_S2;
+    profile_payload.minimum_bus_voltage_V = SERVO200W_UNDER_VOLTAGE_V;
+    profile_payload.maximum_bus_voltage_V = SERVO200W_OVER_VOLTAGE_V;
 
     /* CRC 指纹（契约 §motor_profile）：profile_crc32 字段清零参与计算；
      * status_flags 为信息字段不参与——本字段恒为 0，临时置零后整体计算
@@ -200,7 +200,11 @@ void service_safety_poll(void)
 
     /* 互锁观察：fault 全零 + PWM 未激活（相输出关断）+ 栅极拉低（PWM 停=低） */
     {
-        const uint8_t outputs_disabled = (g_foc.pwm_active == 0u) ? 1u : 0u;
+        uint8_t outputs_disabled = 1u;
+        if (g_foc.pwm_active != 0u)
+        {
+            outputs_disabled = 0u;
+        }
         axdr_safety_runtime_observe(&safety, now, g_foc.fault.all,
                                     outputs_disabled, outputs_disabled);
     }
@@ -357,7 +361,11 @@ static uint8_t provide_firmware_resource(uint8_t *resp, uint16_t cap,
     p.uptime_ms = g_foc.fast_seq / 20u; /* 20kHz 序号 → 毫秒，与 now_ms 同源 */
     p.reset_reason = (uint8_t)target_reset_reason();
     target_irq_profile_read(&irq);
-    p.stats_valid = (irq.count != 0u) ? 1u : 0u;
+    p.stats_valid = 0u;
+    if (irq.count != 0u)
+    {
+        p.stats_valid = 1u;
+    }
     p.stats_seq = ++resource_stats_seq;
     p.irq_count = irq.count;
     p.irq_last_cycles = irq.last_cycles;
@@ -429,27 +437,27 @@ static uint8_t provide_control_limits(uint8_t *resp, uint16_t cap,
     p.profile_id = MOTOR_PROFILE_ID;
     p.profile_revision = MOTOR_PROFILE_REVISION;
     p.profile_crc32 = profile_payload.profile_crc32;
-    p.maximum_current_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
-    p.maximum_speed_rad_s = CHENSHA_PEAK_SPEED_RAD_S;
-    p.maximum_speed_iq_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
+    p.maximum_current_A = SERVO200W_COMMAND_CURRENT_LIMIT_A;
+    p.maximum_speed_rad_s = SERVO200W_PEAK_SPEED_RAD_S;
+    p.maximum_speed_iq_A = SERVO200W_COMMAND_CURRENT_LIMIT_A;
     /* 宿主合同要求全部 16 项限幅有限且为正：零值=非法包络，整帧拒收
      * （上一轮解析失败根因之二）。本固件不提供位置/MIT/VF/IF 命令，
      * 但包络是电机物理描述而非模式开关——按 motor_config 真值填写，
      * 模式有无仍由 opcode 掩码门控。 */
     p.maximum_position_rad = MOTOR_MAX_POSITION_RAD;
-    p.maximum_position_velocity_rad_s = CHENSHA_PEAK_SPEED_RAD_S;
-    p.maximum_position_acceleration_rad_s2 = CHENSHA_ACCEL_LIMIT_RAD_S2;
-    p.maximum_position_iq_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
+    p.maximum_position_velocity_rad_s = SERVO200W_PEAK_SPEED_RAD_S;
+    p.maximum_position_acceleration_rad_s2 = SERVO200W_ACCEL_LIMIT_RAD_S2;
+    p.maximum_position_iq_A = SERVO200W_COMMAND_CURRENT_LIMIT_A;
     p.maximum_mit_position_rad = MOTOR_MAX_POSITION_RAD;
-    p.maximum_mit_velocity_rad_s = CHENSHA_PEAK_SPEED_RAD_S;
+    p.maximum_mit_velocity_rad_s = SERVO200W_PEAK_SPEED_RAD_S;
     /* 增益上限按饱和域推：Kp=8A/0.5rad、Kd=8A/160rad/s（推导域写死注释） */
     p.maximum_mit_kp_A_per_rad = 16.0f;
     p.maximum_mit_kd_A_per_rad_s = 0.05f;
-    p.maximum_mit_feedforward_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
-    p.maximum_mit_iq_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
-    p.maximum_alignment_current_A = CHENSHA_ALIGN_CURRENT_A;
-    p.maximum_vf_voltage_V = CHENSHA_UNDER_VOLTAGE_V; /* 不超最低母线 */
-    p.maximum_if_current_A = CHENSHA_COMMAND_CURRENT_LIMIT_A;
+    p.maximum_mit_feedforward_A = SERVO200W_COMMAND_CURRENT_LIMIT_A;
+    p.maximum_mit_iq_A = SERVO200W_COMMAND_CURRENT_LIMIT_A;
+    p.maximum_alignment_current_A = SERVO200W_ALIGN_CURRENT_A;
+    p.maximum_vf_voltage_V = SERVO200W_UNDER_VOLTAGE_V; /* 不超最低母线 */
+    p.maximum_if_current_A = SERVO200W_COMMAND_CURRENT_LIMIT_A;
     return payload_out(&p, sizeof(p), resp, cap, len);
 }
 
@@ -528,10 +536,18 @@ static uint8_t provide_control_state(uint8_t *resp, uint16_t cap,
     p.command_deadline_ms = command_deadline_ms;
     p.applied_count = applied_count;
     p.timeout_count = lease_timeout_count;
-    p.mode = commanded ? protocol_control_mode((uint8_t)g_foc.mode.debug) : 0u;
+    p.mode = 0u;
+    if (commanded != 0u)
+    {
+        p.mode = protocol_control_mode((uint8_t)g_foc.mode.debug);
+    }
     p.active = commanded;
     p.stop_reason = last_stop_reason;
-    p.alignment_valid = (g_foc.enc_aligned != 0u) ? 1u : 0u;
+    p.alignment_valid = 0u;
+    if (g_foc.enc_aligned != 0u)
+    {
+        p.alignment_valid = 1u;
+    }
     p.speed_target_rad_s = g_foc.ref.spd_r;
     p.iq_target_A = g_foc.ref.iq;
     return payload_out(&p, sizeof(p), resp, cap, len);
@@ -625,8 +641,11 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
              * 与 ARM 路径同款现场 observe：静止时两位硬件位齐，只刷新
              * 快照；DISARM 后 PWM 关断窗口由 20ms 停机宽限期覆盖。 */
             {
-                const uint8_t outputs_disabled =
-                    (g_foc.pwm_active == 0u) ? 1u : 0u;
+                uint8_t outputs_disabled = 1u;
+                if (g_foc.pwm_active != 0u)
+                {
+                    outputs_disabled = 0u;
+                }
                 axdr_safety_runtime_observe(&safety, now_ms(),
                                             g_foc.fault.all, outputs_disabled,
                                             outputs_disabled);
@@ -654,8 +673,11 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
              * 执法，互锁位只能在这里刷新——ARM 本就应在"电机静止"瞬间评估
              * 互锁（输出使能中 ARM → INTERLOCK_OPEN/FAULT_LOCKED，B 原语义）。 */
             {
-                const uint8_t outputs_disabled =
-                    (g_foc.pwm_active == 0u) ? 1u : 0u;
+                uint8_t outputs_disabled = 1u;
+                if (g_foc.pwm_active != 0u)
+                {
+                    outputs_disabled = 0u;
+                }
                 axdr_safety_runtime_observe(&safety, now_ms(),
                                             g_foc.fault.all, outputs_disabled,
                                             outputs_disabled);
@@ -692,8 +714,14 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             if ((g_foc.fault.all != 0u) ||
                 (safety.state == AXDR_SAFETY_FAULT_LOCKED))
             {
-                fault_recovery_pending =
-                    (drive_fault_clear(&g_foc) == true) ? 0u : 1u;
+                if (drive_fault_clear(&g_foc))
+                {
+                    fault_recovery_pending = 0u;
+                }
+                else
+                {
+                    fault_recovery_pending = 1u;
+                }
             }
             (void)axdr_safety_runtime_disarm(&safety, now_ms());
             command_active = 0u;
@@ -708,8 +736,11 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
              * 下互锁立即回 READY_TO_ARM；同批竞态（PWM 尚未关断）如实
              * 报 0x04，宿主周期刷新会拿到恢复后的真值。 */
             {
-                const uint8_t outputs_disabled =
-                    (g_foc.pwm_active == 0u) ? 1u : 0u;
+                uint8_t outputs_disabled = 1u;
+                if (g_foc.pwm_active != 0u)
+                {
+                    outputs_disabled = 0u;
+                }
                 axdr_safety_runtime_observe(&safety, now_ms(),
                                             g_foc.fault.all, outputs_disabled,
                                             outputs_disabled);
@@ -840,10 +871,10 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
              * （14 号数值政策阴招③；ALIGN_ENCODER 同款防护）。 */
             if (!isfinite(req->target_rad_s) ||
                 !isfinite(req->iq_limit_A) ||
-                (req->target_rad_s > CHENSHA_PEAK_SPEED_RAD_S) ||
-                (req->target_rad_s < -CHENSHA_PEAK_SPEED_RAD_S) ||
+                (req->target_rad_s > SERVO200W_PEAK_SPEED_RAD_S) ||
+                (req->target_rad_s < -SERVO200W_PEAK_SPEED_RAD_S) ||
                 (req->iq_limit_A <= 0.0f) ||
-                (req->iq_limit_A > CHENSHA_COMMAND_CURRENT_LIMIT_A))
+                (req->iq_limit_A > SERVO200W_COMMAND_CURRENT_LIMIT_A))
             {
                 return AXDR_REASON_OUT_OF_RANGE;
             }
@@ -888,10 +919,10 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             }
             if (!isfinite(req->iq_target_A) || /* NaN 防护同 SET_SPEED */
                 !isfinite(req->id_target_A) ||
-                (req->iq_target_A > CHENSHA_COMMAND_CURRENT_LIMIT_A) ||
-                (req->iq_target_A < -CHENSHA_COMMAND_CURRENT_LIMIT_A) ||
-                (req->id_target_A > CHENSHA_COMMAND_CURRENT_LIMIT_A) ||
-                (req->id_target_A < -CHENSHA_COMMAND_CURRENT_LIMIT_A))
+                (req->iq_target_A > SERVO200W_COMMAND_CURRENT_LIMIT_A) ||
+                (req->iq_target_A < -SERVO200W_COMMAND_CURRENT_LIMIT_A) ||
+                (req->id_target_A > SERVO200W_COMMAND_CURRENT_LIMIT_A) ||
+                (req->id_target_A < -SERVO200W_COMMAND_CURRENT_LIMIT_A))
             {
                 return AXDR_REASON_OUT_OF_RANGE;
             }
@@ -933,7 +964,7 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
              * target/iq 顺序相反——用专用结构防混读）。宿主固定发
              * forced_angle=0（电气零位）——与 drive 内置对齐语义一致；
              * 非零角不支持，显式拒。对齐电流用档案绑定值，请求 id 只做
-             * 值域校验（上限即 limits 报的 CHENSHA_ALIGN_CURRENT_A）。 */
+             * 值域校验（上限即 limits 报的 SERVO200W_ALIGN_CURRENT_A）。 */
             const axdr_alignment_request_t *req = payload_in(
                 request_payload, request_payload_length, sizeof(*req));
             uint8_t reason;
@@ -942,7 +973,7 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
                 return AXDR_REASON_INVALID_PAYLOAD;
             }
             if ((req->id_target_A <= 0.0f) ||
-                (req->id_target_A > CHENSHA_ALIGN_CURRENT_A) ||
+                (req->id_target_A > SERVO200W_ALIGN_CURRENT_A) ||
                 (req->forced_electrical_angle_rad != 0.0f)) /* NaN 恒真，一并拒 */
             {
                 return AXDR_REASON_OUT_OF_RANGE;
@@ -978,7 +1009,7 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
                  * alignment_valid 后自行失能。 */
                 g_foc.mode.sys = debug_mode;
                 g_foc.mode.debug = spd_curr_cl;
-                g_foc.ref.iq = CHENSHA_ALIGN_CURRENT_A;
+                g_foc.ref.iq = SERVO200W_ALIGN_CURRENT_A;
                 g_foc.ref.spd_r = 0.0f;
                 g_foc.req = DRIVE_REQ_START;
             }

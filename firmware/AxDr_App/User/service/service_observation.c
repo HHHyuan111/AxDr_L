@@ -168,7 +168,7 @@ static uint32_t signal_bits(uint16_t id)
         ((g_foc.state == DRIVE_STATE_RUN) || (g_foc.state == DRIVE_STATE_DIAG) ||
          (alignment_current != 0u));
     if ((id <= 5u) && !g_foc.fb.i_valid) return 0x7FC00000u;
-    /* STOP/首次中性占空比不执行 FOC，不能把缓存 dq/Vdq 当成本拍结果。 */
+    /* STOP/首次中性占空比无 FOC 计算，缓存 dq/Vdq 作废。 */
     if ((id >= 4u) && (id <= 7u) && (control_current == 0u)) return 0x7FC00000u;
     if ((id >= 14u) && (id <= 16u) && (output_current == 0u)) return 0x7FC00000u;
     if (((id == 13u) || (id == 32u)) && (control_current == 0u)) return 0x7FC00000u;
@@ -614,7 +614,7 @@ void service_observation_poll(void)
         uint8_t limit;
         uint32_t head;
         /* 20 kHz 至多四帧 848B；旧档仍至多两帧。不等待凑批，不阻塞 ISR。
-         * 保存一次 head 快照，当前批不能读尚未发布的槽或混入另一流。 */
+         * 保存一次 head 快照；本批只读已发布的槽，且只属于本流。 */
         pending_tx_count = 1u;
         head = ring_head;
         observation_barrier();

@@ -15,7 +15,7 @@ struct foc_plan
     float theta;
 };
 
-/* Clarke/Park 变换，只更新电流与角度，不执行 PI 或输出 PWM。 */
+/* Clarke/Park 变换，只更新电流与角度。 */
 void foc_update_current(foc_t *foc, float theta, foc_frame_t *frame);
 
 /* 使用本拍坐标执行控制和调制，只生成占空比。 */

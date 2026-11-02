@@ -42,6 +42,22 @@ bool drive_mode_is_supported(const foc_t *foc)
     }
 }
 
+bool drive_mode_requires_encoder(const foc_t *foc)
+{
+    if (foc->mode.sys == debug_mode)
+    {
+        if ((foc->mode.debug == drag_vf) || (foc->mode.debug == drag_if))
+        {
+            /* VF/IF 用虚拟积分场角（02 规范 §3）。 */
+            return false;
+        }
+        return true;
+    }
+
+    /* release / calibrat / halt 及未知模式一律要求编码器前提。 */
+    return true;
+}
+
 bool drive_mode_prepare(foc_t *foc)
 {
     if (!drive_mode_is_supported(foc))

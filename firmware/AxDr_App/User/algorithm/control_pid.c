@@ -158,7 +158,7 @@ PLATFORM_FAST_CODE float control_pid_pdff_step(pid_para_t *pid,
  * @brief PDFF 条件积分步进（B 库 pdff_ctrl_conditional 原样移植）。
  *
  * 与 control_pid_pdff_step 的动态积分限幅抗饱和不同，本变体采用条件积分：
- * 仅当积分增量不会把（试探）输出进一步推过限幅时才采纳该增量。
+ * 积分增量把试探输出推过限幅时放弃该增量。
  * abs_output_limit 为调用方给定的绝对输出限幅，与 pid 内部限幅取更严者；
  * 限幅非正时退化为普通 PDFF。
  * @note 使用场合（B 库行为）：观测器速度接管模式（无感 H2）专用——

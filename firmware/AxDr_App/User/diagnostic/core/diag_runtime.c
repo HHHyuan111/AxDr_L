@@ -98,7 +98,7 @@ static void diag_profile_init(diag_profile_t *profile,
     profile->sweep.reject_saturated_points =
         DIAG_SWEEP_REJECT_SATURATED_POINTS;
 
-    /* 参数辨识（mc_param_ident）无 profile 种子：激励层用核内置沉沙
+    /* 参数辨识（mc_param_ident）无 profile 种子：激励层用核内置200W 伺服电机
      * 默认档案，平台参数与安全限值在 diag_start_job 桥接时由 seed 与
      * profile 限值覆盖。 */
 
@@ -248,7 +248,7 @@ static mc_status_t diag_start_job(diag_runtime_t *runtime)
                     ? MC_PARAM_IDENT_MODE_LQ
                     : MC_PARAM_IDENT_MODE_FULL;
 
-            /* 激励层用核内置沉沙默认档案；控制周期/极对数取 seed，
+            /* 激励层用核内置200W 伺服电机默认档案；控制周期/极对数取 seed，
              * 安全限值与母线下限取 profile 闸门（0=禁止启动的语义
              * 两层一致）。 */
             mc_param_ident_default_config(&config);

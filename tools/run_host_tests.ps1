@@ -748,9 +748,9 @@ if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; th
 if ($LASTEXITCODE -ne 0) { throw "drive_align 测试运行失败" }
 Write-Host "Host C11/ABZ 上电自动对齐测试通过。"
 
-$motorChenshaTestSource = Join-Path $testDir "test_motor_chensha.c"
+$motorChenshaTestSource = Join-Path $testDir "test_motor_servo200w.c"
 $motorProfileSource = Join-Path $configDir "motor_profile.c"
-$motorChenshaExecutablePath = Join-Path $outputDir "test_motor_chensha.exe"
+$motorChenshaExecutablePath = Join-Path $outputDir "test_motor_servo200w.exe"
 
 $compileOutput = @(
     & $compilerCommand.Source -std=c11 -Wall -Wextra -Wpedantic -Werror `
@@ -760,9 +760,9 @@ $compileOutput = @(
         -o $motorChenshaExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )
-if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "motor_chensha 编译失败" }
+if ($LASTEXITCODE -ne 0) { $compileOutput | ForEach-Object { Write-Host $_ }; throw "motor_servo200w 编译失败" }
 & $motorChenshaExecutablePath
-if ($LASTEXITCODE -ne 0) { throw "motor_chensha 测试运行失败" }
+if ($LASTEXITCODE -ne 0) { throw "motor_servo200w 测试运行失败" }
 Write-Host "Host C11/沉沙档案定版值锁定测试通过。"
 
 $fastTrigTestSource = Join-Path $testDir "test_fast_trig.c"

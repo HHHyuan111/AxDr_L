@@ -508,7 +508,7 @@ uint8_t service_scope_route(void *context, uint16_t opcode,
                                       response_payload_capacity,
                                       response_payload_length, ack_state);
 
-    /* 旧 0x1B～0x1F 仍兼容扫频，但不能广播成被动高速波形。
+    /* 旧 0x1B～0x1F 仍兼容扫频；被动高速波形用新能力位独立声明。
      * 新能力独立声明，CRC 由 core 按改后 payload 重算。 */
     if ((opcode == AXDR_OPCODE_GET_PROTOCOL_INFO) &&
         (reason == AXDR_REASON_NONE) &&

@@ -77,7 +77,7 @@ typedef struct __attribute__((packed))
 } axdr_observation_capture_state_t;
 
 /* 流计数自连接起，IRQ/TX 计数自启动起。tx_completed 含命令及慢遥测，
- * 不能解释成观测样本数；未绑定的硬件诊断为 UINT32_MAX，不表示通过。 */
+ * 未绑定的硬件诊断值为 UINT32_MAX（未测量）。 */
 typedef struct __attribute__((packed))
 {
     uint16_t schema_version;

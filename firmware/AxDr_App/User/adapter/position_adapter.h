@@ -21,7 +21,7 @@ typedef struct
 /**
  * @brief 消费新编码器样本，更新跨圈历史，返回本拍位置。
  *
- * 不写入 fb.theta_e、fb.pos_r、fb.pos_m，由控制周期统一装入。
+ * fb.theta_e、fb.pos_r、fb.pos_m 由控制周期统一装入。
  * 无新样本或配置不支持时返回 false，保留历史和 sample 原值。
  * foc 与 sample 必须指向有效且互不重叠的对象。
  */

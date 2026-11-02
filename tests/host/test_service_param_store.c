@@ -69,7 +69,7 @@ static void rec_store(void)
     (void)target_flash_write(STORE_ADDR, rec_buf, sizeof(rec_buf));
 }
 
-/* 上电复位：fake 页保持当前内容，foc 复位为沉沙 ABZ 初态 */
+/* 上电复位：fake 页保持当前内容，foc 复位为200W 伺服电机 ABZ 初态 */
 static void power_on(void)
 {
     memset(&g_foc, 0, sizeof(g_foc));

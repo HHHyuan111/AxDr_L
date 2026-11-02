@@ -16,7 +16,7 @@ static uint32_t latched_reason;
 void target_reset_latch(void)
 {
     latched_reason = RCC->CSR & TARGET_RESET_FLAGS;
-    /* 清掉标志：下一次复位的原因才能被正确锁存，不会被旧标志污染。 */
+    /* 清掉标志：下一次复位的锁存从干净状态开始。 */
     __HAL_RCC_CLEAR_RESET_FLAGS();
 }
 

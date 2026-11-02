@@ -63,9 +63,8 @@ void target_adc_read_iabc_raw(target_adc_abc_raw_t *iabc);
  *
  * @param[out] adc_raw 接收原始 ADC 值的结构体，调用者必须传入有效地址。
  *
- * 本函数只是把硬件寄存器和 DMA 缓冲区中的现有结果复制出来，不会启动新转换，
- * 也不会等待下一次转换完成。当前保持原工程的数据来源和读取顺序，不宣称 ADC1、
- * ADC2 注入组和 ADC2 DMA 数据已经经过硬件同拍验证。
+ * 本函数只复制硬件寄存器和 DMA 缓冲区中的现有结果。
+ * 当前保持原工程的数据来源和读取顺序。
  */
 void target_adc_read_raw(target_adc_raw_t *adc_raw);
 

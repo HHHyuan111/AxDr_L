@@ -41,4 +41,12 @@ bool drive_mode_prepare(foc_t *foc);
  */
 bool drive_mode_step(foc_t *foc, foc_plan_t *cmd);
 
+/**
+ * @brief 当前模式是否需要编码器反馈（对齐门控与保护前提共用，02 规范 §3/§6.4）。
+ *
+ * VF/IF 用虚拟积分场角，不需要编码器；有感闭环、诊断与未知模式都需要。
+ * 需要编码器的模式：ABZ 未对齐时 START 先进入对齐；保护要求位置有效。
+ */
+bool drive_mode_requires_encoder(const foc_t *foc);
+
 #endif /* AXDR_DRIVE_MODE_H */

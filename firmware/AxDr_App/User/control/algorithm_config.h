@@ -79,7 +79,7 @@
 #define DIAG_SWEEP_REJECT_SATURATED_POINTS      (true)
 
 /* 参数辨识（DIAG_JOB_PARAM_IDENT）不设宏组：激励层用 mc_param_ident
- * 核内置沉沙默认档案，安全限值走 board_config 闸门（原 HJY 的
+ * 核内置200W 伺服电机默认档案，安全限值走 board_config 闸门（原 HJY 的
  * DIAG_RS_ 与 DIAG_L_ 前缀宏组随旧辨识退役删除）。 */
 
 /* 极对数辨识：驱动电流为 0 时禁止启动，实物验证前必须填写。 */

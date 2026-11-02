@@ -15,7 +15,7 @@ bool target_pwm_stop_phase_outputs(void)
 {
     bool stopped = true;
 
-    /* 六路停止都要尝试，不能因为前一路失败而跳过其余通道。 */
+    /* 六路停止都要尝试；前一路失败后其余通道继续。 */
     stopped &= HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1) == HAL_OK;
     stopped &= HAL_TIMEx_PWMN_Stop(&htim1, TIM_CHANNEL_1) == HAL_OK;
     stopped &= HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2) == HAL_OK;

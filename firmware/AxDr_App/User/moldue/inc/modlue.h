@@ -15,7 +15,7 @@ typedef union
 /* VOFA functions */
 void usb_printf(const char *format, ...);
 void vofa_start(void);
-void vofa_send_data(uint8_t num, float data); 
+void vofa_send_data(uint8_t num, float data);
 void vofa_sendframetail(void);
 void vofa_demo(void);
 void display_foc(void);

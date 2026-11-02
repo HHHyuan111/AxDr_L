@@ -37,8 +37,7 @@
 #define PS_IDENT_VERSION 1U
 
 /* 32B 记录：字段序刻意凑 8 对齐，无填充洞；reserved 恒 0。
- * （无保存计数字段——旧记录有效即蕴含 boot 已装载，本周期不会再保存，
- *  计数递增逻辑不可达，不留伪诊断字段。） */
+ * （无保存计数字段——旧记录有效即蕴含 boot 已装载，每上电周期至多保存一次。） */
 typedef struct
 {
     uint32_t magic;
@@ -236,9 +235,12 @@ static uint8_t ps_ident_save_merged(const service_ident_data_t *data)
     rec.data = merged;
     rec.crc32 = axdr_command_crc32((const uint8_t *)&rec, sizeof(rec));
 
-    return ((target_flash_erase_page(PS_IDENT_ADDR) == RET_OK)
-            && (target_flash_write(PS_IDENT_ADDR, &rec, sizeof(rec))
-                == RET_OK)) ? 1U : 0U;
+    if ((target_flash_erase_page(PS_IDENT_ADDR) != RET_OK) ||
+        (target_flash_write(PS_IDENT_ADDR, &rec, sizeof(rec)) != RET_OK))
+    {
+        return 0U;
+    }
+    return 1U;
 }
 
 void service_param_store_ident_poll(void)

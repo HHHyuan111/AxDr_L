@@ -333,7 +333,7 @@ typedef enum
 #define AXDR_CONTROL_LEASE_DEFAULT_MS 300u
 #define AXDR_CONTROL_LEASE_MAX_MS 1000u
 #define AXDR_CONTROL_RAMP_MAX_MS 5000u
-/* 2026-09-22 重定目标：沉沙 200W（3000rpm 额定 / 3200rpm 最高 / iq 台架限 ±8A）。
+/* 2026-09-22 重定目标：200W 伺服电机（3000rpm 额定 / 3200rpm 最高 / iq 台架限 ±8A）。
  * 旧 42EM64 值（300rpm/1A/0.6A/0.2A/1A）见 git 历史。 */
 #define AXDR_CONTROL_MAX_SPEED_RAD_S 335.0f /* 3200 rpm */
 #define AXDR_CONTROL_MAX_CURRENT_A 8.0f

@@ -1,7 +1,7 @@
 /**
  * @file fast_trig.h
  * @brief 多项式成对 sincos 近似（header-only）。
- * @note  来源：沉沙ABZ固件 axdr_fast_trig.h（B 库三闭环验证所用实现，仅改名）。
+ * @note  来源：200W 伺服电机 ABZ 固件 axdr_fast_trig.h（B 库三闭环验证所用实现，仅改名）。
  *        FOC 电角已包络到 [0,2π]。先折叠到最近象限使余角在 ±π/4 内；
  *        正弦 9 阶、余弦 10 阶的截断余项分别小于 1.8e-9 和 1.2e-10。
  *        非有限数及区间外输入回退 libm 通用语义，不隐式钳位。

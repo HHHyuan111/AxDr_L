@@ -41,8 +41,7 @@ void drive_pwm_set_neutral(foc_t *foc);
  * @return 占空比和相序有效且已经写入 Target 时返回 true；否则立即关闭三相
  *         输出、撤销本周期命令有效标志并返回 false。
  *
- * 本函数不计算 SVPWM，也不修改有效占空比。NaN、Inf、越界占空比或非法相序
- * 都不会写入比较寄存器。
+ * 本函数只校验并提交占空比；NaN、Inf、越界或非法相序一律关断输出。
  */
 bool drive_pwm_commit(foc_t *foc);
 

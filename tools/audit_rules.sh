@@ -19,6 +19,9 @@ for f in $DIFF_FILES; do
   tabs=$(git diff HEAD -U0 -- "$f" 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' | grep -n "$(printf '\t')" | head -3)
   [ -n "$hits" ] && OUT="$OUT [黑名单] $f: $(echo "$hits" | tr '\n' ' ')"
   [ -n "$tabs" ] && OUT="$OUT [TAB] $f"
+  terns=$(git diff HEAD -U0 -- "$f" 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' \
+    | grep -nE '\? .* :' | grep -vE '^\S+:.*\*|//' | head -3)
+  [ -n "$terns" ] && OUT="$OUT [三元] $f: $(echo "$terns" | tr '\n' ' ')"
 done
 
 # 3) 新增 .c 双登记（Keil 两 target + CMake）

@@ -56,7 +56,7 @@ void service_usb_tx_init(service_usb_tx_submit_fn submit,
                          service_usb_tx_lock_fn lock,
                          service_usb_tx_unlock_fn unlock)
 {
-    /* 此时 USB 尚未启动，初始化不依赖中断锁。 */
+    /* 此时 USB 尚未启动，初始化无需中断锁。 */
     submit_fn = submit;
     lock_fn = lock;
     unlock_fn = unlock;

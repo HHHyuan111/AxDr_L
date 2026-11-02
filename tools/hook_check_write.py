@@ -28,10 +28,13 @@ def main():
     bad = re.compile(
         r"不是|不能|不会|并不能|不负责|不访问|不写入|不读取|不依赖|不执行"
         r"|不接管|不授权|不重新|不自动|需要说明|值得注意的是|换句话说")
+    ternary = re.compile(r"\?\s*[^:]+:")  # 三元表达式（04 规范 §3.2：少用三元）
     hits = []
     for i, line in enumerate(lines, 1):
         if bad.search(line):
             hits.append("%d: %s" % (i, line.strip()[:60]))
+        elif ternary.search(line) and not line.lstrip().startswith(("//", "*")):
+            hits.append("%d: [三元]" % i)
         elif "\t" in line:
             hits.append("%d: [TAB]" % i)
         if len(hits) >= 10:

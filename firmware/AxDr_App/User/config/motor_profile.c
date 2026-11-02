@@ -1,7 +1,7 @@
 /**
  * @file motor_profile.c
  * @brief 电机档案装载实现。PR60/2312S 自 foc_drv.c 原样迁入（零行为变化），
- *        沉沙档案为新增（值出处见 motor_config.h 档案块注释）。
+ *        200W 伺服电机档案为新增（值出处见 motor_config.h 档案块注释）。
  */
 
 #include "motor_profile.h"
@@ -139,70 +139,70 @@ static void motor_2312s_init(foc_t *foc)
 }
 #endif
 
-#if MOTOR_SELECTED_MODEL == MOTOR_MODEL_CHENSHA
+#if MOTOR_SELECTED_MODEL == MOTOR_MODEL_SERVO200W
 /**
- * @brief 沉沙 200W PMSM 档案装载（B 库三闭环验证组合，值出处 motor_config.h 注释）。
+ * @brief 200W 伺服电机 档案装载（B 库三闭环验证组合，值出处 motor_config.h 注释）。
  */
-static void motor_chensha_init(foc_t *foc)
+static void motor_servo200w_init(foc_t *foc)
 {
-    foc->motor.rated_voltage = CHENSHA_RATED_VOLTAGE_V;
-    foc->motor.rated_current = CHENSHA_RATED_CURRENT_A;
-    foc->motor.rated_speed = CHENSHA_RATED_SPEED_RAD_S;
-    foc->motor.rated_torque = CHENSHA_RATED_TORQUE_NM;
-    foc->motor.rated_power = CHENSHA_RATED_POWER_W;
-    foc->motor.peak_current = CHENSHA_PEAK_CURRENT_A;
-    foc->motor.peak_torque = CHENSHA_PEAK_TORQUE_NM;
-    foc->motor.peak_speed = CHENSHA_PEAK_SPEED_RAD_S;
+    foc->motor.rated_voltage = SERVO200W_RATED_VOLTAGE_V;
+    foc->motor.rated_current = SERVO200W_RATED_CURRENT_A;
+    foc->motor.rated_speed = SERVO200W_RATED_SPEED_RAD_S;
+    foc->motor.rated_torque = SERVO200W_RATED_TORQUE_NM;
+    foc->motor.rated_power = SERVO200W_RATED_POWER_W;
+    foc->motor.peak_current = SERVO200W_PEAK_CURRENT_A;
+    foc->motor.peak_torque = SERVO200W_PEAK_TORQUE_NM;
+    foc->motor.peak_speed = SERVO200W_PEAK_SPEED_RAD_S;
 
-    foc->motor.pn = CHENSHA_POLE_PAIRS;
-    foc->motor.Rs = CHENSHA_PHASE_RESISTANCE_OHM;
-    foc->motor.Ld = CHENSHA_D_AXIS_INDUCTANCE_H;
-    foc->motor.Lq = CHENSHA_Q_AXIS_INDUCTANCE_H;
-    foc->motor.Ls = CHENSHA_AVERAGE_INDUCTANCE_H;
-    foc->motor.Ldif = CHENSHA_DIFFERENTIAL_INDUCTANCE_H;
-    foc->motor.flux = CHENSHA_FLUX_LINKAGE_WB;
-    foc->motor.B = CHENSHA_VISCOUS_FRICTION_NM_S;
-    foc->motor.Js = CHENSHA_INERTIA_KG_M2;
+    foc->motor.pn = SERVO200W_POLE_PAIRS;
+    foc->motor.Rs = SERVO200W_PHASE_RESISTANCE_OHM;
+    foc->motor.Ld = SERVO200W_D_AXIS_INDUCTANCE_H;
+    foc->motor.Lq = SERVO200W_Q_AXIS_INDUCTANCE_H;
+    foc->motor.Ls = SERVO200W_AVERAGE_INDUCTANCE_H;
+    foc->motor.Ldif = SERVO200W_DIFFERENTIAL_INDUCTANCE_H;
+    foc->motor.flux = SERVO200W_FLUX_LINKAGE_WB;
+    foc->motor.B = SERVO200W_VISCOUS_FRICTION_NM_S;
+    foc->motor.Js = SERVO200W_INERTIA_KG_M2;
 
-    foc->motor.Gr = CHENSHA_GEAR_RATIO;
+    foc->motor.Gr = SERVO200W_GEAR_RATIO;
     foc->motor.div_pn = 1.0f / foc->motor.pn;
     foc->motor.pnd_2pi = foc->motor.pn / M_2PI;
     foc->motor.div_Gr = 1.0f / foc->motor.Gr;
     foc->motor.Kt = 1.5f * foc->motor.pn * foc->motor.flux;
     foc->motor.div_Kt = 1.0f / foc->motor.Kt;
 
-    foc->ref.acc_m = CHENSHA_ACCEL_LIMIT_RAD_S2;
-    foc->ref.dec_m = CHENSHA_ACCEL_LIMIT_RAD_S2;
+    foc->ref.acc_m = SERVO200W_ACCEL_LIMIT_RAD_S2;
+    foc->ref.dec_m = SERVO200W_ACCEL_LIMIT_RAD_S2;
 
-    foc->motor.phase_order = CHENSHA_PHASE_ORDER;
-    foc->motor.align_current_a = CHENSHA_ALIGN_CURRENT_A;
-    foc->motor.e_off = CHENSHA_ELECTRICAL_OFFSET_RAD;
-    foc->motor.r_off = CHENSHA_ROTOR_OFFSET_RAD;
-    foc->motor.m_off = CHENSHA_MECHANICAL_OFFSET_RAD;
+    foc->motor.phase_order = SERVO200W_PHASE_ORDER;
+    foc->motor.align_current_a = SERVO200W_ALIGN_CURRENT_A;
+    foc->motor.e_off = SERVO200W_ELECTRICAL_OFFSET_RAD;
+    foc->motor.r_off = SERVO200W_ROTOR_OFFSET_RAD;
+    foc->motor.m_off = SERVO200W_MECHANICAL_OFFSET_RAD;
 
     foc->app.pmax_posm = MOTOR_MAX_POSITION_RAD;
     foc->app.nmax_posm = -foc->app.pmax_posm;
 
-    /* 台架限幅直接定版（B 库 target_config 沉沙段）：指令电流 ±8A、速度 ±335 rad/s。
+    /* 台架限幅直接定版（B 库 target_config 200W 伺服电机段）：指令电流 ±8A、速度 ±335 rad/s。
      * 不走 peak_torque×usage_ratio 链，避免换算歧义——这两个数就是验收基准。 */
-    foc->app.pmax_torm = CHENSHA_COMMAND_CURRENT_LIMIT_A * foc->motor.Kt;
+    foc->app.pmax_torm = SERVO200W_COMMAND_CURRENT_LIMIT_A * foc->motor.Kt;
     foc->app.nmax_torm = -foc->app.pmax_torm;
-    foc->app.pmax_velm = CHENSHA_PEAK_SPEED_RAD_S;
+    foc->app.pmax_velm = SERVO200W_PEAK_SPEED_RAD_S;
     foc->app.nmax_velm = -foc->app.pmax_velm;
 
-    foc->ref.iq_max = CHENSHA_COMMAND_CURRENT_LIMIT_A;
-    foc->ref.iq_min = -CHENSHA_COMMAND_CURRENT_LIMIT_A;
-    foc->ref.spd_max = CHENSHA_PEAK_SPEED_RAD_S * foc->motor.Gr;
+    foc->ref.iq_max = SERVO200W_COMMAND_CURRENT_LIMIT_A;
+    foc->ref.iq_min = -SERVO200W_COMMAND_CURRENT_LIMIT_A;
+    foc->ref.spd_max = SERVO200W_PEAK_SPEED_RAD_S * foc->motor.Gr;
     foc->ref.spd_min = -foc->ref.spd_max;
 
     /* 环路整定（电流环 Kp/Ki 由 cur_pi_init 按 ibw 公式计算）。 */
-    foc->motor.ibw = CHENSHA_CURRENT_BW_RAD_S;
+    foc->motor.ibw = SERVO200W_CURRENT_BW_RAD_S;
     foc->motor.delta = 1.0f;
-    foc->spd_pi.kfp = CHENSHA_SPEED_REFERENCE_WEIGHT;
-    foc->spd_pi.kf_damp = CHENSHA_SPEED_FEEDBACK_DAMPING;
-    foc->pos_pi.kp = CHENSHA_POSITION_KP_S_INV;
-    foc->pos_pi.ki = CHENSHA_POSITION_KI;
-    foc->pos_pi.kd = CHENSHA_POSITION_KD;
+    foc->spd_pi.kfp = SERVO200W_SPEED_REFERENCE_WEIGHT;
+    foc->spd_pi.kf_damp = SERVO200W_SPEED_FEEDBACK_DAMPING;
+    foc->pos_pi.kp = SERVO200W_POSITION_KP_S_INV;
+    foc->pos_pi.ki = SERVO200W_POSITION_KI;
+    foc->pos_pi.kd = SERVO200W_POSITION_KD;
 }
 #endif
 
@@ -212,8 +212,8 @@ void motor_profile_load(foc_t *foc)
     motor_pr60_init(foc);
 #elif MOTOR_SELECTED_MODEL == MOTOR_MODEL_2312S
     motor_2312s_init(foc);
-#elif MOTOR_SELECTED_MODEL == MOTOR_MODEL_CHENSHA
-    motor_chensha_init(foc);
+#elif MOTOR_SELECTED_MODEL == MOTOR_MODEL_SERVO200W
+    motor_servo200w_init(foc);
 #else
 #error "Unsupported MOTOR_SELECTED_MODEL"
 #endif
@@ -221,15 +221,15 @@ void motor_profile_load(foc_t *foc)
 
 void motor_profile_control_load(foc_t *foc)
 {
-#if MOTOR_SELECTED_MODEL == MOTOR_MODEL_CHENSHA
-    /* 保护阈值定版：覆盖 prot_cfg_init 的板级默认（B 库沉沙 10A/30V/10V）。 */
-    foc->prot_cfg.over_current_a = CHENSHA_OVER_CURRENT_A;
-    foc->prot_cfg.over_voltage_v = CHENSHA_OVER_VOLTAGE_V;
-    foc->prot_cfg.under_voltage_v = CHENSHA_UNDER_VOLTAGE_V;
+#if MOTOR_SELECTED_MODEL == MOTOR_MODEL_SERVO200W
+    /* 保护阈值定版：覆盖 prot_cfg_init 的板级默认（B 库200W 伺服电机 10A/30V/10V）。 */
+    foc->prot_cfg.over_current_a = SERVO200W_OVER_CURRENT_A;
+    foc->prot_cfg.over_voltage_v = SERVO200W_OVER_VOLTAGE_V;
+    foc->prot_cfg.under_voltage_v = SERVO200W_UNDER_VOLTAGE_V;
 
     /* 速度环固化值：覆盖 spd_pi_init 的机械模型公式（联轴实测证据，B 库 servo profile）。 */
-    foc->spd_pi.kp = CHENSHA_SPEED_KP_A_PER_RAD_S;
-    foc->spd_pi.ki = CHENSHA_SPEED_KI_A_PER_RAD;
+    foc->spd_pi.kp = SERVO200W_SPEED_KP_A_PER_RAD_S;
+    foc->spd_pi.ki = SERVO200W_SPEED_KI_A_PER_RAD;
 #else
     (void)foc;
 #endif

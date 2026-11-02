@@ -62,7 +62,7 @@ bool board_adc_convert(const board_adc_cfg_t *cfg,
 /**
  * @brief 读取已完成的 ADC 结果，换算本拍电流和母线电压。
  *
- * 成功时保存 foc->adc.raw 并返回 sample，不写入 foc->fb。
+ * 成功时保存 foc->adc.raw 并返回 sample（fb 由控制周期统一装入）。
  * 相序无效时返回 false，保留原始计数和 sample 原值。
  * foc 与 sample 必须指向有效且互不重叠的对象。
  */

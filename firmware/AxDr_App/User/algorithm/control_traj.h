@@ -44,7 +44,7 @@ void traj_pos_reset(traj_pos_t *traj, float pos, float spd);
  * @brief 按最大速度、加速度和减速度推进一个在线梯形位置轨迹。
  *
  * 算法根据剩余距离实时计算制动速度，因此短行程自动形成三角形轨迹，长行程
- * 自动形成梯形轨迹，不依赖电机、编码器或 PWM。
+ * 自动形成梯形轨迹（纯算法）。
  *
  * @return 本周期新的位置参考，单位 rad。
  * @pre spd_lim、acc、dec 和 dt 大于 0，所有参数均为有限值。

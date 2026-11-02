@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "common.h"
 #include "foc_run.h"
@@ -467,6 +468,71 @@ static bool test_unknown_system_mode_returns_failure(foc_t *foc)
                        "未知系统模式不应调用任何实现。");
 }
 
+/* S2：编码器前提判定表——VF/IF 用虚拟角度不需要编码器，其余模式都需要。 */
+static bool test_encoder_requirements(foc_t *foc)
+{
+    static const struct
+    {
+        sys_mode_e sys;
+        int sub;
+        bool expected;
+    } cases[] = {
+        {debug_mode, drag_vf, false},
+        {debug_mode, drag_if, false},
+        {debug_mode, volt_op, true},
+        {debug_mode, curr_cl, true},
+        {debug_mode, spd_curr_cl, true},
+        {debug_mode, pos_spd_curr_cl, true},
+        {release_mode, mit_mode, true},
+        {release_mode, vel_mode, true},
+        {release_mode, cst_mode, true},
+        {calibrat_mode, iden_pm, true},
+        {halt_mode, quick_mode, true},
+    };
+    size_t i;
+    bool ok = true;
+
+    for (i = 0U; i < sizeof(cases) / sizeof(cases[0]); i++)
+    {
+        memset(foc, 0, sizeof(*foc));
+        foc->mode.sys = cases[i].sys;
+        switch (cases[i].sys)
+        {
+            case debug_mode:
+                foc->mode.debug = (debug_mode_e)cases[i].sub;
+                break;
+            case release_mode:
+                foc->mode.release = (release_mode_e)cases[i].sub;
+                break;
+            case calibrat_mode:
+                foc->mode.calibrat = (calibrat_mode_e)cases[i].sub;
+                break;
+            case halt_mode:
+                foc->mode.halt = (halt_mode_e)cases[i].sub;
+                break;
+            default:
+                break;
+        }
+        if (drive_mode_requires_encoder(foc) != cases[i].expected)
+        {
+            fprintf(stderr, "编码器前提判定错误：sys=%d sub=%d。\n",
+                    (int)cases[i].sys, cases[i].sub);
+            ok = false;
+        }
+    }
+
+    /* 未知 debug 子模式：默认要求编码器（fail-closed）。 */
+    memset(foc, 0, sizeof(*foc));
+    foc->mode.sys = debug_mode;
+    foc->mode.debug = (debug_mode_e)99;
+    if (!drive_mode_requires_encoder(foc))
+    {
+        fprintf(stderr, "未知 debug 子模式必须默认要求编码器。\n");
+        ok = false;
+    }
+    return ok;
+}
+
 int main(void)
 {
     foc_t foc = {0};
@@ -507,6 +573,11 @@ int main(void)
     if (!test_unknown_system_mode_returns_failure(&foc))
     {
         return 6;
+    }
+
+    if (!test_encoder_requirements(&foc))
+    {
+        return 7;
     }
 
     return 0;

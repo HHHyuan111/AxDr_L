@@ -177,9 +177,9 @@ void foc_init(foc_t *foc)
         CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S,
         -CTRL_POSITION_PI_INITIAL_LIMIT_RAD_S);
 
-    /* 档案晚绑定项（沉沙：保护阈值与速度环固化值），须在 prot/spd 初始化后定版。 */
+    /* 档案晚绑定项（200W 伺服电机：保护阈值与速度环固化值），须在 prot/spd 初始化后定版。 */
     motor_profile_control_load(foc);
-    
+
     /* 上电默认保持三相功率输出关闭，等待明确的 START 请求。 */
     foc->req = DRIVE_REQ_STOP;
     foc->state = DRIVE_STATE_STOP;

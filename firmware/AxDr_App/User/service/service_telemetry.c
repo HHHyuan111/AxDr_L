@@ -147,7 +147,7 @@ static void fill_frame(volatile service_telemetry_frame_t *frame,
     frame->cmd_vd_V = g_foc.out.vd;
     frame->cmd_vq_V = g_foc.out.vq;
     frame->cmd_id_A = g_foc.ref.id;
-    /* 级联模式下 iq 参考字段是速度环 PI 实际输出，不是配置限幅（B 原语义） */
+    /* 级联模式下 iq 参考字段是速度环 PI 实际输出（B 原语义） */
     frame->cmd_iq_A = cascaded ? g_foc.ref.iq_lim : g_foc.ref.iq;
     frame->cmd_wr_rad_s = g_foc.ref.spd_r;
     frame->cmd_wm_rad_s = g_foc.ref.spd_m;
@@ -251,7 +251,7 @@ void service_telemetry_poll(void)
 
         if (telemetry_pending_frame.sequence != next_sequence)
         {
-            return; /* 槽内还不是目标帧，下一轮再取 */
+            return; /* 槽内尚无目标帧，下一轮再取 */
         }
 
         drop_count += overwritten_frames;

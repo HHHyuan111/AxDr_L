@@ -1,7 +1,7 @@
 /**
  * @file motor_profile.h
  * @brief 电机档案装载：按 MOTOR_SELECTED_MODEL 把配置宏装入 foc_t（值的家在配置层）。
- * @note  本文件不依赖任何硬件头，可主机编译测试（12 号参数规范）。
+ * @note  纯配置头，可主机编译测试（12 号参数规范）。
  */
 
 #ifndef MOTOR_PROFILE_H

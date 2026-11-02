@@ -354,7 +354,7 @@ static void usb_tx_unlock(uint32_t enabled)
 static int usb_command_tx(const uint8_t *data, uint16_t length)
 {
     const uint32_t enabled = usb_tx_lock();
-    /* 命令处理可被 USB 复位打断；检查与入队之间不能跨越连接切换。 */
+    /* 命令处理可被 USB 复位打断；检查与入队同在一个临界区。 */
     const int result = service_usb_response_is_current() != 0u
         ? service_usb_tx_enqueue_command(data, length) : 2;
     usb_tx_unlock(enabled);

@@ -99,7 +99,16 @@ void obs_step(const foc_t *motor)
 
 bool open_volt_step(foc_t *motor, foc_plan_t *cmd)
 {
-    (void)motor; (void)cmd; return false;
+    /* S2 门控场景需要 VF 生成有效给定：与真实实现同形的最小桩。 */
+    *cmd = (foc_plan_t){
+        .ref = {
+            .mode = FOC_CTRL_MODE_VOLT,
+            .vd = motor->ref.vd,
+            .vq = motor->ref.vq,
+        },
+        .theta = motor->ref.theta_e,
+    };
+    return true;
 }
 
 bool open_cur_step(foc_t *motor, foc_plan_t *cmd)
@@ -286,6 +295,73 @@ static int replay_speed_scenario(void)
     return 0;
 }
 
+/*
+ * S2 模式门控回放场景：未对齐 ABZ 的 START 按下表分派——
+ * VF（虚拟角度）跳过对齐直接 STARTING→RUN；有感闭环（curr_cl）仍先进入 ALIGN。
+ */
+static int replay_mode_gating_scenario(void)
+{
+    foc_t motor = {
+        .mode = {.sys = debug_mode, .debug = drag_vf},
+        .req = DRIVE_REQ_STOP,
+        .state = DRIVE_STATE_STOP,
+        .motor = {.phase_order = PHASE_ORDER_ABC},
+        .enc = {.primary = ENCODER_TYPE_ABZ}, /* 上电未对齐 */
+        .prot_cfg = {.invalid_position_samples = 1U},
+        .rate = {.foc_fs = 20000.0f}
+    };
+    control_cycle_input_t input;
+    control_cycle_output_t output = {0};
+
+    pwm_start_count = 0U;
+    pwm_stop_count = 0U;
+    pwm_write_count = 0U;
+
+    input = replay_sample(100U);
+    control_cycle_step(&motor, &input, &output);
+    motor.req = DRIVE_REQ_START;
+    input = replay_sample(101U);
+    control_cycle_step(&motor, &input, &output);
+    if (output.state != (uint32_t)DRIVE_STATE_STARTING)
+    {
+        (void)fprintf(stderr, "VF 未对齐 START 应跳过对齐进 STARTING，实际 %u。\n",
+                      output.state);
+        return 1;
+    }
+    input = replay_sample(102U);
+    control_cycle_step(&motor, &input, &output);
+    if (output.state != (uint32_t)DRIVE_STATE_RUN)
+    {
+        (void)fprintf(stderr, "VF 第二拍应进 RUN，实际 %u。\n", output.state);
+        return 2;
+    }
+
+    /* 对照：同样未对齐条件下，curr_cl 仍先进入对齐。 */
+    {
+        foc_t closed = {
+            .mode = {.sys = debug_mode, .debug = curr_cl},
+            .req = DRIVE_REQ_STOP,
+            .state = DRIVE_STATE_STOP,
+            .motor = {.phase_order = PHASE_ORDER_ABC},
+            .enc = {.primary = ENCODER_TYPE_ABZ},
+            .prot_cfg = {.invalid_position_samples = 1U},
+            .rate = {.foc_fs = 20000.0f}
+        };
+        input = replay_sample(200U);
+        control_cycle_step(&closed, &input, &output);
+        closed.req = DRIVE_REQ_START;
+        input = replay_sample(201U);
+        control_cycle_step(&closed, &input, &output);
+        if (output.state != (uint32_t)DRIVE_STATE_ALIGN)
+        {
+            (void)fprintf(stderr, "curr_cl 未对齐 START 应进 ALIGN，实际 %u。\n",
+                          output.state);
+            return 3;
+        }
+    }
+    return 0;
+}
+
 int main(void)
 {
     foc_t motor = {
@@ -364,6 +440,13 @@ int main(void)
             return 10 + speed_result;
         }
     }
+    {
+        const int gating_result = replay_mode_gating_scenario();
+        if (gating_result != 0)
+        {
+            return 20 + gating_result;
+        }
+    }
     return 0;
 }
 
@@ -379,6 +462,8 @@ bool foc_execute(foc_t *foc, const foc_plan_t *cmd, const foc_frame_t *frame)
 { (void)frame;
   if (cmd->ref.mode == FOC_CTRL_MODE_CUR)
     return foc_cur_step(foc,cmd->ref.id_ref,cmd->ref.iq_ref,cmd->theta);
+  if (cmd->ref.mode == FOC_CTRL_MODE_VOLT)
+    return true; /* S2 门控场景：VF 电压模式给定有效即可。 */
   return false;
 }
 bool drive_diag_check_output(foc_t *foc, const foc_plan_t *cmd)

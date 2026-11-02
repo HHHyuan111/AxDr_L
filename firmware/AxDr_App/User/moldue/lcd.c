@@ -11,11 +11,11 @@
 *               - 当USE_ANALOG_SPI宏定义为假时，通过HAL_SPI_Transmit函数使用硬件SPI传输1字节数据。
 ************************************************************************
 **/
-void LCD_Writ_Bus(uint8_t dat) 
-{	
+void LCD_Writ_Bus(uint8_t dat)
+{
 	LCD_CS_Clr();
 #if USE_ANALOG_SPI
-	for(uint8_t i=0;i<8;i++) {			  
+	for(uint8_t i=0;i<8;i++) {
 		LCD_SCLK_Clr();
 		if(dat&0x80) {
 		   LCD_MOSI_Set();
@@ -27,8 +27,8 @@ void LCD_Writ_Bus(uint8_t dat)
 	}
 #else
 	HAL_SPI_Transmit(&hspi3, &dat, 1, 0xffff);
-#endif	
-  LCD_CS_Set();	
+#endif
+  LCD_CS_Set();
 }
 /**
 ************************************************************************
@@ -130,16 +130,16 @@ void LCD_Address_Set(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2)
 ************************************************************************
 **/
 void LCD_Fill(uint16_t xsta,uint16_t ysta,uint16_t xend,uint16_t yend,uint16_t color)
-{          
-	uint16_t i,j; 
+{
+	uint16_t i,j;
 	LCD_Address_Set(xsta,ysta,xend-1,yend-1);//设置显示范围
 	for(i=ysta;i<yend;i++)
-	{													   	 	
+	{
 		for(j=xsta;j<xend;j++)
 		{
 			LCD_WR_DATA(color);
 		}
-	} 					  	    
+	}
 }
 /**
 ************************************************************************
@@ -152,9 +152,9 @@ void LCD_Fill(uint16_t xsta,uint16_t ysta,uint16_t xend,uint16_t yend,uint16_t c
 **/
 void LCD_DrawPoint(uint16_t x,uint16_t y,uint16_t color)
 {
-	LCD_Address_Set(x,y,x,y);//设置光标位置 
+	LCD_Address_Set(x,y,x,y);//设置光标位置
 	LCD_WR_DATA(color);
-} 
+}
 /**
 ************************************************************************
 * @brief:      	LCD_DrawLine: 在LCD上画线
@@ -167,20 +167,20 @@ void LCD_DrawPoint(uint16_t x,uint16_t y,uint16_t color)
 **/
 void LCD_DrawLine(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2,uint16_t color)
 {
-	uint16_t t; 
+	uint16_t t;
 	int xerr=0,yerr=0,delta_x,delta_y,distance;
 	int incx,incy,uRow,uCol;
-	delta_x=x2-x1; //计算坐标增量 
+	delta_x=x2-x1; //计算坐标增量
 	delta_y=y2-y1;
 	uRow=x1;//画线起点坐标
 	uCol=y1;
-	if(delta_x>0)incx=1; //设置单步方向 
-	else if (delta_x==0)incx=0;//垂直线 
+	if(delta_x>0)incx=1; //设置单步方向
+	else if (delta_x==0)incx=0;//垂直线
 	else {incx=-1;delta_x=-delta_x;}
 	if(delta_y>0)incy=1;
-	else if (delta_y==0)incy=0;//水平线 
+	else if (delta_y==0)incy=0;//水平线
 	else {incy=-1;delta_y=-delta_y;}
-	if(delta_x>delta_y)distance=delta_x; //选取基本增量坐标轴 
+	if(delta_x>delta_y)distance=delta_x; //选取基本增量坐标轴
 	else distance=delta_y;
 	for(t=0;t<distance+1;t++)
 	{
@@ -230,16 +230,16 @@ void LCD_DrawRectangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2,uint16
 void Draw_Circle(uint16_t x0,uint16_t y0,uint8_t r,uint16_t color)
 {
 	int a,b;
-	a=0;b=r;	  
+	a=0;b=r;
 	while(a<=b)
 	{
-		LCD_DrawPoint(x0-b,y0-a,color);             //3           
-		LCD_DrawPoint(x0+b,y0-a,color);             //0           
-		LCD_DrawPoint(x0-a,y0+b,color);             //1                
-		LCD_DrawPoint(x0-a,y0-b,color);             //2             
-		LCD_DrawPoint(x0+b,y0+a,color);             //4               
+		LCD_DrawPoint(x0-b,y0-a,color);             //3
+		LCD_DrawPoint(x0+b,y0-a,color);             //0
+		LCD_DrawPoint(x0-a,y0+b,color);             //1
+		LCD_DrawPoint(x0-a,y0-b,color);             //2
+		LCD_DrawPoint(x0+b,y0+a,color);             //4
 		LCD_DrawPoint(x0+a,y0-b,color);             //5
-		LCD_DrawPoint(x0+a,y0+b,color);             //6 
+		LCD_DrawPoint(x0+a,y0+b,color);             //6
 		LCD_DrawPoint(x0-b,y0+a,color);             //7
 		a++;
 		if((a*a+b*b)>(r*r))//判断要画的点是否过远
@@ -295,17 +295,17 @@ void LCD_ShowChinese12x12(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 	uint16_t TypefaceNum;//一个字符所占字节大小
 	uint16_t x0=x;
 	TypefaceNum=(sizey/8+((sizey%8)?1:0))*sizey;
-	                         
+
     HZnum = (uint16_t)(sizeof(tfont12) / sizeof(tfont12[0]) - 1U);
-	for(k=0;k<HZnum;k++) 
+	for(k=0;k<HZnum;k++)
 	{
 		if((tfont12[k].Index[0]==*(s))&&(tfont12[k].Index[1]==*(s+1)))
-		{ 	
+		{
 			LCD_Address_Set(x,y,x+sizey-1,y+sizey-1);
 			for(i=0;i<TypefaceNum;i++)
 			{
 				for(j=0;j<8;j++)
-				{	
+				{
 					if(!mode)//非叠加方式
 					{
 						if(tfont12[k].Msk[i]&(0x01<<j))LCD_WR_DATA(fc);
@@ -330,10 +330,10 @@ void LCD_ShowChinese12x12(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 					}
 				}
 			}
-		}				  	
+		}
 		continue;  //查找到对应点阵字库立即退出，防止多个汉字重复取模带来影响
 	}
-} 
+}
 /**
 ************************************************************************
 * @brief:      	LCD_ShowChinese16x16: 在LCD上显示16x16汉字
@@ -356,15 +356,15 @@ void LCD_ShowChinese16x16(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 	uint16_t x0=x;
   TypefaceNum=(sizey/8+((sizey%8)?1:0))*sizey;
     HZnum = (uint16_t)(sizeof(tfont16) / sizeof(tfont16[0]) - 1U);
-	for(k=0;k<HZnum;k++) 
+	for(k=0;k<HZnum;k++)
 	{
 		if ((tfont16[k].Index[0]==*(s))&&(tfont16[k].Index[1]==*(s+1)))
-		{ 	
+		{
 			LCD_Address_Set(x,y,x+sizey-1,y+sizey-1);
 			for(i=0;i<TypefaceNum;i++)
 			{
 				for(j=0;j<8;j++)
-				{	
+				{
 					if(!mode)//非叠加方式
 					{
 						if(tfont16[k].Msk[i]&(0x01<<j))LCD_WR_DATA(fc);
@@ -389,10 +389,10 @@ void LCD_ShowChinese16x16(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 					}
 				}
 			}
-		}				  	
+		}
 		continue;  //查找到对应点阵字库立即退出，防止多个汉字重复取模带来影响
 	}
-} 
+}
 /**
 ************************************************************************
 * @brief:      	LCD_ShowChinese24x24: 在LCD上显示24x24汉字
@@ -415,15 +415,15 @@ void LCD_ShowChinese24x24(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 	uint16_t x0=x;
 	TypefaceNum=(sizey/8+((sizey%8)?1:0))*sizey;
     HZnum = (uint16_t)(sizeof(tfont24) / sizeof(tfont24[0]) - 1U);
-	for(k=0;k<HZnum;k++) 
+	for(k=0;k<HZnum;k++)
 	{
 		if ((tfont24[k].Index[0]==*(s))&&(tfont24[k].Index[1]==*(s+1)))
-		{ 	
+		{
 			LCD_Address_Set(x,y,x+sizey-1,y+sizey-1);
 			for(i=0;i<TypefaceNum;i++)
 			{
 				for(j=0;j<8;j++)
-				{	
+				{
 					if(!mode)//非叠加方式
 					{
 						if(tfont24[k].Msk[i]&(0x01<<j))LCD_WR_DATA(fc);
@@ -448,10 +448,10 @@ void LCD_ShowChinese24x24(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 					}
 				}
 			}
-		}				  	
+		}
 		continue;  //查找到对应点阵字库立即退出，防止多个汉字重复取模带来影响
 	}
-} 
+}
 /**
 ************************************************************************
 * @brief:      	LCD_ShowChinese32x32: 在LCD上显示32x32汉字
@@ -474,15 +474,15 @@ void LCD_ShowChinese32x32(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 	uint16_t x0=x;
 	TypefaceNum=(sizey/8+((sizey%8)?1:0))*sizey;
     HZnum = (uint16_t)(sizeof(tfont32) / sizeof(tfont32[0]) - 1U);
-	for(k=0;k<HZnum;k++) 
+	for(k=0;k<HZnum;k++)
 	{
 		if ((tfont32[k].Index[0]==*(s))&&(tfont32[k].Index[1]==*(s+1)))
-		{ 	
+		{
 			LCD_Address_Set(x,y,x+sizey-1,y+sizey-1);
 			for(i=0;i<TypefaceNum;i++)
 			{
 				for(j=0;j<8;j++)
-				{	
+				{
 					if(!mode)//非叠加方式
 					{
 						if(tfont32[k].Msk[i]&(0x01<<j))LCD_WR_DATA(fc);
@@ -507,7 +507,7 @@ void LCD_ShowChinese32x32(uint16_t x,uint16_t y,uint8_t *s,uint16_t fc,uint16_t 
 					}
 				}
 			}
-		}				  	
+		}
 		continue;  //查找到对应点阵字库立即退出，防止多个汉字重复取模带来影响
 	}
 }
@@ -532,9 +532,9 @@ void LCD_ShowChar(uint16_t x,uint16_t y,uint8_t num,uint16_t fc,uint16_t bc,uint
 	sizex=sizey/2;
 	TypefaceNum=(sizex/8+((sizex%8)?1:0))*sizey;
 	num=num-' ';    //得到偏移后的值
-	LCD_Address_Set(x,y,x+sizex-1,y+sizey-1);  //设置光标位置 
+	LCD_Address_Set(x,y,x+sizex-1,y+sizey-1);  //设置光标位置
 	for(i=0;i<TypefaceNum;i++)
-	{ 
+	{
 		if(sizey==12)temp=ascii_1206[num][i];		       //调用6x12字体
 		else if(sizey==16)temp=ascii_1608[num][i];		 //调用8x16字体
 		else if(sizey==24)temp=ascii_2412[num][i];		 //调用12x24字体
@@ -565,7 +565,7 @@ void LCD_ShowChar(uint16_t x,uint16_t y,uint8_t num,uint16_t fc,uint16_t bc,uint
 				}
 			}
 		}
-	}   	 	  
+	}
 }
 /**
 ************************************************************************
@@ -581,13 +581,13 @@ void LCD_ShowChar(uint16_t x,uint16_t y,uint8_t num,uint16_t fc,uint16_t bc,uint
 ************************************************************************
 **/
 void LCD_ShowString(uint16_t x,uint16_t y,const uint8_t *p,uint16_t fc,uint16_t bc,uint8_t sizey,uint8_t mode)
-{         
+{
 	while(*p!='\0')
-	{       
+	{
 		LCD_ShowChar(x,y,*p,fc,bc,sizey,mode);
 		x+=sizey/2;
 		p++;
-	}  
+	}
 }
 /**
 ************************************************************************
@@ -600,7 +600,7 @@ void LCD_ShowString(uint16_t x,uint16_t y,const uint8_t *p,uint16_t fc,uint16_t 
 **/
 uint32_t mypow(uint8_t m,uint8_t n)
 {
-	uint32_t result=1;	 
+	uint32_t result=1;
 	while(n--)result*=m;
 	return result;
 }
@@ -619,7 +619,7 @@ uint32_t mypow(uint8_t m,uint8_t n)
 ************************************************************************
 **/
 void LCD_ShowIntNum(uint16_t x,uint16_t y,uint16_t num,uint8_t len,uint16_t fc,uint16_t bc,uint8_t sizey)
-{         	
+{
 	uint8_t t,temp;
 	uint8_t enshow=0;
 	uint8_t sizex=sizey/2;
@@ -632,12 +632,12 @@ void LCD_ShowIntNum(uint16_t x,uint16_t y,uint16_t num,uint8_t len,uint16_t fc,u
 			{
 				LCD_ShowChar(x+t*sizex,y,' ',fc,bc,sizey,0);
 				continue;
-			}else enshow=1; 
-		 	 
+			}else enshow=1;
+
 		}
 	 	LCD_ShowChar(x+t*sizex,y,temp+48,fc,bc,sizey,0);
 	}
-} 
+}
 /**
 ************************************************************************
 * @brief:      	LCD_ShowFloatNum: 在LCD上显示格式化的浮点数，支持负数
@@ -760,7 +760,7 @@ void LCD_ShowPicture(uint16_t x,uint16_t y,uint16_t length,uint16_t width,const 
 			LCD_WR_DATA8(pic[k*2+1]);
 			k++;
 		}
-	}			
+	}
 }
 /**
 ************************************************************************
@@ -776,20 +776,20 @@ void LCD_Init(void)
 	HAL_Delay(100);
 	LCD_RES_Set();
 	HAL_Delay(100);
-	
+
 	LCD_BLK_Set();//打开背光
 	HAL_Delay(100);
-	
-	LCD_WR_REG(0x11); 
-	HAL_Delay(120); 
-	LCD_WR_REG(0x36); 
+
+	LCD_WR_REG(0x11);
+	HAL_Delay(120);
+	LCD_WR_REG(0x36);
 	if(USE_HORIZONTAL==0)
 		LCD_WR_DATA8(0x00);
 	else if(USE_HORIZONTAL==1)
 		LCD_WR_DATA8(0xC0);
 	else if(USE_HORIZONTAL==2)
 		LCD_WR_DATA8(0x70);
-	else 
+	else
 		LCD_WR_DATA8(0xA0);
 
 	LCD_WR_REG(0x3A);
@@ -800,10 +800,10 @@ void LCD_Init(void)
 	LCD_WR_DATA8(0x0C);
 	LCD_WR_DATA8(0x00);
 	LCD_WR_DATA8(0x33);
-	LCD_WR_DATA8(0x33); 
+	LCD_WR_DATA8(0x33);
 
-	LCD_WR_REG(0xB7); 
-	LCD_WR_DATA8(0x35);  
+	LCD_WR_REG(0xB7);
+	LCD_WR_DATA8(0x35);
 
 	LCD_WR_REG(0xBB);
 	LCD_WR_DATA8(0x19);
@@ -815,15 +815,15 @@ void LCD_Init(void)
 	LCD_WR_DATA8(0x01);
 
 	LCD_WR_REG(0xC3);
-	LCD_WR_DATA8(0x12);   
+	LCD_WR_DATA8(0x12);
 
 	LCD_WR_REG(0xC4);
-	LCD_WR_DATA8(0x20);  
+	LCD_WR_DATA8(0x20);
 
-	LCD_WR_REG(0xC6); 
-	LCD_WR_DATA8(0x0F);    
+	LCD_WR_REG(0xC6);
+	LCD_WR_DATA8(0x0F);
 
-	LCD_WR_REG(0xD0); 
+	LCD_WR_REG(0xD0);
 	LCD_WR_DATA8(0xA4);
 	LCD_WR_DATA8(0xA1);
 
@@ -859,8 +859,8 @@ void LCD_Init(void)
 	LCD_WR_DATA8(0x20);
 	LCD_WR_DATA8(0x23);
 
-	LCD_WR_REG(0x21); 
+	LCD_WR_REG(0x21);
 
-	LCD_WR_REG(0x29); 
+	LCD_WR_REG(0x29);
 }
 

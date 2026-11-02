@@ -18,8 +18,8 @@
 #define LCD_H 135
 #endif
 
- 
-//-----------------LCD引脚定义---------------- 
+
+//-----------------LCD引脚定义----------------
 #if USE_ANALOG_SPI
 #define LCD_SCLK_Clr() HAL_GPIO_WritePin(LCD_SCK_GPIO_Port,LCD_SCK_Pin, GPIO_PIN_RESET)//SCL=SCLK
 #define LCD_SCLK_Set() HAL_GPIO_WritePin(LCD_SCK_GPIO_Port,LCD_SCK_Pin, GPIO_PIN_SET)
@@ -33,7 +33,7 @@
 
 #define LCD_DC_Clr()   HAL_GPIO_WritePin(LCD_DC_GPIO_Port,LCD_DC_Pin, GPIO_PIN_RESET)//DC
 #define LCD_DC_Set()   HAL_GPIO_WritePin(LCD_DC_GPIO_Port,LCD_DC_Pin, GPIO_PIN_SET)
- 		     
+
 #define LCD_CS_Clr()   HAL_GPIO_WritePin(LCD_CS_GPIO_Port,LCD_CS_Pin, GPIO_PIN_RESET)//CS
 #define LCD_CS_Set()   HAL_GPIO_WritePin(LCD_CS_GPIO_Port,LCD_CS_Pin, GPIO_PIN_SET)
 
@@ -72,8 +72,8 @@ void LCD_ShowPicture(uint16_t x,uint16_t y,uint16_t length,uint16_t width,const 
 //画笔颜色
 
 #define WHITE         	 0xFFFF
-#define BLACK         	 0x0000	  
-#define BLUE           	 0x001F  
+#define BLACK         	 0x0000
+#define BLUE           	 0x001F
 #define BRED             0XF81F
 #define GRED 			       0XFFE0
 #define GBLUE			       0X07FF

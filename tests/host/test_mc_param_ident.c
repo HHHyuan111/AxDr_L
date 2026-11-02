@@ -267,7 +267,7 @@ static void fast_config(mc_param_ident_config_t *cfg)
     cfg->flux_spinup_s = 0.6f;
     cfg->flux_sample_s = 0.2f;
     /* 默认档案已回填真机标称（Rs 0.118/L 100µ）；plant 是 0.069Ω 假电机，
-     * 偏差门必须清零隔离——host 测核算法，不测沉沙档案匹配。 */
+     * 偏差门必须清零隔离——host 测核算法，不测200W 伺服电机档案匹配。 */
     cfg->nominal_r = 0.0f;
     cfg->tol_r = 0.0f;
     cfg->nominal_l = 0.0f;
@@ -399,7 +399,7 @@ static void test_config_gates(void)
     /* ctx 契约：使用前必须零初始化（io 回调域非法指针会崩）。 */
     memset(&ident, 0, sizeof(ident));
 
-    /* 默认值抽查：算法层=G11 原值，激励层=沉沙档案，安全闸门=关。 */
+    /* 默认值抽查：算法层=G11 原值，激励层=200W 伺服电机档案，安全闸门=关。 */
     mc_param_ident_default_config(&cfg);
     CHECK_NEAR(cfg.pole_pairs, 5.0f, 0.0f);
     CHECK_NEAR(cfg.rs_current_lo_a, 2.0f, 0.0f);
@@ -774,7 +774,7 @@ static void test_full_chain_flux(void)
 
 static void test_flux_deadtime_correction(void)
 {
-    /* 单点对照：毛电压 vq 输入，不修正 λ̂ 偏 +vdt_rot/ωe（沉沙量级
+    /* 单点对照：毛电压 vq 输入，不修正 λ̂ 偏 +vdt_rot/ωe（200W 伺服电机量级
      * ≈ +77%），修正后精确恢复——符号/量级错误在此露馅。 */
     {
         mc_param_ident_flux_eval_input_t in;

@@ -1,7 +1,7 @@
 /**
  * @file encoder_config.h
  * @brief 当前工程支持的编码器方向、分辨率和默认选择。
- * @note  本阶段唯一验证对象 = 沉沙电机 + ABZ（B 库正在使用的组合，18 号盘点 §2.1）。
+ * @note  本阶段唯一验证对象 = 200W 伺服电机 + ABZ（B 库正在使用的组合，18 号盘点 §2.1）。
  *        SPI 磁编（MA732/MT6816）代码保留但不进入主链；值全部迁自 B 库已验证配置。
  */
 
@@ -26,7 +26,7 @@
 #define ABZ_RESOLUTION_BITS                   (14U)    /* 10000 计数需 14 位，B 库坑③ */
 #define ABZ_COUNTS_PER_REV                    (10000U) /* 2500 线 × TI12 四倍频 */
 
-/* 测速差分窗口（B 库沉沙配置：窗口 2 拍，chensha_config L26）。 */
+/* 测速差分窗口（B 库200W 伺服电机配置：窗口 2 拍，B 库配置 L26）。 */
 #define ABZ_SPEED_WINDOW_TICKS                (2U)
 
 /* 以下 SPI 磁编参数保留（代码不在主链，仅存档）。 */

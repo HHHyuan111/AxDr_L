@@ -1,6 +1,6 @@
 /**
  * @file target_qenc.c
- * @brief TIM3 正交编码器接口实现（配置值全部迁自沉沙ABZ固件已验证代码）。
+ * @brief TIM3 正交编码器接口实现（配置值全部迁自200W 伺服电机 ABZ 固件已验证代码）。
  *
  * 硬件事实（AxDrive-L，HALL 接口）：PA6=A / PA7=B / PB0=Z，板上 1k 分压网络。
  * 参数：TI12 双边沿四倍频、PSC=0、ARR=9999（10000 计数/圈）、IC 滤波器=15（B 库实测值）。

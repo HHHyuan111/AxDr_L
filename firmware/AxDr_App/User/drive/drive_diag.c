@@ -168,7 +168,7 @@ static _RAM_FUNC void drive_diag_build_sample(foc_t *foc,
     };
     foc_frame_t frame;
 
-    /* 这里重新计算本周期坐标变换，不读取上一拍 FOC 留下的 i_d/i_q。 */
+    /* 这里重新计算本周期坐标变换（本拍数据）。 */
     foc_core_prepare(&foc_sample, &frame);
 
     *sample = (mc_sample_t){

@@ -1,6 +1,14 @@
 /**
  * @file motor_modes.c
  * @brief 控制模式给定生成：轨迹、单位换算和控制角度。主链位置：第 4 步内。
+ *
+ * 本拍控制角度 theta 的来源（02 号规范 §3）：
+ *   有感闭环（电流/速度/位置/MIT 及 release 族）→ fb.theta_e（编码器电角，要求已对齐）
+ *   VF / IF                                  → ref.theta_e（虚拟积分场角，与编码器无关）
+ *   对齐                                     → 校准场角（drive.c 的 drive_align_prepare）
+ *   无感（预留）                              → 观测估计角，未锁定不得选用
+ *
+ * 除 VF/IF 外各函数统一使用 fb.theta_e，来源不再逐处重复注释。
  */
 
 #include "common.h"
@@ -29,7 +37,7 @@ _RAM_FUNC bool open_volt_step(foc_t *foc, foc_plan_t *cmd)
             .vd = foc->ref.vd,
             .vq = foc->ref.vq,
         },
-        .theta = foc->ref.theta_e,
+        .theta = foc->ref.theta_e, /* 虚拟积分场角（VF）。 */
     };
     return true;
 }
@@ -50,7 +58,7 @@ _RAM_FUNC bool open_cur_step(foc_t *foc, foc_plan_t *cmd)
             .id_ref = foc->ref.id,
             .iq_ref = foc->ref.iq,
         },
-        .theta = foc->ref.theta_e,
+        .theta = foc->ref.theta_e, /* 虚拟积分场角（IF）。 */
     };
     return true;
 }

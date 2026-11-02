@@ -1,9 +1,9 @@
 /**
- * @file test_motor_chensha.c
- * @brief 沉沙档案装载验收：B 库定版值逐项锁定（浮点字面量按位比对）。
+ * @file test_motor_servo200w.c
+ * @brief 200W 伺服电机档案装载验收：B 库定版值逐项锁定（浮点字面量按位比对）。
  *
- * 值出处：motor_config.h 沉沙档案块注释（B 库 axdr_chensha_config.h /
- * axdr_chensha_servo_profile.h / target_config 沉沙段 / foc_drv.c 实测零位）。
+ * 值出处：motor_config.h 200W 伺服电机档案块注释（B 库 B 库配置头 /
+ * B 库伺服配置头 / target_config 200W 伺服电机段 / foc_drv.c 实测零位）。
  * 本测试是关口②/③参数不漂移的第一道防线：任何人改档案值，这里立刻红。
  */
 
@@ -53,7 +53,7 @@ int main(void)
     const float flux_expected = 0.06f / (1.41421356237f * 1.5f * 5.0f);
     memset(&g_foc, 0, sizeof(g_foc));
 
-    /* ---- 物理档案（B 库 chensha_config 逐项） ---- */
+    /* ---- 物理档案（B 库 B 库配置 逐项） ---- */
     motor_profile_load(&g_foc);
 
     expect_bits("Rs", g_foc.motor.Rs, 0.105125f);
@@ -73,7 +73,7 @@ int main(void)
                  1.5f * 5.0f * flux_expected, 1e-9f);
     expect_bits("ibw=500(降噪,厂商对照)", g_foc.motor.ibw, 500.0f);
 
-    /* ---- 台架限幅（B 库 target_config 沉沙段） ---- */
+    /* ---- 台架限幅（B 库 target_config 200W 伺服电机段） ---- */
     expect_close("iq_max=8A", g_foc.ref.iq_max, 8.0f, 1e-6f);
     expect_close("iq_min=-8A", g_foc.ref.iq_min, -8.0f, 1e-6f);
     expect_bits("spd_max=335", g_foc.ref.spd_max, 335.0f);
@@ -112,9 +112,9 @@ int main(void)
 
     if (fail_count == 0)
     {
-        (void)printf("test_motor_chensha: all pass\n");
+        (void)printf("test_motor_servo200w: all pass\n");
         return 0;
     }
-    (void)printf("test_motor_chensha: %d failure(s)\n", fail_count);
+    (void)printf("test_motor_servo200w: %d failure(s)\n", fail_count);
     return 1;
 }
