@@ -37,7 +37,7 @@
 #include "target_adc.h"
 #include "target_time.h"
 #include "target_irq_profile.h"
-#include "modlue.h"
+#include "moldue.h"
 #include "lcd.h"
 #include "service_command.h"
 #include "service_param_store.h"

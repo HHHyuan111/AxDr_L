@@ -9,7 +9,8 @@ LOG="$(dirname "$PROJ")/build_log.txt"
 [ -f "$UV4" ] || { echo "UV4 未找到: $UV4"; exit 2; }
 # 构建前生成唯一 build_id（贯穿固件、构建回执与资源包）
 python "$(cd "$(dirname "$0")/.." && pwd)/tools/gen_build_id.py" AxDr || { echo "build_id 生成失败"; exit 2; }
-"$UV4" -r "$PROJ" -j0 -o "$LOG" >/dev/null 2>&1
+# 显式指定 Release target：不依赖上次在 GUI 里激活的是哪个 target。
+"$UV4" -r -t "AxDr" "$PROJ" -j0 -o "$LOG" >/dev/null 2>&1
 sleep 1
 # UV4 输出为 GBK，统计 Error/Warning 行
 ERR=$(iconv -f GBK -t UTF-8 "$LOG" 2>/dev/null | grep -cE "Error\(s\)|error:" )
