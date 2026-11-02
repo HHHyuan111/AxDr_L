@@ -76,6 +76,7 @@ PLATFORM_FAST_CODE void drive_control_reset_for_start(foc_t *foc)
     const float speed_target_r = foc->ref.spd_r;
     const float speed_target_m = foc->ref.spd_m;
     const float position_target_m = foc->ref.pos_m;
+    const float position_target_r = foc->ref.pos_r;
     const float torque_target_m = foc->ref.torq_m;
     const float torque_feedforward = foc->ref.torq_ff;
     const float mit_kp = foc->ref.kp;
@@ -90,6 +91,7 @@ PLATFORM_FAST_CODE void drive_control_reset_for_start(foc_t *foc)
     foc->ref.spd_r = speed_target_r;
     foc->ref.spd_m = speed_target_m;
     foc->ref.pos_m = position_target_m;
+    foc->ref.pos_r = position_target_r;
     foc->ref.torq_m = torque_target_m;
     foc->ref.torq_ff = torque_feedforward;
     foc->ref.kp = mit_kp;

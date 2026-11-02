@@ -515,6 +515,70 @@ int main(void)
                ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
     }
 
+    /* ---- 14c. SET_POSITION（S4）：范围校验、转子换算、快照 mode=4 ---- */
+    {
+        axdr_position_request_t pos = {
+            .session_id = session_id, .lease_ms = 300u, .reserved = 0u,
+            .position_rad = 1.0f, .velocity_limit_rad_s = 2.0f,
+            .acceleration_limit_rad_s2 = 4.0f, .iq_limit_A = 3.0f,
+        };
+
+        g_foc.motor.Gr = 5.0f;
+        send_frame((const uint8_t *)&pos, sizeof(pos), 1501u,
+                   AXDR_OPCODE_SET_POSITION);
+        expect("SET_POSITION APPLIED", ack() == AXDR_ACK_APPLIED);
+        expect("位置模式已发布",
+               g_foc.mode.sys == debug_mode &&
+               g_foc.mode.debug == pos_spd_curr_cl);
+        expect("位置目标转子换算",
+               g_foc.ref.pos_m == 1.0f && g_foc.ref.pos_r == 5.0f);
+        expect("速度与电流限制已发布",
+               g_foc.ref.spd_m == 2.0f && g_foc.ref.spd_r == 10.0f &&
+               g_foc.ref.iq == 3.0f && g_foc.ref.id == 0.0f);
+        expect("加速度限制已发布",
+               g_foc.ref.acc_m == 4.0f && g_foc.ref.dec_m == 4.0f);
+        expect("绝对位置模式", g_foc.app.pos_ctrl_mode == abs_pos_mode);
+        expect("快照 mode=4",
+               rd_u8(resp_payload(),
+                     offsetof(axdr_control_state_payload_t, mode)) ==
+                   AXDR_CONTROL_POSITION);
+        expect("req=START", g_foc.req == DRIVE_REQ_START);
+
+        pos.position_rad = 30000.0f;
+        send_frame((const uint8_t *)&pos, sizeof(pos), 1502u,
+                   AXDR_OPCODE_SET_POSITION);
+        expect("超限位置拒",
+               ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
+        pos.position_rad = 1.0f;
+        pos.velocity_limit_rad_s = 0.0f;
+        send_frame((const uint8_t *)&pos, sizeof(pos), 1503u,
+                   AXDR_OPCODE_SET_POSITION);
+        expect("零速度限制拒",
+               ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
+        pos.velocity_limit_rad_s = 9999.0f;
+        send_frame((const uint8_t *)&pos, sizeof(pos), 1504u,
+                   AXDR_OPCODE_SET_POSITION);
+        expect("超限速度限制拒",
+               ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
+        pos.velocity_limit_rad_s = 2.0f;
+        pos.acceleration_limit_rad_s2 = 0.0f;
+        send_frame((const uint8_t *)&pos, sizeof(pos), 1505u,
+                   AXDR_OPCODE_SET_POSITION);
+        expect("零加速度限制拒",
+               ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
+        pos.acceleration_limit_rad_s2 = 4.0f;
+        pos.iq_limit_A = 0.0f;
+        send_frame((const uint8_t *)&pos, sizeof(pos), 1506u,
+                   AXDR_OPCODE_SET_POSITION);
+        expect("零电流限制拒",
+               ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
+        pos.iq_limit_A = 9.0f;
+        send_frame((const uint8_t *)&pos, sizeof(pos), 1507u,
+                   AXDR_OPCODE_SET_POSITION);
+        expect("超限电流限制拒",
+               ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
+    }
+
     /* ---- 15. ControlStop：无条件可用（安全方向），撤运行授权 ---- */
     {
         const unsigned count_before = irq_entries;

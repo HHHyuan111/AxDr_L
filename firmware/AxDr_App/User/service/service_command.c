@@ -526,6 +526,10 @@ static uint8_t protocol_control_mode(uint8_t debug_mode)
     {
         return AXDR_CONTROL_IF;
     }
+    if (debug_mode == (uint8_t)pos_spd_curr_cl)
+    {
+        return AXDR_CONTROL_POSITION;
+    }
     return 0u;
 }
 
@@ -1078,6 +1082,65 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             }
             irq_unlock(key);
             /* Applied 携带控制快照（active=1，mode=8）。 */
+            *ack_state = AXDR_ACK_APPLIED;
+            return provide_control_state(response_payload,
+                                         response_payload_capacity,
+                                         response_payload_length);
+        }
+
+        case AXDR_OPCODE_SET_POSITION:
+        {
+            const axdr_position_request_t *req = payload_in(
+                request_payload, request_payload_length, sizeof(*req));
+            uint8_t reason;
+            if (req == NULL)
+            {
+                return AXDR_REASON_INVALID_PAYLOAD;
+            }
+            if (!isfinite(req->position_rad) ||
+                !isfinite(req->velocity_limit_rad_s) ||
+                !isfinite(req->acceleration_limit_rad_s2) ||
+                !isfinite(req->iq_limit_A) ||
+                (req->position_rad > AXDR_CONTROL_MAX_POSITION_RAD) ||
+                (req->position_rad < -AXDR_CONTROL_MAX_POSITION_RAD) ||
+                (req->velocity_limit_rad_s <= 0.0f) ||
+                (req->velocity_limit_rad_s > AXDR_CONTROL_MAX_POSITION_VELOCITY_RAD_S) ||
+                (req->acceleration_limit_rad_s2 <= 0.0f) ||
+                (req->acceleration_limit_rad_s2 > AXDR_CONTROL_MAX_POSITION_ACCEL_RAD_S2) ||
+                (req->iq_limit_A <= 0.0f) ||
+                (req->iq_limit_A > SERVO200W_COMMAND_CURRENT_LIMIT_A))
+            {
+                return AXDR_REASON_OUT_OF_RANGE;
+            }
+            reason = authorize_motion(req->lease_ms, req->session_id);
+            if (reason != AXDR_REASON_NONE)
+            {
+                return reason;
+            }
+            const irq_lock_key_t key = irq_lock();
+            if (g_foc.fault.all != 0u || g_foc.state == DRIVE_STATE_FAULT)
+            {
+                irq_unlock(key);
+                return AXDR_REASON_FAULT_ACTIVE;
+            }
+            g_foc.mode.sys = debug_mode;
+            g_foc.mode.debug = pos_spd_curr_cl;
+            g_foc.app.pos_ctrl_mode = abs_pos_mode;
+            /* 合同语义：输出轴绝对多圈位置；控制链按转子侧换算。 */
+            g_foc.ref.pos_m = req->position_rad;
+            g_foc.ref.pos_r = req->position_rad * g_foc.motor.Gr;
+            g_foc.ref.spd_m = req->velocity_limit_rad_s;
+            g_foc.ref.spd_r = req->velocity_limit_rad_s * g_foc.motor.Gr;
+            g_foc.ref.acc_m = req->acceleration_limit_rad_s2;
+            g_foc.ref.dec_m = req->acceleration_limit_rad_s2;
+            g_foc.ref.iq = req->iq_limit_A;
+            g_foc.ref.id = 0.0f;
+            if (g_foc.state != DRIVE_STATE_RUN)
+            {
+                g_foc.req = DRIVE_REQ_START;
+            }
+            irq_unlock(key);
+            /* Applied 携带控制快照（active=1，mode=4）。 */
             *ack_state = AXDR_ACK_APPLIED;
             return provide_control_state(response_payload,
                                          response_payload_capacity,

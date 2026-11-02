@@ -103,6 +103,7 @@ int main(void)
     motor.ref.spd_r = 12.0f;
     motor.ref.spd_m = 3.0f;
     motor.ref.pos_m = 4.0f;
+    motor.ref.pos_r = 5.0f;
     motor.ref.torq_m = 0.5f;
     motor.ref.torq_ff = 0.2f;
     motor.ref.kp = 1.5f;
@@ -122,6 +123,7 @@ int main(void)
                        (motor.ref.spd_r == 12.0f) &&
                        (motor.ref.spd_m == 3.0f) &&
                        (motor.ref.pos_m == 4.0f) &&
+                       (motor.ref.pos_r == 5.0f) &&
                        (motor.ref.torq_m == 0.5f) &&
                        (motor.ref.torq_ff == 0.2f) &&
                        (motor.ref.kp == 1.5f) &&
