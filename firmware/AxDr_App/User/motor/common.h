@@ -138,6 +138,15 @@ typedef enum
     DRIVE_REQ_RUN,
 } drive_req_e;
 
+/** @brief 无感起动子阶段（RUN 内，仅 sensorless_enabled 时有效）。 */
+typedef enum
+{
+    DRIVE_SENSORLESS_OFF = 0,
+    DRIVE_SENSORLESS_IF,     /* I/F 电流拖动，虚拟角频率斜坡 */
+    DRIVE_SENSORLESS_SWITCH, /* 切态保持：SMO 在真实反电动势上收敛 */
+    DRIVE_SENSORLESS_RUN,    /* SMO 角度接管，正常模式计算 */
+} drive_sensorless_phase_e;
+
 typedef enum
 {
     DRIVE_STATE_STOP = 0,
@@ -488,6 +497,12 @@ struct foc
     traj_spd_t spd_traj;
     traj_pos_t pos_traj;
     speed_est_t speed; /* 每个电机独立保存测速窗口；旧成员偏移不变。 */
+
+    /* 无感起动序列（02 规范 §3 观测预留落地）：由 drive 层推进。
+     * 只在结构体末尾追加，保持既有字段偏移不变。 */
+    uint8_t sensorless_enabled; /* 1=START 走 I/F 起动并切换到 SMO 角度 */
+    uint8_t sensorless_phase;   /* 见 drive_sensorless_phase_e */
+    uint32_t sensorless_ticks;
 };
 
 void ctrl_fb_update(foc_t *foc, float vbus);

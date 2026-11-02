@@ -4,6 +4,9 @@
 #include "board_adapter.h"
 #include "position_adapter.h"
 #include "drive_cycle_test.h"
+#include "observer_adapter.h"
+obs_t g_obs;
+
 
 void run_drive_cycle(foc_t *foc)
 {

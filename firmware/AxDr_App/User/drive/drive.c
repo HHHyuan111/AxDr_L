@@ -9,11 +9,13 @@
 #include <math.h>
 
 #include "common.h"
+#include "algorithm_config.h"
 #include "fast_trig.h"
 #include "drive_diag.h"
 #include "drive_mode.h"
 #include "drive_pwm.h"
 #include "drive_reset.h"
+#include "observer_adapter.h" /* 无感序列读写 SMO 估计角度 */
 
 /* 状态只保存在 foc->state；req 是外部请求。
  * STOP --START--> STARTING --下一拍--> RUN / DIAG
@@ -58,6 +60,12 @@ static _RAM_FUNC void drive_enter_state(foc_t *foc, drive_state_e next)
             drive_align_reset(foc);
         }
         foc->req = DRIVE_REQ_STOP;
+        if (foc->sensorless_enabled != 0U)
+        {
+            /* 停机即重头：下次 START 重新走 I/F 起动。 */
+            foc->sensorless_phase = DRIVE_SENSORLESS_IF;
+            foc->sensorless_ticks = 0U;
+        }
         /* 关断失败保留 pwm_active，下一拍重试。 */
         if (foc->fault.all != 0U)
         {
@@ -90,9 +98,11 @@ _RAM_FUNC void drive_update_state(foc_t *foc)
                 break;
             }
             drive_enter_state(foc, DRIVE_STATE_STARTING);
-            /* 对齐门控按模式：VF/IF 用虚拟角度，不要求编码器对齐（02 规范 §3）。 */
+            /* 对齐门控按模式：VF/IF 与无感起动用虚拟/SMO 角度，
+             * 不要求编码器对齐（02 规范 §3）。 */
             if (foc->state == DRIVE_STATE_STARTING &&
                 drive_mode_requires_encoder(foc) &&
+                (foc->sensorless_enabled == 0U) &&
                 foc->enc.primary == ENCODER_TYPE_ABZ && !foc->enc_aligned)
             {
                 drive_enter_state(foc, DRIVE_STATE_ALIGN);
@@ -136,6 +146,60 @@ _RAM_FUNC void drive_update_state(foc_t *foc)
     }
 }
 
+/* 无感起动：I/F 阶段用虚拟角拖动，切态阶段保持并让 SMO 收敛，
+ * RUN 阶段 SMO 角度接管（02 规范 §3 观测预留落地）。 */
+static _RAM_FUNC bool drive_sensorless_step(foc_t *foc, foc_plan_t *cmd)
+{
+    const float t = (float)foc->sensorless_ticks * foc->rate.foc_ts;
+    float we = CTRL_SENSORLESS_START_WE_RAD_S +
+               (CTRL_SENSORLESS_SWITCH_WE_RAD_S - CTRL_SENSORLESS_START_WE_RAD_S) *
+               (t / CTRL_SENSORLESS_RAMP_S);
+
+    if (we > CTRL_SENSORLESS_SWITCH_WE_RAD_S)
+    {
+        we = CTRL_SENSORLESS_SWITCH_WE_RAD_S;
+    }
+    foc->ref.theta_e += we * foc->rate.foc_ts;
+    wrap_0_2pi(foc->ref.theta_e);
+
+    *cmd = (foc_plan_t){
+        .ref = {
+            .mode = FOC_CTRL_MODE_CUR,
+            .id_ref = 0.0f,
+            .iq_ref = CTRL_SENSORLESS_IF_CURRENT_A,
+        },
+        .theta = foc->ref.theta_e, /* 虚拟积分场角（I/F 起动）。 */
+    };
+
+    if (foc->sensorless_phase == DRIVE_SENSORLESS_IF)
+    {
+        if (t >= CTRL_SENSORLESS_RAMP_S)
+        {
+            /* 切态对齐：SMO 角度直接对准虚拟轴，PLL 随后在真实反电动势上收敛。 */
+            g_obs.smo.theta = foc->ref.theta_e;
+            foc->sensorless_phase = DRIVE_SENSORLESS_SWITCH;
+            foc->sensorless_ticks = 0U;
+        }
+        else
+        {
+            foc->sensorless_ticks++;
+        }
+    }
+    else if (foc->sensorless_phase == DRIVE_SENSORLESS_SWITCH)
+    {
+        if (t >= CTRL_SENSORLESS_SWITCH_HOLD_S)
+        {
+            foc->sensorless_phase = DRIVE_SENSORLESS_RUN;
+            foc->sensorless_ticks = 0U;
+        }
+        else
+        {
+            foc->sensorless_ticks++;
+        }
+    }
+    return true;
+}
+
 /* 第四步：本拍做什么。这里只生成给定，PI 和 PWM 仍在七步主流程后部。 */
 _RAM_FUNC void drive_handle_state(foc_t *foc, drive_cycle_t *cycle)
 {
@@ -148,7 +212,21 @@ _RAM_FUNC void drive_handle_state(foc_t *foc, drive_cycle_t *cycle)
             break;
         case DRIVE_STATE_RUN:
         case DRIVE_STATE_DIAG:
-            cycle->ready = drive_mode_step(foc, &cycle->cmd);
+            if ((foc->sensorless_enabled != 0U) &&
+                (foc->sensorless_phase != DRIVE_SENSORLESS_RUN))
+            {
+                cycle->ready = drive_sensorless_step(foc, &cycle->cmd);
+            }
+            else
+            {
+                cycle->ready = drive_mode_step(foc, &cycle->cmd);
+                if ((foc->sensorless_enabled != 0U) &&
+                    (foc->sensorless_phase == DRIVE_SENSORLESS_RUN))
+                {
+                    /* SMO 角度接管：模式计算照旧，只换控制角度。 */
+                    cycle->cmd.theta = g_obs.smo.theta;
+                }
+            }
             break;
         default:
             break; /* 其余状态无控制给定。 */
@@ -328,7 +406,10 @@ static _RAM_FUNC void drive_start_pwm(foc_t *foc)
     if (drive_pwm_start())
     {
         drive_control_reset_for_start(foc);
-        foc->direction_guard_armed = start_from_rest;
+        /* 无感起动不武装方向守卫：I/F 起步的转子微动不是接线错误，
+         * 守卫误报 enc_err 会锁死起动序列。 */
+        foc->direction_guard_armed = start_from_rest &&
+                                     (foc->sensorless_enabled == 0U);
         foc->pwm_active = true;
     }
     else

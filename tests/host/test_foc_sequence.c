@@ -17,6 +17,9 @@
 #include "board_adapter.h"
 #include "position_adapter.h"
 #include "speed_adapter.h"
+#include "observer_adapter.h"
+obs_t g_obs;
+
 
 static unsigned starts, stops, writes;
 static float duty_a, duty_b, duty_c;

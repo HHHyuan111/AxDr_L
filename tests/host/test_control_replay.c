@@ -14,6 +14,9 @@
 #include "foc_run.h"
 #include "control_cycle.h"
 #include "speed_adapter.h"
+#include "observer_adapter.h"
+obs_t g_obs;
+
 
 static unsigned int pwm_start_count;
 static unsigned int pwm_stop_count;
