@@ -106,9 +106,9 @@
 
 /* 无感起动序列（S5）：I/F 拖动电流、切换点电角速度与斜坡时长。
  * 切换点按额定 10% 左右选择——反电动势在该点已可靠（SMO 旁路对照实测）。 */
-#define CTRL_SENSORLESS_IF_CURRENT_A          (3.0f)  /* 台架实测：2A 在低速段临界，3A 锁入可靠 */
-/* 起步场速非零：跳过最粘滞的零速段，直接给初始拖动。 */
-#define CTRL_SENSORLESS_START_WE_RAD_S        (20.0f)
+#define CTRL_SENSORLESS_IF_CURRENT_A          (4.0f)  /* 台架实测：3A 仍临界，4A 给足锁定余量 */
+/* 静态对齐停留：固定场角吸合转子（场角 0），之后斜坡起动——对齐后的转子必然跟场。 */
+#define CTRL_SENSORLESS_DWELL_S               (0.5f)
 /* 切换点电角速度必须低于目标转速（对应转子 8 rad/s < 速度环目标 10 rad/s）：
  * 切换瞬间速度环处于加速方向，接手平滑；高于目标会先刹车导致失速。 */
 #define CTRL_SENSORLESS_SWITCH_WE_RAD_S       (40.0f)

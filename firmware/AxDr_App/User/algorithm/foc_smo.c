@@ -64,6 +64,21 @@ void foc_smo_reset(foc_smo_t *s)
     s->pll_int = 0.0f;
 }
 
+void foc_smo_seed(foc_smo_t *s, float theta, float we, float flux,
+                  float ia_meas, float ib_meas)
+{
+    s->theta = theta;
+    s->spd = we;
+    s->spd_f = we;
+    s->pll_int = we / s->pll_ki;
+    /* 反电动势按虚拟轴相位的期望值预置（负载角由 PLL 自行收敛）。 */
+    s->ea_f = -flux * we * sinf(theta);
+    s->eb_f = flux * we * cosf(theta);
+    s->e_mag = fabsf(flux * we);
+    s->ia_est = ia_meas;
+    s->ib_est = ib_meas;
+}
+
 void foc_smo_step(foc_smo_t *s, float ua, float ub, float ia, float ib)
 {
     float ia_err;

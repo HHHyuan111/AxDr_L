@@ -151,13 +151,22 @@ _RAM_FUNC void drive_update_state(foc_t *foc)
 static _RAM_FUNC bool drive_sensorless_step(foc_t *foc, foc_plan_t *cmd)
 {
     const float t = (float)foc->sensorless_ticks * foc->rate.foc_ts;
-    float we = CTRL_SENSORLESS_START_WE_RAD_S +
-               (CTRL_SENSORLESS_SWITCH_WE_RAD_S - CTRL_SENSORLESS_START_WE_RAD_S) *
-               (t / CTRL_SENSORLESS_RAMP_S);
+    const float t_ramp = t - CTRL_SENSORLESS_DWELL_S;
+    float we;
 
-    if (we > CTRL_SENSORLESS_SWITCH_WE_RAD_S)
+    if (t_ramp <= 0.0f)
     {
-        we = CTRL_SENSORLESS_SWITCH_WE_RAD_S;
+        /* 静态对齐停留：场角固定，转子吸合到当前位置。 */
+        we = 0.0f;
+    }
+    else
+    {
+        we = CTRL_SENSORLESS_SWITCH_WE_RAD_S *
+             (t_ramp / CTRL_SENSORLESS_RAMP_S);
+        if (we > CTRL_SENSORLESS_SWITCH_WE_RAD_S)
+        {
+            we = CTRL_SENSORLESS_SWITCH_WE_RAD_S;
+        }
     }
     foc->ref.theta_e += we * foc->rate.foc_ts;
     wrap_0_2pi(foc->ref.theta_e);
@@ -173,14 +182,17 @@ static _RAM_FUNC bool drive_sensorless_step(foc_t *foc, foc_plan_t *cmd)
 
     if (foc->sensorless_phase == DRIVE_SENSORLESS_IF)
     {
-        if (t >= CTRL_SENSORLESS_RAMP_S)
+        if (t >= CTRL_SENSORLESS_DWELL_S + CTRL_SENSORLESS_RAMP_S)
         {
-            /* 切态对齐：SMO 角度对准虚拟轴，速度与积分器初始化为已知场速——
-             * 转子此时接近场速，这比 PLL 的瞬态噪声值可靠得多。 */
-            g_obs.smo.theta = foc->ref.theta_e;
-            g_obs.smo.spd = CTRL_SENSORLESS_SWITCH_WE_RAD_S;
-            g_obs.smo.spd_f = CTRL_SENSORLESS_SWITCH_WE_RAD_S;
-            g_obs.smo.pll_int = CTRL_SENSORLESS_SWITCH_WE_RAD_S / g_obs.smo.pll_ki;
+            /* 切态预置（VESC 法）：观测器全部状态放到"虚拟轴+负载角"的
+             * 期望值上，释放后从正确轨迹出发，无需等待低速收敛。
+             * 速度环目标暂存，参考从当前速度起步防阶跃。 */
+            foc_smo_seed(&g_obs.smo, foc->ref.theta_e,
+                         CTRL_SENSORLESS_SWITCH_WE_RAD_S,
+                         foc->motor.flux,
+                         foc->fb.ialpha, foc->fb.ibeta);
+            foc->sensorless_target = foc->ref.spd_r;
+            foc->ref.spd_r = CTRL_SENSORLESS_SWITCH_WE_RAD_S / foc->motor.pn;
             foc->sensorless_phase = DRIVE_SENSORLESS_SWITCH;
             foc->sensorless_ticks = 0U;
         }
@@ -230,7 +242,27 @@ _RAM_FUNC void drive_handle_state(foc_t *foc, drive_cycle_t *cycle)
                     /* SMO 角度与速度接管：模式计算照旧，只换控制反馈。
                      * 保护（第 2 步）仍读编码器值——有编码器场合照常工作，
                      * 无编码器前提在 S5.5 按模式化。 */
-                    cycle->cmd.theta = g_obs.smo.theta;
+                    /* 相位滞后补偿：反电动势低通在 ωe 处滞后 atan(ωe/wc)，
+                     * 使用时把滞后角加回去（VESC 的相位补偿同目的）。 */
+                    cycle->cmd.theta = g_obs.smo.theta +
+                        atanf(g_obs.smo.spd_f / g_obs.smo.lpf_wc);
+                    wrap_0_2pi(cycle->cmd.theta);
+                    /* 速度环参考斜坡接续：从切换时速度 1s 爬升到最终目标。 */
+                    {
+                        const float step =
+                            (foc->sensorless_target - foc->ref.spd_r) *
+                            (foc->rate.foc_ts / 1.0f);
+
+                        if (fabsf(foc->sensorless_target - foc->ref.spd_r) >
+                            fabsf(step))
+                        {
+                            foc->ref.spd_r += step;
+                        }
+                        else
+                        {
+                            foc->ref.spd_r = foc->sensorless_target;
+                        }
+                    }
                     foc->fb.spd_r = g_obs.smo.spd_f / foc->motor.pn;
 
                     /* 失锁检测：速度宣称高但反电动势幅值对不上（转子停转时

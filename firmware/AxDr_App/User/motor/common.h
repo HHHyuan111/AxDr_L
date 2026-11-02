@@ -504,6 +504,7 @@ struct foc
     uint8_t sensorless_phase;   /* 见 drive_sensorless_phase_e */
     uint32_t sensorless_ticks;
     uint32_t sensorless_losstick; /* 失锁嫌疑连续拍数（0.2s 确认才停机） */
+    float sensorless_target;    /* 切换时保存的速度环最终目标（转子 rad/s） */
 };
 
 void ctrl_fb_update(foc_t *foc, float vbus);

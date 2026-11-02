@@ -47,6 +47,12 @@ void foc_smo_init(foc_smo_t *s, float rs, float ls, float kslide,
 /* 清空估计历史（起动/切换前调用）。 */
 void foc_smo_reset(foc_smo_t *s);
 
+/* 切换前预置观测器状态（VESC 法）：角度、速度与反电动势按虚拟轴相位
+ * 的期望值预置；电流估计直接取本拍实测值——滑模修正以电流误差驱动，
+ * 误差为零时预置的反电动势才能存活下来，PLL 从正确轨迹出发。 */
+void foc_smo_seed(foc_smo_t *s, float theta, float we, float flux,
+                  float ia_meas, float ib_meas);
+
 /* 每拍入口：输入本拍 αβ 电压指令与本拍 αβ 电流反馈。 */
 void foc_smo_step(foc_smo_t *s, float ua, float ub, float ia, float ib);
 

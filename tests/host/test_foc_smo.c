@@ -92,6 +92,44 @@ int main(void)
     expect("角度估计收敛", fabsf(wrap_diff(smo.theta, theta)) < 0.15f);
     expect("估计电流跟随", fabsf(smo.ia_est - ia) < 0.3f);
 
+    /* 预置语义（VESC 法）：seed 后几步内应保持在预置轨迹附近。 */
+    {
+        const float theta0 = 1.0f;
+        const float we0 = 50.0f;
+        foc_smo_t s2;
+        float t2 = theta0;
+        int k;
+
+        foc_smo_init(&s2, rs, ls, 5.0f, 2000.0f, ts, 0.0f, 0.0f, 300.0f);
+        foc_smo_seed(&s2, theta0, we0, flux, ia, ib);
+        for (k = 0; k < 100; ++k)
+        {
+            float ea;
+            float eb;
+            float ia_ref;
+            float ib_ref;
+            float ua;
+            float ub;
+
+            t2 += we0 * ts;
+            if (t2 > MATH_2PI_LOCAL)
+            {
+                t2 -= MATH_2PI_LOCAL;
+            }
+            ea = -flux * we0 * sinf(t2);
+            eb = flux * we0 * cosf(t2);
+            ia_ref = i_amp * cosf(t2);
+            ib_ref = i_amp * sinf(t2);
+            ua = ea + rs * ia_ref + ls * (-i_amp * we0 * sinf(t2));
+            ub = eb + rs * ib_ref + ls * (i_amp * we0 * cosf(t2));
+            ia += (ua - rs * ia - ea) / ls * ts;
+            ib += (ub - rs * ib - eb) / ls * ts;
+            foc_smo_step(&s2, ua, ub, ia, ib);
+        }
+        expect("预置后角度保持", fabsf(wrap_diff(s2.theta, t2)) < 0.3f);
+        expect("预置后速度保持", fabsf(s2.spd - we0) < 0.15f * we0);
+    }
+
     /* 复位语义：清空后输出归零，再跑重新收敛。 */
     foc_smo_reset(&smo);
     expect("复位清空输出", smo.spd == 0.0f && smo.theta == 0.0f);
