@@ -24,8 +24,16 @@ BIN_SHA=$(sha256sum "$OUT/$TARGET.bin" | awk '{print $1}')
 AXF_SHA=$(sha256sum "$OUT/$TARGET.axf" | awk '{print $1}')
 MAP_SHA=$(sha256sum "$OUT/$TARGET.map" | awk '{print $1}')
 BUILD_ID=$(grep -E "^#define AXDR_BUILD_ID[[:space:]]" "$REPO/firmware/AxDr_App/User/service/axdr_build_id.h" | awk '{print $3}' | tr -d 'u')
+HEADER_TARGET=$(grep -E "^#define AXDR_TARGET_NAME[[:space:]]" "$REPO/firmware/AxDr_App/User/service/axdr_build_id.h" | awk '{print $3}' | tr -d '"')
 BUILT_AT=$(date "+%Y-%m-%dT%H:%M:%S%z")
 TARGET_ID=0; [ "$TARGET" = "AxDr-Debug" ] && TARGET_ID=1
+# 一致性门：头文件里的 target 必须等于本次产包 target——双 target 共用头文件，
+# 最后构建的是哪个 target，头就是哪个；不匹配说明产物与身份不一致，拒绝产包。
+if [ "$HEADER_TARGET" != "$TARGET" ]; then
+    echo "身份不一致：头文件 target=$HEADER_TARGET，请求产包=$TARGET。"
+    echo "请先用对应 target 重新构建（Release 产包前最后一次构建必须是 AxDr）。"
+    exit 2
+fi
 
 cat > "$MDK/build_identity.json" <<EOF
 {

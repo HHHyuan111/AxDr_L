@@ -1,0 +1,45 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "timeout": 30,
+            "statusMessage": "危险动作检查",
+            "command": "PYTHONIOENCODING=utf-8 python \"$CLAUDE_PROJECT_DIR/tools/hook_guard_bash.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "timeout": 30,
+            "statusMessage": "规范扫描",
+            "command": "PYTHONIOENCODING=utf-8 python \"$CLAUDE_PROJECT_DIR/tools/hook_check_write.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "timeout": 60,
+            "statusMessage": "04 号规范审计",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/tools/audit_rules.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
