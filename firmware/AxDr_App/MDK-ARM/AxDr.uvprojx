@@ -504,6 +504,11 @@
               <FileType>1</FileType>
               <FilePath>..\User\algorithm\foc_transform.c</FilePath>
             </File>
+            <File>
+              <FileName>foc_smo.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\algorithm\foc_smo.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -1538,6 +1543,11 @@
               <FileName>foc_transform.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\algorithm\foc_transform.c</FilePath>
+            </File>
+            <File>
+              <FileName>foc_smo.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\algorithm\foc_smo.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -85,6 +85,7 @@ set(AXDR_USER_SOURCES
     User/control/foc_core.c
     User/algorithm/foc_svm.c
     User/algorithm/foc_transform.c
+    User/algorithm/foc_smo.c
     User/diagnostic/core/mc_bias_bandwidth.c
     User/diagnostic/core/diag_runtime.c
     User/diagnostic/core/mc_biased_l_ident.c

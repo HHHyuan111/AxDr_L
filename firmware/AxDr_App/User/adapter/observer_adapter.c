@@ -25,6 +25,17 @@ void obs_init(const foc_t *foc)
     };
     mc_flux_observer_init(&g_obs.flux);
     g_obs.status = MC_REJECTED;
+
+    /* 滑模观测：滑模增益按额定电角速度下的反电动势幅值定标；
+     * 低通截止与 PLL 带宽用核心默认值。旁路阶段只观测，不接管控制。 */
+    foc_smo_init(&g_obs.smo,
+                 foc->motor.Rs,
+                 foc->motor.Ld,
+                 foc->motor.flux * foc->motor.pn * foc->motor.peak_speed,
+                 2000.0f,
+                 foc->rate.foc_ts,
+                 0.0f, 0.0f,
+                 foc->motor.peak_speed * foc->motor.pn * 1.2f);
 }
 
 PLATFORM_FAST_CODE void obs_step(const foc_t *foc)
@@ -47,4 +58,10 @@ PLATFORM_FAST_CODE void obs_step(const foc_t *foc)
     };
 
     g_obs.status = mc_flux_observer_step(&g_obs.flux, &g_obs.cfg, &sample);
+
+    /* 滑模旁路：用本拍 αβ 电压指令与电流反馈估计角度与速度。
+     * 与磁链观测同拍执行；切换接入控制链在 S5.4 落地。 */
+    foc_smo_step(&g_obs.smo,
+                 foc->out.valpha, foc->out.vbeta,
+                 foc->fb.ialpha, foc->fb.ibeta);
 }

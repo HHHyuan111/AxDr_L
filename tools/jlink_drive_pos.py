@@ -22,6 +22,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAP = os.path.join(REPO, "firmware", "AxDr_App", "MDK-ARM", "AxDr", "AxDr.map")
 BIN = os.path.join(REPO, "firmware", "AxDr_App", "MDK-ARM", "AxDr", "AxDr.bin")
 JLINK = "D:/Users/ready/AppData/Local/Keil_v5/ARM/Segger/JLink.exe"
+FROMELF = "D:/Users/ready/AppData/Local/Keil_v5/ARM/ARMCLANG/bin/fromelf.exe"
 GCC = ("C:/Users/ready/Desktop/Axdr/AX_Driver_Lab/.tools/Qt/Tools/"
        "mingw1310_64/bin/gcc.exe")
 USER = os.path.join(REPO, "firmware", "AxDr_App", "User")
@@ -122,6 +123,12 @@ def jlink(script_path):
 
 def stage(base, off):
     addr = {f: base + off[f] for f in FIELDS}
+
+    # 从当前 axf 重新生成 bin：避免"烧了旧镜像、按新 map 读地址"的错位。
+    axf = BIN.replace(".bin", ".axf")
+    r = run([FROMELF, "--bin", "--output", BIN, axf])
+    if r.returncode != 0:
+        sys.exit("fromelf 生成 bin 失败:\n" + r.stderr)
 
     s1 = os.path.join(REPO, "artifacts", "jlink_pos_stage1.jlink")
     io.open(s1, "w", newline="\n").write("\n".join([

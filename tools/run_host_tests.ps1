@@ -521,6 +521,7 @@ $compileOutput = @(
         "-I$controlDir" "-I$algorithmDir" "-I$diagnosticIncludeDir" "-I$driveDir" "-I$motorDir" `
         $observerAdapterTestSource $observerAdapterSource `
         $mcCommonSource $mcFluxObserverSource `
+        (Join-Path $algorithmDir "foc_smo.c") `
         -o $observerAdapterExecutablePath -lm 2>&1 |
         ForEach-Object { $_.ToString() }
 )
