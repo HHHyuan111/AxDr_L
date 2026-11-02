@@ -26,6 +26,13 @@
  */
 _RAM_FUNC bool open_volt_step(foc_t *foc, foc_plan_t *cmd)
 {
+    /* 频率斜坡：输出轴速度经梯形轨迹逼近目标；VF 的目标速度是设定，不是反馈。 */
+    foc->ref.spd_m_ramp = traj_spd_step(&foc->spd_traj,
+                                        foc->ref.spd_m,
+                                        foc->ref.acc_m,
+                                        foc->ref.dec_m,
+                                        foc->rate.foc_ts);
+    foc->ref.spd_r = foc->ref.spd_m_ramp * foc->motor.Gr;
     foc->ref.spd_e = foc->ref.spd_r * foc->motor.pn;
     foc->ref.theta_step = foc->ref.spd_e * foc->rate.foc_ts;
     foc->ref.theta_e += foc->ref.theta_step;
@@ -47,6 +54,13 @@ _RAM_FUNC bool open_volt_step(foc_t *foc, foc_plan_t *cmd)
  */
 _RAM_FUNC bool open_cur_step(foc_t *foc, foc_plan_t *cmd)
 {
+    /* 频率斜坡：输出轴速度经梯形轨迹逼近目标；IF 的目标速度是设定，不是反馈。 */
+    foc->ref.spd_m_ramp = traj_spd_step(&foc->spd_traj,
+                                        foc->ref.spd_m,
+                                        foc->ref.acc_m,
+                                        foc->ref.dec_m,
+                                        foc->rate.foc_ts);
+    foc->ref.spd_r = foc->ref.spd_m_ramp * foc->motor.Gr;
     foc->ref.spd_e = foc->ref.spd_r * foc->motor.pn;
     foc->ref.theta_step = foc->ref.spd_e * foc->rate.foc_ts;
     foc->ref.theta_e += foc->ref.theta_step;

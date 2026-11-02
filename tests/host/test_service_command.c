@@ -450,6 +450,71 @@ int main(void)
     expect("重使能 SetSpeed APPLIED", ack() == AXDR_ACK_APPLIED);
     expect("req=START", g_foc.req == DRIVE_REQ_START);
 
+    /* ---- 14b. SET_VF / SET_IF（S3）：范围校验、授权发布、快照 mode=7/8 ---- */
+    {
+        axdr_vf_request_t vf = {
+            .session_id = session_id, .lease_ms = 300u, .ramp_ms = 200u,
+            .target_rad_s = 10.0f, .voltage_q_V = 1.0f,
+        };
+        axdr_if_request_t iff = {
+            .session_id = session_id, .lease_ms = 300u, .ramp_ms = 0u,
+            .target_rad_s = -5.0f, .iq_target_A = 2.0f,
+        };
+
+        g_foc.rate.foc_fs = 20000.0f;
+        send_frame((const uint8_t *)&vf, sizeof(vf), 1401u, AXDR_OPCODE_SET_VF);
+        expect("SET_VF APPLIED", ack() == AXDR_ACK_APPLIED);
+        expect("VF 模式已发布",
+               g_foc.mode.sys == debug_mode && g_foc.mode.debug == drag_vf);
+        expect("VF 目标与电压已发布",
+               g_foc.ref.spd_m == 10.0f && g_foc.ref.vq == 1.0f &&
+               g_foc.ref.vd == 0.0f);
+        expect("VF 斜坡 acc=目标/时长",
+               g_foc.ref.acc_m > 49.99f && g_foc.ref.acc_m < 50.01f);
+        expect("快照 mode=7",
+               rd_u8(resp_payload(),
+                     offsetof(axdr_control_state_payload_t, mode)) ==
+                   AXDR_CONTROL_VF);
+        expect("req=START", g_foc.req == DRIVE_REQ_START);
+
+        send_frame((const uint8_t *)&iff, sizeof(iff), 1402u, AXDR_OPCODE_SET_IF);
+        expect("SET_IF APPLIED", ack() == AXDR_ACK_APPLIED);
+        expect("IF 模式已发布",
+               g_foc.mode.sys == debug_mode && g_foc.mode.debug == drag_if);
+        expect("IF 目标与电流已发布",
+               g_foc.ref.spd_m == -5.0f && g_foc.ref.iq == 2.0f &&
+               g_foc.ref.id == 0.0f);
+        expect("IF ramp=0 一拍到位",
+               g_foc.ref.acc_m == 5.0f * g_foc.rate.foc_fs);
+        expect("快照 mode=8",
+               rd_u8(resp_payload(),
+                     offsetof(axdr_control_state_payload_t, mode)) ==
+                   AXDR_CONTROL_IF);
+
+        /* 范围校验：负电压 / 超限电压 / 超限频率 / 超限电流 / 负电流 */
+        vf.voltage_q_V = -0.1f;
+        send_frame((const uint8_t *)&vf, sizeof(vf), 1403u, AXDR_OPCODE_SET_VF);
+        expect("负电压拒",
+               ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
+        vf.voltage_q_V = 3.0f;
+        send_frame((const uint8_t *)&vf, sizeof(vf), 1404u, AXDR_OPCODE_SET_VF);
+        expect("超限电压拒",
+               ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
+        vf.voltage_q_V = 1.0f;
+        vf.target_rad_s = 9999.0f;
+        send_frame((const uint8_t *)&vf, sizeof(vf), 1405u, AXDR_OPCODE_SET_VF);
+        expect("超限频率拒",
+               ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
+        iff.iq_target_A = 5.0f;
+        send_frame((const uint8_t *)&iff, sizeof(iff), 1406u, AXDR_OPCODE_SET_IF);
+        expect("超限 IF 电流拒",
+               ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
+        iff.iq_target_A = -0.5f;
+        send_frame((const uint8_t *)&iff, sizeof(iff), 1407u, AXDR_OPCODE_SET_IF);
+        expect("负 IF 电流拒",
+               ack() == AXDR_ACK_REJECTED && reason() == AXDR_REASON_OUT_OF_RANGE);
+    }
+
     /* ---- 15. ControlStop：无条件可用（安全方向），撤运行授权 ---- */
     {
         const unsigned count_before = irq_entries;

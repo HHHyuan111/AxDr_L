@@ -187,12 +187,79 @@ static void check_stage_contract(void)
     }
     puts("stage contract: PASS (deferred PWM, current frame, invalid calculation, alignment abort, NaN, phase order, stop failure)");
 }
+
+/* S3：VF/IF 给定映射——频率斜坡、输出轴→转子换算、虚拟角度积分与回绕。 */
+static void check_vf_if_mapping(void)
+{
+    foc_t f = make_motor(0U);
+    foc_plan_t cmd;
+    float ramp_before;
+    float theta_before;
+    unsigned i;
+
+    /* VF：目标 1 rad/s（输出轴）、acc=2 rad/s²、q 轴电压 1.5V */
+    f.ref.spd_m = 1.0f;
+    f.ref.acc_m = 2.0f;
+    f.ref.dec_m = 2.0f;
+    f.ref.vq = 1.5f;
+    f.ref.vd = 0.0f;
+    f.ref.theta_e = 0.0f;
+
+    (void)open_volt_step(&f, &cmd);
+    assert(cmd.ref.mode == FOC_CTRL_MODE_VOLT);
+    assert(cmd.ref.vq == 1.5f && cmd.ref.vd == 0.0f);
+    assert(cmd.theta == f.ref.theta_e);
+    /* 第一拍：spd_m_ramp = acc*ts = 1e-4；spd_r = ramp*Gr = 5e-4 */
+    assert(fabsf(f.ref.spd_m_ramp - 1.0e-4f) < 1.0e-7f);
+    assert(fabsf(f.ref.spd_r - 5.0e-4f) < 1.0e-9f);
+
+    /* 连跑 100 拍：斜坡单调逼近目标，虚拟角度持续前进 */
+    theta_before = f.ref.theta_e;
+    ramp_before = f.ref.spd_m_ramp;
+    for (i = 0; i < 100; ++i)
+    {
+        (void)open_volt_step(&f, &cmd);
+    }
+    assert(f.ref.theta_e > theta_before);
+    assert(f.ref.spd_m_ramp > ramp_before && f.ref.spd_m_ramp <= 1.0f);
+
+    /* 斜坡饱和：acc=2 rad/s² 到目标 1 rad/s 需 10000 拍（0.5s） */
+    for (i = 0; i < 11000; ++i)
+    {
+        (void)open_volt_step(&f, &cmd);
+    }
+    assert(f.ref.spd_m_ramp == 1.0f);
+
+    /* 回绕：斜坡满速时每拍推进 0.00175 rad，从 2π 前出发应回到 [0, 2π) */
+    f.ref.theta_e = 6.283f;
+    (void)open_volt_step(&f, &cmd);
+    assert(f.ref.theta_e > 0.0f && f.ref.theta_e < 6.28f);
+
+    /* IF：目标 -5 rad/s、ramp=0 语义（一拍到位）、id=0/iq=2A */
+    f = make_motor(0U);
+    f.ref.spd_m = -5.0f;
+    f.ref.acc_m = 5.0f * f.rate.foc_fs;
+    f.ref.dec_m = f.ref.acc_m;
+    f.ref.iq = 2.0f;
+    f.ref.id = 0.0f;
+    (void)open_cur_step(&f, &cmd);
+    assert(cmd.ref.mode == FOC_CTRL_MODE_CUR);
+    assert(cmd.ref.iq_ref == 2.0f && cmd.ref.id_ref == 0.0f);
+    assert(f.ref.spd_m_ramp == -5.0f);
+    assert(f.ref.spd_r == -25.0f);
+    puts("vf/if mapping: PASS (ramp, unit conversion, theta integration, wrap, instant ramp)");
+}
 #endif
 
 int main(int argc, char **argv)
 {
 #ifndef AXDR_BASELINE
-    if (argc>1 && strcmp(argv[1],"--stages")==0) { check_stage_contract(); return 0; }
+    if (argc>1 && strcmp(argv[1],"--stages")==0)
+    {
+        check_stage_contract();
+        check_vf_if_mapping();
+        return 0;
+    }
 #else
     (void)argc; (void)argv;
 #endif

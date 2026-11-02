@@ -312,7 +312,9 @@ static uint8_t provide_protocol_info(uint8_t *resp, uint16_t cap,
                          AXDR_CAPABILITY_MOTOR_PROFILE_CONFIRMATION |
                          AXDR_CAPABILITY_LINK_DIAGNOSTICS |
                          AXDR_CAPABILITY_CURRENT_PI_RUNTIME_TUNING |
-                         AXDR_CAPABILITY_FIRMWARE_RESOURCE;
+                         AXDR_CAPABILITY_FIRMWARE_RESOURCE |
+                         AXDR_CAPABILITY_VF_CONTROL |
+                         AXDR_CAPABILITY_IF_CONTROL;
     p.supported_opcode_mask = SVC_SUPPORTED_MASK;
     p.parameter_count = 0u;
     return payload_out(&p, sizeof(p), resp, cap, len);
@@ -503,17 +505,26 @@ static uint8_t provide_current_pi_state(uint8_t *resp, uint16_t cap,
     return payload_out(&p, sizeof(p), resp, cap, len);
 }
 
-/* 控制模式协议编号：上位机合同（速度=1/电流=2）与固件内部
- * debug_mode_e（spd_curr_cl=4/curr_cl=3）是两套编号空间，上报前必须翻译。 */
+/* 控制模式协议编号：上位机合同（速度=1/电流=2/VF=7/IF=8）与固件内部
+ * debug_mode_e（spd_curr_cl=4/curr_cl=3/drag_vf=0/drag_if=1）是两套编号空间，
+ * 上报前必须翻译。 */
 static uint8_t protocol_control_mode(uint8_t debug_mode)
 {
     if (debug_mode == (uint8_t)spd_curr_cl)
     {
-        return 1u;
+        return AXDR_CONTROL_SPEED;
     }
     if (debug_mode == (uint8_t)curr_cl)
     {
-        return 2u;
+        return AXDR_CONTROL_CURRENT;
+    }
+    if (debug_mode == (uint8_t)drag_vf)
+    {
+        return AXDR_CONTROL_VF;
+    }
+    if (debug_mode == (uint8_t)drag_if)
+    {
+        return AXDR_CONTROL_IF;
     }
     return 0u;
 }
@@ -952,6 +963,121 @@ uint8_t service_command_dispatch(void *context, uint16_t opcode,
             }
             irq_unlock(key);
             /* 同 SET_SPEED：Applied 携带控制快照（active=1，mode=2）。 */
+            *ack_state = AXDR_ACK_APPLIED;
+            return provide_control_state(response_payload,
+                                         response_payload_capacity,
+                                         response_payload_length);
+        }
+
+        case AXDR_OPCODE_SET_VF:
+        {
+            const axdr_vf_request_t *req = payload_in(
+                request_payload, request_payload_length, sizeof(*req));
+            uint8_t reason;
+            if (req == NULL)
+            {
+                return AXDR_REASON_INVALID_PAYLOAD;
+            }
+            /* isfinite 先行：NaN 与任何数比较恒假（14 号数值政策阴招③）。 */
+            if (!isfinite(req->target_rad_s) ||
+                !isfinite(req->voltage_q_V) ||
+                (req->target_rad_s > AXDR_CONTROL_MAX_SPEED_RAD_S) ||
+                (req->target_rad_s < -AXDR_CONTROL_MAX_SPEED_RAD_S) ||
+                (req->voltage_q_V < 0.0f) ||
+                (req->voltage_q_V > AXDR_CONTROL_MAX_VF_VOLTAGE_V))
+            {
+                return AXDR_REASON_OUT_OF_RANGE;
+            }
+            reason = authorize_motion(req->lease_ms, req->session_id);
+            if (reason != AXDR_REASON_NONE)
+            {
+                return reason;
+            }
+            const irq_lock_key_t key = irq_lock();
+            if (g_foc.fault.all != 0u || g_foc.state == DRIVE_STATE_FAULT)
+            {
+                irq_unlock(key);
+                return AXDR_REASON_FAULT_ACTIVE;
+            }
+            g_foc.mode.sys = debug_mode;
+            g_foc.mode.debug = drag_vf;
+            g_foc.ref.spd_m = req->target_rad_s; /* 输出轴目标速度 */
+            g_foc.ref.vq = req->voltage_q_V;     /* q 轴电压幅值 */
+            g_foc.ref.vd = 0.0f;
+            /* 频率斜坡：ramp_ms=0 表示一拍到位；否则按梯形加速度逼近目标。 */
+            if (req->ramp_ms == 0u)
+            {
+                g_foc.ref.acc_m = fabsf(req->target_rad_s) * g_foc.rate.foc_fs;
+            }
+            else
+            {
+                g_foc.ref.acc_m = fabsf(req->target_rad_s) /
+                                  ((float)req->ramp_ms / 1000.0f);
+            }
+            g_foc.ref.dec_m = g_foc.ref.acc_m;
+            if (g_foc.state != DRIVE_STATE_RUN)
+            {
+                g_foc.req = DRIVE_REQ_START;
+            }
+            irq_unlock(key);
+            /* Applied 携带控制快照（active=1，mode=7）。 */
+            *ack_state = AXDR_ACK_APPLIED;
+            return provide_control_state(response_payload,
+                                         response_payload_capacity,
+                                         response_payload_length);
+        }
+
+        case AXDR_OPCODE_SET_IF:
+        {
+            const axdr_if_request_t *req = payload_in(
+                request_payload, request_payload_length, sizeof(*req));
+            uint8_t reason;
+            if (req == NULL)
+            {
+                return AXDR_REASON_INVALID_PAYLOAD;
+            }
+            if (!isfinite(req->target_rad_s) ||
+                !isfinite(req->iq_target_A) ||
+                (req->target_rad_s > AXDR_CONTROL_MAX_SPEED_RAD_S) ||
+                (req->target_rad_s < -AXDR_CONTROL_MAX_SPEED_RAD_S) ||
+                (req->iq_target_A < 0.0f) ||
+                (req->iq_target_A > AXDR_CONTROL_MAX_IF_CURRENT_A))
+            {
+                return AXDR_REASON_OUT_OF_RANGE;
+            }
+            reason = authorize_motion(req->lease_ms, req->session_id);
+            if (reason != AXDR_REASON_NONE)
+            {
+                return reason;
+            }
+            const irq_lock_key_t key = irq_lock();
+            if (g_foc.fault.all != 0u || g_foc.state == DRIVE_STATE_FAULT)
+            {
+                irq_unlock(key);
+                return AXDR_REASON_FAULT_ACTIVE;
+            }
+            g_foc.mode.sys = debug_mode;
+            g_foc.mode.debug = drag_if;
+            g_foc.ref.spd_m = req->target_rad_s; /* 输出轴目标速度 */
+            g_foc.ref.iq = req->iq_target_A;     /* q 轴电流幅值 */
+            g_foc.ref.id = 0.0f;
+            /* 频率斜坡：与 SET_VF 同款。 */
+            if (req->ramp_ms == 0u)
+            {
+                g_foc.ref.acc_m = fabsf(req->target_rad_s) * g_foc.rate.foc_fs;
+            }
+            else
+            {
+                g_foc.ref.acc_m = fabsf(req->target_rad_s) /
+                                  ((float)req->ramp_ms / 1000.0f);
+            }
+            g_foc.ref.dec_m = g_foc.ref.acc_m;
+            if (g_foc.state != DRIVE_STATE_RUN)
+            {
+                g_foc.req = DRIVE_REQ_START;
+            }
+            irq_unlock(key);
+            /* Applied 携带控制快照（active=1，mode=8）。 */
             *ack_state = AXDR_ACK_APPLIED;
             return provide_control_state(response_payload,
                                          response_payload_capacity,
